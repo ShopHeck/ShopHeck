@@ -1,0 +1,406 @@
+import { useState } from 'react';
+import { Plus, Dumbbell, Trash2, Clock, Zap } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { getCurrentWeekNumber } from '../utils/campGenerator';
+import { format, parseISO } from 'date-fns';
+import Modal from './shared/Modal';
+import type { SessionType } from '../types';
+
+const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
+  { value: 'conditioning', label: 'Conditioning', emoji: '🔥' },
+  { value: 'skill', label: 'Skill Training', emoji: '🥊' },
+  { value: 'sparring', label: 'Sparring', emoji: '⚡' },
+  { value: 'strength', label: 'Strength', emoji: '💪' },
+  { value: 'recovery', label: 'Recovery', emoji: '🧘' },
+];
+
+const TAB_CONFIG = [
+  { id: 'workout', label: 'Workouts' },
+  { id: 'sparring', label: 'Sparring' },
+  { id: 'conditioning', label: 'Tests' },
+];
+
+export default function WorkoutLogger() {
+  const { state, dispatch } = useApp();
+  const { activeCamp, workoutLogs, sparringLogs, conditioningTests } = state;
+  const [tab, setTab] = useState<'workout' | 'sparring' | 'conditioning'>('workout');
+  const [showModal, setShowModal] = useState(false);
+  const [showSparModal, setShowSparModal] = useState(false);
+  const [showCondModal, setShowCondModal] = useState(false);
+
+  // Workout form
+  const [wDate, setWDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [wType, setWType] = useState<SessionType>('skill');
+  const [wTitle, setWTitle] = useState('');
+  const [wDuration, setWDuration] = useState('60');
+  const [wRpe, setWRpe] = useState('7');
+  const [wNotes, setWNotes] = useState('');
+
+  // Sparring form
+  const [sDate, setSDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [sRounds, setSRounds] = useState('5');
+  const [sRoundDur, setSRoundDur] = useState('3');
+  const [sPartner, setSPartner] = useState('');
+  const [sPartnerLevel, setSPartnerLevel] = useState('Similar');
+  const [sFocus, setSFocus] = useState('');
+  const [sPerf, setSPerf] = useState<1|2|3|4|5>(3);
+  const [sNotes, setSNotes] = useState('');
+
+  // Conditioning form
+  const [cDate, setCDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [cType, setCType] = useState('3-Mile Run');
+  const [cValue, setCValue] = useState('');
+  const [cUnit, setCUnit] = useState('minutes');
+  const [cNotes, setCNotes] = useState('');
+
+  const COND_TESTS = [
+    { label: '3-Mile Run', unit: 'minutes' },
+    { label: '1-Mile Run', unit: 'minutes' },
+    { label: 'Beep Test', unit: 'level' },
+    { label: '400m Sprint', unit: 'seconds' },
+    { label: 'Push-up Max', unit: 'reps' },
+    { label: 'Pull-up Max', unit: 'reps' },
+    { label: 'Burpee 1-min', unit: 'reps' },
+    { label: 'Jump Rope (5min)', unit: 'misses' },
+    { label: 'VO2 Max (est)', unit: 'ml/kg/min' },
+  ];
+
+  if (!activeCamp) return null;
+  const camp = activeCamp;
+
+  const campWorkouts = workoutLogs.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const campSparring = sparringLogs.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const campCond = conditioningTests.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const currentWeekNum = getCurrentWeekNumber(camp);
+
+  function logWorkout() {
+    if (!wTitle.trim()) return;
+    dispatch({
+      type: 'LOG_WORKOUT',
+      payload: {
+        campId: camp.id,
+        date: wDate,
+        weekNumber: currentWeekNum,
+        dayLabel: format(parseISO(wDate), 'EEEE'),
+        sessionType: wType,
+        title: wTitle.trim(),
+        duration: parseInt(wDuration),
+        rpe: parseInt(wRpe),
+        notes: wNotes,
+        completed: true,
+      },
+    });
+    setWTitle(''); setWNotes(''); setShowModal(false);
+  }
+
+  function logSparring() {
+    dispatch({
+      type: 'LOG_SPARRING',
+      payload: {
+        campId: camp.id,
+        date: sDate,
+        weekNumber: currentWeekNum,
+        rounds: parseInt(sRounds),
+        roundDuration: parseInt(sRoundDur),
+        partnerName: sPartner.trim() || 'Unknown',
+        partnerLevel: sPartnerLevel,
+        focus: sFocus.trim(),
+        performance: sPerf,
+        notes: sNotes,
+      },
+    });
+    setSPartner(''); setSFocus(''); setSNotes(''); setShowSparModal(false);
+  }
+
+  function logCondTest() {
+    if (!cValue) return;
+    dispatch({
+      type: 'LOG_CONDITIONING',
+      payload: {
+        campId: camp.id,
+        date: cDate,
+        weekNumber: currentWeekNum,
+        testType: cType,
+        value: parseFloat(cValue),
+        unit: cUnit,
+        notes: cNotes,
+      },
+    });
+    setCValue(''); setCNotes(''); setShowCondModal(false);
+  }
+
+  const PERF_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Below Avg', 3: 'Average', 4: 'Good', 5: 'Excellent' };
+  const PERF_COLORS: Record<number, string> = { 1: 'bg-red-700', 2: 'bg-orange-700', 3: 'bg-yellow-700', 4: 'bg-green-700', 5: 'bg-emerald-600' };
+
+  return (
+    <div className="space-y-4 pb-4">
+      {/* Tab bar */}
+      <div className="mx-4 mt-4">
+        <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
+          {TAB_CONFIG.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as typeof tab)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                tab === t.id ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* WORKOUTS TAB */}
+      {tab === 'workout' && (
+        <div className="mx-4 space-y-3">
+          <button onClick={() => setShowModal(true)} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Plus size={18} /> Log Workout
+          </button>
+          {campWorkouts.length === 0 ? (
+            <div className="card text-center py-10">
+              <Dumbbell size={32} className="text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 font-medium">No workouts logged yet</p>
+              <p className="text-sm text-gray-600 mt-1">Tap "Log Workout" to record your first session</p>
+            </div>
+          ) : (
+            campWorkouts.map(log => (
+              <div key={log.id} className="card">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Dumbbell size={16} className="text-brand-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-white text-sm">{log.title}</p>
+                      <button onClick={() => dispatch({ type: 'DELETE_WORKOUT', payload: log.id })}
+                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <span className="flex items-center gap-1"><Clock size={11} /> {log.duration}min</span>
+                      <span className="flex items-center gap-1"><Zap size={11} /> RPE {log.rpe}/10</span>
+                      <span>{format(parseISO(log.date), 'MMM d')}</span>
+                    </div>
+                    {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* SPARRING TAB */}
+      {tab === 'sparring' && (
+        <div className="mx-4 space-y-3">
+          <button onClick={() => setShowSparModal(true)} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Plus size={18} /> Log Sparring
+          </button>
+          {campSparring.length === 0 ? (
+            <div className="card text-center py-10">
+              <Zap size={32} className="text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 font-medium">No sparring logged yet</p>
+              <p className="text-sm text-gray-600 mt-1">Log rounds to track your progress</p>
+            </div>
+          ) : (
+            campSparring.map(log => (
+              <div key={log.id} className="card">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{log.rounds} rounds</span>
+                      <span className="text-xs text-gray-500">×{log.roundDuration}min</span>
+                      <span className={`badge text-xs text-white ${PERF_COLORS[log.performance]}`}>{PERF_LABELS[log.performance]}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      vs {log.partnerName} ({log.partnerLevel}) · {format(parseISO(log.date), 'MMM d')}
+                    </p>
+                    {log.focus && <p className="text-xs text-gray-400 mt-1">Focus: {log.focus}</p>}
+                    {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* CONDITIONING TESTS TAB */}
+      {tab === 'conditioning' && (
+        <div className="mx-4 space-y-3">
+          <button onClick={() => setShowCondModal(true)} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Plus size={18} /> Log Test Result
+          </button>
+          {campCond.length === 0 ? (
+            <div className="card text-center py-10">
+              <Clock size={32} className="text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 font-medium">No conditioning tests yet</p>
+              <p className="text-sm text-gray-600 mt-1">Track benchmark tests throughout camp</p>
+            </div>
+          ) : (
+            campCond.map(test => (
+              <div key={test.id} className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white text-sm">{test.testType}</p>
+                    <p className="text-xs text-gray-500">{format(parseISO(test.date), 'MMM d')} · Week {test.weekNumber}</p>
+                    {test.notes && <p className="text-xs text-gray-600 mt-1 italic">{test.notes}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-black text-brand-400">{test.value}</p>
+                    <p className="text-xs text-gray-500">{test.unit}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Log Workout Modal */}
+      {showModal && (
+        <Modal title="Log Workout" onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Date</label>
+              <input className="input" type="date" value={wDate} onChange={e => setWDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Session Type</label>
+              <div className="grid grid-cols-3 gap-2">
+                {SESSION_TYPES.map(st => (
+                  <button key={st.value} onClick={() => setWType(st.value)}
+                    className={`py-2 px-2 rounded-xl text-xs font-medium border-2 transition-all ${wType === st.value ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
+                    {st.emoji} {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">Workout Title *</label>
+              <input className="input" placeholder="e.g. Morning Pad Work" value={wTitle} onChange={e => setWTitle(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Duration (min)</label>
+                <input className="input" type="number" min="5" max="300" value={wDuration} onChange={e => setWDuration(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">RPE (1–10)</label>
+                <input className="input" type="number" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-1">
+                <label className="label mb-0">Effort: {wRpe}/10</label>
+              </div>
+              <input type="range" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)}
+                className="w-full accent-brand-500" />
+            </div>
+            <div>
+              <label className="label">Notes</label>
+              <textarea className="input resize-none" rows={2} placeholder="How did it feel? What went well?" value={wNotes} onChange={e => setWNotes(e.target.value)} />
+            </div>
+            <button onClick={logWorkout} disabled={!wTitle.trim()} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Log Sparring Modal */}
+      {showSparModal && (
+        <Modal title="Log Sparring" onClose={() => setShowSparModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Date</label>
+              <input className="input" type="date" value={sDate} onChange={e => setSDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Rounds</label>
+                <input className="input" type="number" min="1" max="20" value={sRounds} onChange={e => setSRounds(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Round Duration (min)</label>
+                <select className="select" value={sRoundDur} onChange={e => setSRoundDur(e.target.value)}>
+                  <option value="2">2 min</option>
+                  <option value="3">3 min</option>
+                  <option value="5">5 min</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Partner Name</label>
+                <input className="input" placeholder="Partner's name" value={sPartner} onChange={e => setSPartner(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Partner Level</label>
+                <select className="select" value={sPartnerLevel} onChange={e => setSPartnerLevel(e.target.value)}>
+                  <option>Beginner</option>
+                  <option>Similar</option>
+                  <option>More Experienced</option>
+                  <option>Pro</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="label">Focus / Goal</label>
+              <input className="input" placeholder="e.g. Jab defense, pressure fighting" value={sFocus} onChange={e => setSFocus(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Performance</label>
+              <div className="flex gap-2">
+                {([1,2,3,4,5] as const).map(n => (
+                  <button key={n} onClick={() => setSPerf(n)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${sPerf === n ? `border-transparent text-white ${PERF_COLORS[n]}` : 'border-dark-400 bg-dark-600 text-gray-500'}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-center text-gray-500 mt-1">{PERF_LABELS[sPerf]}</p>
+            </div>
+            <div>
+              <label className="label">Notes</label>
+              <textarea className="input resize-none" rows={2} placeholder="What worked? What to improve?" value={sNotes} onChange={e => setSNotes(e.target.value)} />
+            </div>
+            <button onClick={logSparring} className="btn-primary w-full">Save Sparring Log</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Log Conditioning Test Modal */}
+      {showCondModal && (
+        <Modal title="Log Conditioning Test" onClose={() => setShowCondModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Date</label>
+              <input className="input" type="date" value={cDate} onChange={e => setCDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Test Type</label>
+              <select className="select" value={cType} onChange={e => {
+                const t = COND_TESTS.find(c => c.label === e.target.value);
+                setCType(e.target.value);
+                if (t) setCUnit(t.unit);
+              }}>
+                {COND_TESTS.map(t => <option key={t.label}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Result ({cUnit})</label>
+              <input className="input" type="number" step="0.01" placeholder={`Enter result in ${cUnit}`} value={cValue} onChange={e => setCValue(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Notes</label>
+              <textarea className="input resize-none" rows={2} placeholder="Conditions, how you felt, etc." value={cNotes} onChange={e => setCNotes(e.target.value)} />
+            </div>
+            <button onClick={logCondTest} disabled={!cValue} className="btn-primary w-full disabled:opacity-50">Save Test Result</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
