@@ -133,4 +133,6 @@ export interface AppState {
   conditioningTests: ConditioningTest[];
   weightEntries: WeightEntry[];
   fighters: FighterProfile[];
+  /** Key: `${campId}-${weekNum}-${dayOfWeek}-${sessionIndex}` */
+  completedSessions: Record<string, boolean>;
 }

@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star, CheckCircle2, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import type { SessionType } from '../types';
+import type { LogPrefill } from '../App';
 
-const SESSION_CONFIG: Record<SessionType, { color: string; icon: React.FC<{ size: number; className?: string }>; label: string }> = {
-  conditioning: { color: 'bg-orange-900/50 border-orange-800/50 text-orange-400', icon: ({ size, className }) => <Flame size={size} className={className} />, label: 'Conditioning' },
-  skill: { color: 'bg-blue-900/50 border-blue-800/50 text-blue-400', icon: ({ size, className }) => <Target size={size} className={className} />, label: 'Skill' },
-  sparring: { color: 'bg-red-900/50 border-red-800/50 text-red-400', icon: ({ size, className }) => <Zap size={size} className={className} />, label: 'Sparring' },
-  strength: { color: 'bg-yellow-900/50 border-yellow-800/50 text-yellow-400', icon: ({ size, className }) => <Activity size={size} className={className} />, label: 'Strength' },
-  recovery: { color: 'bg-green-900/50 border-green-800/50 text-green-400', icon: ({ size, className }) => <Clock size={size} className={className} />, label: 'Recovery' },
-  rest: { color: 'bg-gray-900/50 border-gray-700/50 text-gray-500', icon: ({ size, className }) => <Star size={size} className={className} />, label: 'Rest' },
+const SESSION_CONFIG: Record<SessionType, { color: string; doneColor: string; icon: React.FC<{ size: number; className?: string }>; label: string }> = {
+  conditioning: { color: 'bg-orange-900/50 border-orange-800/50 text-orange-400', doneColor: 'bg-orange-950/30 border-orange-900/30 text-orange-600', icon: ({ size, className }) => <Flame size={size} className={className} />, label: 'Conditioning' },
+  skill:        { color: 'bg-blue-900/50 border-blue-800/50 text-blue-400',   doneColor: 'bg-blue-950/30 border-blue-900/30 text-blue-600',   icon: ({ size, className }) => <Target size={size} className={className} />,   label: 'Skill' },
+  sparring:     { color: 'bg-red-900/50 border-red-800/50 text-red-400',     doneColor: 'bg-red-950/30 border-red-900/30 text-red-700',       icon: ({ size, className }) => <Zap size={size} className={className} />,      label: 'Sparring' },
+  strength:     { color: 'bg-yellow-900/50 border-yellow-800/50 text-yellow-400', doneColor: 'bg-yellow-950/30 border-yellow-900/30 text-yellow-700', icon: ({ size, className }) => <Activity size={size} className={className} />, label: 'Strength' },
+  recovery:     { color: 'bg-green-900/50 border-green-800/50 text-green-400', doneColor: 'bg-green-950/30 border-green-900/30 text-green-700', icon: ({ size, className }) => <Clock size={size} className={className} />,    label: 'Recovery' },
+  rest:         { color: 'bg-gray-900/50 border-gray-700/50 text-gray-500',   doneColor: 'bg-gray-900/30 border-gray-800/30 text-gray-700',   icon: ({ size, className }) => <Star size={size} className={className} />,      label: 'Rest' },
 };
 
 const PHASE_COLORS: Record<string, string> = {
@@ -25,15 +26,13 @@ const PHASE_COLORS: Record<string, string> = {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-import type { LogPrefill } from '../App';
-
 interface Props {
   onLogSession: (prefill: LogPrefill) => void;
 }
 
 export default function WeeklyPlanner({ onLogSession }: Props) {
-  const { state } = useApp();
-  const { activeCamp, trainingSchedule, workoutLogs } = state;
+  const { state, dispatch } = useApp();
+  const { activeCamp, trainingSchedule, completedSessions } = state;
 
   const currentWeekNum = activeCamp ? getCurrentWeekNumber(activeCamp) : 1;
   const [selectedWeek, setSelectedWeek] = useState(currentWeekNum);
@@ -49,11 +48,21 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
     ? week.days.find(d => d.dayOfWeek === selectedDay)
     : null;
 
-  const loggedSessionIds = new Set(
-    workoutLogs
-      .filter(l => l.campId === activeCamp.id && l.weekNumber === selectedWeek)
-      .map(l => l.title)
+  function sessionKey(dayOfWeek: number, sessionIdx: number) {
+    return `${activeCamp!.id}-${selectedWeek}-${dayOfWeek}-${sessionIdx}`;
+  }
+
+  function toggleDone(dayOfWeek: number, sessionIdx: number) {
+    dispatch({ type: 'TOGGLE_SESSION', payload: sessionKey(dayOfWeek, sessionIdx) });
+  }
+
+  // Adherence for the selected week: completed non-rest sessions / total non-rest sessions
+  const weekSessions = week.days.flatMap((d, _di) =>
+    d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${selectedWeek}-${d.dayOfWeek}-${si}`)
   );
+  const completedCount = weekSessions.filter(k => completedSessions[k]).length;
+  const totalCount = weekSessions.length;
+  const adherencePct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <div className="space-y-4 pb-4">
@@ -83,24 +92,50 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
           </button>
         </div>
 
-        {/* Phase badge */}
+        {/* Phase card with adherence */}
         <div className="bg-dark-700 border border-dark-500 rounded-xl p-3 mt-2">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <span className={`text-sm font-bold ${PHASE_COLORS[week.phase] || 'text-white'}`}>{week.phase}</span>
               <p className="text-xs text-gray-500 mt-0.5 leading-tight">{week.focus}</p>
             </div>
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <span className={`badge text-xs ${
                 week.intensity === 'Very High' ? 'bg-red-900/50 text-red-400' :
-                week.intensity === 'High' ? 'bg-orange-900/50 text-orange-400' :
-                week.intensity === 'Medium' ? 'bg-yellow-900/50 text-yellow-400' :
-                'bg-green-900/50 text-green-400'
+                week.intensity === 'High'     ? 'bg-orange-900/50 text-orange-400' :
+                week.intensity === 'Medium'   ? 'bg-yellow-900/50 text-yellow-400' :
+                                                'bg-green-900/50 text-green-400'
               }`}>
                 {week.intensity}
               </span>
+              {totalCount > 0 && (
+                <span className={`badge text-xs ${
+                  adherencePct === 100 ? 'bg-green-900/50 text-green-400' :
+                  adherencePct >= 70  ? 'bg-brand-900/50 text-brand-400' :
+                                        'bg-dark-500 text-gray-400'
+                }`}>
+                  {completedCount}/{totalCount} done
+                </span>
+              )}
             </div>
           </div>
+
+          {/* Adherence bar */}
+          {totalCount > 0 && (
+            <div className="mt-2.5">
+              <div className="h-1.5 bg-dark-500 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    adherencePct === 100 ? 'bg-green-500' :
+                    adherencePct >= 70  ? 'bg-brand-500' :
+                                          'bg-dark-300'
+                  }`}
+                  style={{ width: `${adherencePct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="mt-2 pt-2 border-t border-dark-500 flex flex-wrap gap-1.5">
             {week.weeklyGoals.map((goal, i) => (
               <span key={i} className="text-xs bg-dark-600 text-gray-400 px-2 py-0.5 rounded-full">
@@ -118,7 +153,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             const dayData = week.days.find(d => d.dayOfWeek === idx);
             const isToday = idx === todayDayOfWeek && selectedWeek === currentWeekNum;
             const isSelected = selectedDay === idx;
-            const hasContent = dayData && !dayData.isRestDay && dayData.sessions.length > 0;
+            const daySessions = dayData && !dayData.isRestDay
+              ? dayData.sessions.map((_, si) => `${activeCamp.id}-${selectedWeek}-${idx}-${si}`)
+              : [];
+            const allDone = daySessions.length > 0 && daySessions.every(k => completedSessions[k]);
+            const someDone = daySessions.some(k => completedSessions[k]);
 
             return (
               <button
@@ -135,8 +174,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                 <span className={`text-xs font-medium ${isSelected ? 'text-brand-400' : isToday ? 'text-brand-300' : 'text-gray-500'}`}>
                   {label}
                 </span>
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  hasContent ? (isSelected ? 'bg-brand-400' : 'bg-brand-700') : 'bg-dark-500'
+                <div className={`w-2 h-2 rounded-full ${
+                  allDone ? 'bg-green-500' :
+                  someDone ? 'bg-brand-600' :
+                  daySessions.length > 0 ? (isSelected ? 'bg-brand-400' : 'bg-dark-300') :
+                  'bg-dark-500'
                 }`} />
               </button>
             );
@@ -164,36 +206,53 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             <div className="space-y-3">
               {selectedDayData.sessions.map((session, i) => {
                 const config = SESSION_CONFIG[session.type];
-                const isLogged = loggedSessionIds.has(session.title);
+                const key = sessionKey(selectedDay, i);
+                const isDone = !!completedSessions[key];
 
                 return (
-                  <div key={i} className={`rounded-xl border p-4 ${config.color}`}>
+                  <div
+                    key={i}
+                    className={`rounded-xl border p-4 transition-all duration-200 ${isDone ? config.doneColor : config.color}`}
+                  >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <config.icon size={18} className={config.color.split(' ').find(c => c.startsWith('text-')) || ''} />
-                      </div>
-                      <div className="flex-1">
+                      {/* Completion toggle */}
+                      <button
+                        onClick={() => toggleDone(selectedDay, i)}
+                        className="flex-shrink-0 mt-0.5 transition-transform active:scale-90"
+                        aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
+                      >
+                        {isDone
+                          ? <CheckCircle2 size={22} className="text-green-400" />
+                          : <Circle size={22} className="text-gray-600 hover:text-gray-400 transition-colors" />
+                        }
+                      </button>
+
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-white">{session.title}</span>
+                          <span className={`text-sm font-bold transition-all ${isDone ? 'line-through text-gray-500' : 'text-white'}`}>
+                            {session.title}
+                          </span>
                           <span className="badge bg-black/20 text-xs">{config.label}</span>
-                          {isLogged && <span className="badge bg-green-900/50 text-green-400 text-xs">Logged ✓</span>}
+                          {isDone && <span className="badge bg-green-900/50 text-green-400 text-xs">Done ✓</span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-gray-400">{session.duration} min</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-2 leading-relaxed">{session.description}</p>
-                        {session.notes && <p className="text-xs text-gray-500 mt-1 italic">{session.notes}</p>}
-                        {!isLogged && (
-                          <button
-                            onClick={() => onLogSession({
-                              sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                              title: session.title,
-                              duration: session.duration,
-                            })}
-                            className="mt-3 text-xs font-semibold text-brand-400 bg-black/30 hover:bg-black/50 border border-brand-700/50 px-3 py-1.5 rounded-lg transition-all"
-                          >
-                            + Log this session
-                          </button>
+                        {!isDone && (
+                          <>
+                            <p className="text-xs text-gray-400 mt-2 leading-relaxed">{session.description}</p>
+                            {session.notes && <p className="text-xs text-gray-500 mt-1 italic">{session.notes}</p>}
+                            <button
+                              onClick={() => onLogSession({
+                                sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                                title: session.title,
+                                duration: session.duration,
+                              })}
+                              className="mt-3 text-xs font-semibold text-brand-400 bg-black/30 hover:bg-black/50 border border-brand-700/50 px-3 py-1.5 rounded-lg transition-all"
+                            >
+                              + Log this session
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -205,7 +264,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
         </div>
       )}
 
-      {/* Week Overview */}
+      {/* Week at a Glance */}
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Week at a Glance</p>
         <div className="card">
@@ -213,31 +272,44 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             {week.days.sort((a, b) => {
               const order = [1, 2, 3, 4, 5, 6, 0];
               return order.indexOf(a.dayOfWeek) - order.indexOf(b.dayOfWeek);
-            }).map(day => (
-              <div
-                key={day.dayOfWeek}
-                className="flex items-center gap-3 cursor-pointer"
-                onClick={() => setSelectedDay(day.dayOfWeek)}
-              >
-                <span className={`text-xs w-8 font-medium ${day.dayOfWeek === todayDayOfWeek && selectedWeek === currentWeekNum ? 'text-brand-400' : 'text-gray-500'}`}>
-                  {DAY_LABELS[day.dayOfWeek]}
-                </span>
-                {day.isRestDay ? (
-                  <span className="text-xs text-gray-600 italic">Rest Day</span>
-                ) : (
-                  <div className="flex gap-1.5 flex-wrap">
-                    {day.sessions.map((s, i) => {
-                      const config = SESSION_CONFIG[s.type];
-                      return (
-                        <span key={i} className={`badge text-xs border ${config.color}`}>
-                          {s.duration}m
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
+            }).map(day => {
+              const daySessions = day.isRestDay ? [] : day.sessions;
+              const doneCount = daySessions.filter((_, si) =>
+                completedSessions[`${activeCamp.id}-${selectedWeek}-${day.dayOfWeek}-${si}`]
+              ).length;
+
+              return (
+                <div
+                  key={day.dayOfWeek}
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => setSelectedDay(day.dayOfWeek)}
+                >
+                  <span className={`text-xs w-8 font-medium ${day.dayOfWeek === todayDayOfWeek && selectedWeek === currentWeekNum ? 'text-brand-400' : 'text-gray-500'}`}>
+                    {DAY_LABELS[day.dayOfWeek]}
+                  </span>
+                  {day.isRestDay ? (
+                    <span className="text-xs text-gray-600 italic">Rest Day</span>
+                  ) : (
+                    <div className="flex gap-1.5 flex-wrap flex-1">
+                      {day.sessions.map((s, i) => {
+                        const config = SESSION_CONFIG[s.type];
+                        const done = !!completedSessions[`${activeCamp.id}-${selectedWeek}-${day.dayOfWeek}-${i}`];
+                        return (
+                          <span key={i} className={`badge text-xs border ${done ? 'bg-green-900/30 border-green-900/30 text-green-600 line-through' : config.color}`}>
+                            {s.duration}m
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {daySessions.length > 0 && (
+                    <span className={`text-xs font-medium flex-shrink-0 ${doneCount === daySessions.length ? 'text-green-400' : 'text-gray-600'}`}>
+                      {doneCount}/{daySessions.length}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

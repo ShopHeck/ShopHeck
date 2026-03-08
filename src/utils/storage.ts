@@ -12,7 +12,18 @@ export const defaultState: AppState = {
   conditioningTests: [],
   weightEntries: [],
   fighters: [],
+  completedSessions: {},
 };
+
+export function toggleSessionComplete(state: AppState, key: string): AppState {
+  return {
+    ...state,
+    completedSessions: {
+      ...state.completedSessions,
+      [key]: !state.completedSessions[key],
+    },
+  };
+}
 
 export function loadState(): AppState {
   try {

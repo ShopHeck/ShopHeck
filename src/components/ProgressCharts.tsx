@@ -37,7 +37,7 @@ function ChartTooltip({ active, payload, label }: CustomTooltipProps) {
 
 export default function ProgressCharts() {
   const { state } = useApp();
-  const { activeCamp, workoutLogs, sparringLogs, conditioningTests } = state;
+  const { activeCamp, workoutLogs, sparringLogs, conditioningTests, trainingSchedule, completedSessions } = state;
 
   if (!activeCamp) return null;
 
@@ -104,6 +104,22 @@ export default function ProgressCharts() {
       rounds: l.rounds,
     }));
 
+  // Weekly adherence from completedSessions
+  const weeklyAdherence = trainingSchedule.map(week => {
+    const keys = week.days.flatMap(d =>
+      d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${week.weekNumber}-${d.dayOfWeek}-${si}`)
+    );
+    const total = keys.length;
+    const done = keys.filter(k => completedSessions[k]).length;
+    return {
+      week: week.weekNumber,
+      adherence: total > 0 ? Math.round((done / total) * 100) : 0,
+      done,
+      total,
+    };
+  });
+  const hasAnyAdherence = weeklyAdherence.some(w => w.total > 0);
+
   // Summary stats
   const totalMinutes = campWorkouts.reduce((s, l) => s + l.duration, 0);
   const totalSparringRounds = campSparring.reduce((s, l) => s + l.rounds, 0);
@@ -135,7 +151,55 @@ export default function ProgressCharts() {
           <div className="text-xl font-black text-white">{avgRpe}</div>
           <div className="text-xs text-gray-500">avg RPE</div>
         </div>
+        {hasAnyAdherence && (() => {
+          const allDone = weeklyAdherence.reduce((s, w) => s + w.done, 0);
+          const allTotal = weeklyAdherence.reduce((s, w) => s + w.total, 0);
+          const overallPct = allTotal > 0 ? Math.round((allDone / allTotal) * 100) : 0;
+          return (
+            <div className="stat-card col-span-2">
+              <Activity size={16} className="text-brand-400" />
+              <div className="text-xl font-black text-white">{overallPct}%</div>
+              <div className="text-xs text-gray-500">overall adherence ({allDone}/{allTotal} planned)</div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Weekly Adherence Chart */}
+      {hasAnyAdherence && (
+        <div className="mx-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weekly Adherence</p>
+          <div className="card p-2">
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={weeklyAdherence} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <XAxis dataKey="week" tick={{ fill: '#666', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = weeklyAdherence.find(w => w.week === label);
+                    return (
+                      <div className="bg-dark-700 border border-dark-400 rounded-lg px-3 py-2 text-xs shadow-xl">
+                        <p className="text-gray-400 mb-1">Week {label}</p>
+                        <p className="text-brand-400 font-semibold">{payload[0].value}% done</p>
+                        {d && <p className="text-gray-500">{d.done}/{d.total} sessions</p>}
+                      </div>
+                    );
+                  }}
+                />
+                <Bar
+                  dataKey="adherence"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={30}
+                  name="Adherence %"
+                  fill="#f97316"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Weekly Volume Chart */}
       {weeklyVolume.some(w => w.sessions > 0) && (

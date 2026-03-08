@@ -15,6 +15,7 @@ import {
   updateProfile,
   deleteCamp,
   setSchedule,
+  toggleSessionComplete,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 
@@ -33,6 +34,7 @@ type Action =
   | { type: 'DELETE_WORKOUT'; payload: string }
   | { type: 'DELETE_SPARRING'; payload: string }
   | { type: 'DELETE_WEIGHT'; payload: string }
+  | { type: 'TOGGLE_SESSION'; payload: string }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -94,6 +96,9 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'DELETE_WEIGHT':
       return deleteWeightEntry(state, action.payload);
+
+    case 'TOGGLE_SESSION':
+      return toggleSessionComplete(state, action.payload);
 
     case 'RESET':
       return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [] };
