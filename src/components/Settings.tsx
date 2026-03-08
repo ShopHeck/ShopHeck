@@ -1,0 +1,463 @@
+import { useState } from 'react';
+import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
+import { format, addDays, parseISO } from 'date-fns';
+import Modal from './shared/Modal';
+
+const WEIGHT_CLASSES: WeightClass[] = [
+  'Strawweight', 'Flyweight', 'Bantamweight', 'Featherweight',
+  'Lightweight', 'Welterweight', 'Middleweight', 'Light Heavyweight',
+  'Heavyweight', 'Super Heavyweight',
+];
+const SPORTS: Sport[] = ['Boxing', 'MMA', 'Muay Thai', 'Kickboxing', 'Wrestling', 'BJJ'];
+const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Beginner', 'Amateur', 'Semi-Pro', 'Professional'];
+
+interface ConfirmDialogProps {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }: ConfirmDialogProps) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${danger ? 'bg-red-900/40' : 'bg-brand-900/40'}`}>
+          <AlertTriangle size={22} className={danger ? 'text-red-400' : 'text-brand-400'} />
+        </div>
+        <h3 className="text-base font-bold text-white text-center mb-2">{title}</h3>
+        <p className="text-sm text-gray-400 text-center mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 ${danger ? 'bg-red-700 hover:bg-red-600 text-white' : 'btn-primary'}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface Props {
+  onNewCamp: () => void;
+}
+
+export default function Settings({ onNewCamp }: Props) {
+  const { state, dispatch } = useApp();
+  const { currentUser, camps, activeCamp } = state;
+
+  // Profile editing
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [pName, setPName] = useState(currentUser?.name ?? '');
+  const [pAge, setPAge] = useState(String(currentUser?.age ?? ''));
+  const [pSport, setPSport] = useState<Sport>(currentUser?.sport ?? 'Boxing');
+  const [pWeightClass, setPWeightClass] = useState<WeightClass>(currentUser?.weightClass ?? 'Lightweight');
+  const [pExperience, setPExperience] = useState<ExperienceLevel>(currentUser?.experienceLevel ?? 'Amateur');
+  const [pGym, setPGym] = useState(currentUser?.gym ?? '');
+  const [pRecord, setPRecord] = useState(currentUser?.record ?? '');
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  // Camp editing
+  const [editingCamp, setEditingCamp] = useState<FightCamp | null>(null);
+  const [cFightDate, setCFightDate] = useState('');
+  const [cOpponent, setCOpponent] = useState('');
+  const [cRounds, setCRounds] = useState('3');
+  const [cRoundDuration, setCRoundDuration] = useState('3');
+  const [cCurrentWeight, setCCurrentWeight] = useState('');
+  const [cTargetWeight, setCTargetWeight] = useState('');
+
+  // Confirms
+  const [confirmDeleteCamp, setConfirmDeleteCamp] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const minDate = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
+  function openEditCamp(camp: FightCamp) {
+    setEditingCamp(camp);
+    setCFightDate(camp.fightDate);
+    setCOpponent(camp.opponent ?? '');
+    setCRounds(String(camp.rounds));
+    setCRoundDuration(String(camp.roundDuration));
+    setCCurrentWeight(String(camp.currentWeight));
+    setCTargetWeight(String(camp.targetWeight));
+  }
+
+  function saveProfile() {
+    if (!currentUser || !pName.trim() || !pAge) return;
+    dispatch({
+      type: 'UPDATE_PROFILE',
+      payload: {
+        ...currentUser,
+        name: pName.trim(),
+        age: parseInt(pAge),
+        sport: pSport,
+        weightClass: pWeightClass,
+        experienceLevel: pExperience,
+        gym: pGym.trim() || undefined,
+        record: pRecord.trim() || undefined,
+      },
+    });
+    setProfileSaved(true);
+    setTimeout(() => { setProfileSaved(false); setEditingProfile(false); }, 1200);
+  }
+
+  function saveCamp() {
+    if (!editingCamp || !cFightDate || !cCurrentWeight || !cTargetWeight) return;
+    const campWeeks = editingCamp.campWeeks;
+    const startDate = format(addDays(parseISO(cFightDate), -(campWeeks * 7)), 'yyyy-MM-dd');
+    dispatch({
+      type: 'UPDATE_CAMP',
+      payload: {
+        ...editingCamp,
+        fightDate: cFightDate,
+        opponent: cOpponent.trim() || undefined,
+        rounds: parseInt(cRounds),
+        roundDuration: parseInt(cRoundDuration),
+        currentWeight: parseFloat(cCurrentWeight),
+        targetWeight: parseFloat(cTargetWeight),
+        startDate,
+      },
+    });
+    setEditingCamp(null);
+  }
+
+  function handleDeleteCamp(id: string) {
+    dispatch({ type: 'DELETE_CAMP', payload: id });
+    setConfirmDeleteCamp(null);
+  }
+
+  function handleReset() {
+    dispatch({ type: 'RESET' });
+  }
+
+  const campStats = (camp: FightCamp) => {
+    const workouts = state.workoutLogs.filter(l => l.campId === camp.id).length;
+    const sparring = state.sparringLogs.filter(l => l.campId === camp.id).reduce((s, l) => s + l.rounds, 0);
+    return { workouts, sparring };
+  };
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Profile Section */}
+      <div className="mx-4 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Profile</p>
+          <button
+            onClick={() => {
+              setEditingProfile(true);
+              setPName(currentUser?.name ?? '');
+              setPAge(String(currentUser?.age ?? ''));
+              setPSport(currentUser?.sport ?? 'Boxing');
+              setPWeightClass(currentUser?.weightClass ?? 'Lightweight');
+              setPExperience(currentUser?.experienceLevel ?? 'Amateur');
+              setPGym(currentUser?.gym ?? '');
+              setPRecord(currentUser?.record ?? '');
+            }}
+            className="flex items-center gap-1.5 text-brand-500 text-xs font-semibold hover:text-brand-400 transition-colors"
+          >
+            <Edit3 size={13} /> Edit
+          </button>
+        </div>
+
+        <div className="card flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-br from-brand-700 to-brand-900 rounded-2xl flex items-center justify-center flex-shrink-0 text-white text-2xl font-black">
+            {currentUser?.name?.charAt(0) ?? '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-white text-base truncate">{currentUser?.name}</p>
+            {currentUser?.gym && <p className="text-xs text-gray-500 truncate">{currentUser.gym}</p>}
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <span className="badge bg-dark-500 text-gray-400 text-xs">{currentUser?.sport}</span>
+              <span className="badge bg-dark-500 text-gray-400 text-xs">{currentUser?.weightClass}</span>
+              <span className="badge bg-dark-500 text-gray-400 text-xs">{currentUser?.experienceLevel}</span>
+              {currentUser?.record && (
+                <span className="badge bg-brand-900/40 text-brand-400 text-xs">{currentUser.record}</span>
+              )}
+            </div>
+          </div>
+          <div className={`badge ${currentUser?.role === 'coach' ? 'bg-purple-900/40 text-purple-400' : 'bg-brand-900/40 text-brand-400'}`}>
+            {currentUser?.role}
+          </div>
+        </div>
+      </div>
+
+      {/* Fight Camps Section */}
+      {currentUser?.role === 'fighter' && (
+        <div className="mx-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fight Camps ({camps.length})</p>
+            <button
+              onClick={onNewCamp}
+              className="flex items-center gap-1.5 text-brand-500 text-xs font-semibold hover:text-brand-400 transition-colors"
+            >
+              <Plus size={13} /> New Camp
+            </button>
+          </div>
+
+          {camps.length === 0 ? (
+            <div className="card text-center py-8">
+              <Flame size={28} className="text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">No fight camps yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {[...camps].reverse().map(camp => {
+                const isActive = activeCamp?.id === camp.id;
+                const stats = campStats(camp);
+                const daysOut = Math.ceil((new Date(camp.fightDate).getTime() - Date.now()) / 86400000);
+                const isPast = daysOut < 0;
+
+                return (
+                  <div
+                    key={camp.id}
+                    className={`card border-2 transition-all ${isActive ? 'border-brand-600' : 'border-dark-500'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-white text-sm">
+                            {format(parseISO(camp.fightDate), 'MMM d, yyyy')}
+                          </p>
+                          {isActive && (
+                            <span className="badge bg-brand-900/60 text-brand-400 text-xs">Active</span>
+                          )}
+                          {isPast && (
+                            <span className="badge bg-gray-800 text-gray-500 text-xs">Past</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {camp.weightClass} · {camp.rounds}R · {camp.campWeeks}wk camp
+                          {camp.opponent && <span> · vs {camp.opponent}</span>}
+                        </p>
+                        {!isPast && (
+                          <p className={`text-xs font-medium mt-0.5 ${daysOut < 14 ? 'text-red-400' : daysOut < 28 ? 'text-yellow-400' : 'text-brand-400'}`}>
+                            {daysOut > 0 ? `${daysOut} days out` : 'Fight day!'}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditCamp(camp)}
+                          className="p-2 text-gray-500 hover:text-white transition-colors"
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteCamp(camp.id)}
+                          className="p-2 text-gray-600 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-2 border-t border-dark-500">
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-white">{stats.workouts}</p>
+                        <p className="text-xs text-gray-600">sessions</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-white">{stats.sparring}</p>
+                        <p className="text-xs text-gray-600">spar rds</p>
+                      </div>
+                      <div className="flex-1" />
+                      {!isActive && (
+                        <button
+                          onClick={() => dispatch({ type: 'SET_ACTIVE_CAMP', payload: camp.id })}
+                          className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors flex items-center gap-1"
+                        >
+                          Switch to this
+                          <ChevronRight size={12} />
+                        </button>
+                      )}
+                      {isActive && (
+                        <span className="flex items-center gap-1 text-xs text-brand-400 font-semibold">
+                          <Check size={12} /> Current
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* App Settings */}
+      <div className="mx-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">App</p>
+        <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-red-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+              <LogOut size={15} className="text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-red-400">Reset & Log Out</p>
+              <p className="text-xs text-gray-600">Delete all data and start over</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* App Version */}
+      <div className="mx-4 text-center">
+        <p className="text-xs text-gray-700">Fight Camp v1.0 · Built for fighters</p>
+      </div>
+
+      {/* Edit Profile Modal */}
+      {editingProfile && (
+        <Modal title="Edit Profile" onClose={() => setEditingProfile(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Full Name</label>
+              <input className="input" value={pName} onChange={e => setPName(e.target.value)} placeholder="Your name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Age</label>
+                <input className="input" type="number" min={16} max={60} value={pAge} onChange={e => setPAge(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Sport</label>
+                <select className="select" value={pSport} onChange={e => setPSport(e.target.value as Sport)}>
+                  {SPORTS.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="label">Weight Class</label>
+              <select className="select" value={pWeightClass} onChange={e => setPWeightClass(e.target.value as WeightClass)}>
+                {WEIGHT_CLASSES.map(wc => <option key={wc}>{wc}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Experience Level</label>
+              <div className="grid grid-cols-2 gap-2">
+                {EXPERIENCE_LEVELS.map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setPExperience(level)}
+                    className={`py-2 rounded-xl text-sm font-medium border-2 transition-all ${pExperience === level ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">Gym / Team</label>
+              <input className="input" value={pGym} onChange={e => setPGym(e.target.value)} placeholder="Your gym or team" />
+            </div>
+            <div>
+              <label className="label">Record (e.g. 5-2-0)</label>
+              <input className="input" value={pRecord} onChange={e => setPRecord(e.target.value)} placeholder="W-L-D" />
+            </div>
+            <button
+              onClick={saveProfile}
+              disabled={!pName.trim() || !pAge}
+              className={`btn-primary w-full flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${profileSaved ? 'bg-green-700 hover:bg-green-600' : ''}`}
+            >
+              {profileSaved ? <><Check size={16} /> Saved!</> : 'Save Profile'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Camp Modal */}
+      {editingCamp && (
+        <Modal title="Edit Fight Camp" onClose={() => setEditingCamp(null)}>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Fight Date</label>
+              <input
+                className="input"
+                type="date"
+                min={minDate}
+                value={cFightDate}
+                onChange={e => setCFightDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Opponent (Optional)</label>
+              <input className="input" placeholder="Opponent's name" value={cOpponent} onChange={e => setCOpponent(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Rounds</label>
+                <select className="select" value={cRounds} onChange={e => setCRounds(e.target.value)}>
+                  {[3, 4, 5, 6, 8, 10, 12, 15].map(n => <option key={n} value={n}>{n} rounds</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Round Duration</label>
+                <select className="select" value={cRoundDuration} onChange={e => setCRoundDuration(e.target.value)}>
+                  <option value="3">3 minutes</option>
+                  <option value="5">5 minutes</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Current Weight (lbs)</label>
+                <input className="input" type="number" step="0.1" value={cCurrentWeight} onChange={e => setCCurrentWeight(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Target Weight (lbs)</label>
+                <input className="input" type="number" step="0.1" value={cTargetWeight} onChange={e => setCTargetWeight(e.target.value)} />
+              </div>
+            </div>
+            <div className="bg-dark-600 rounded-xl p-3 border border-dark-400">
+              <p className="text-xs text-gray-500">
+                Camp length stays at <span className="text-white font-medium">{editingCamp.campWeeks} weeks</span>. Start date will be recalculated from the fight date.
+              </p>
+            </div>
+            <button
+              onClick={saveCamp}
+              disabled={!cFightDate || !cCurrentWeight || !cTargetWeight}
+              className="btn-primary w-full disabled:opacity-50"
+            >
+              Save Changes
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Camp Confirm */}
+      {confirmDeleteCamp && (
+        <ConfirmDialog
+          title="Delete Fight Camp?"
+          message="This will permanently delete this camp and all associated workouts, sparring logs, conditioning tests, and weight entries. This cannot be undone."
+          confirmLabel="Delete Camp"
+          danger
+          onConfirm={() => handleDeleteCamp(confirmDeleteCamp)}
+          onCancel={() => setConfirmDeleteCamp(null)}
+        />
+      )}
+
+      {/* Reset Confirm */}
+      {confirmReset && (
+        <ConfirmDialog
+          title="Reset Everything?"
+          message="This will delete your profile, all fight camps, and all training data. You will be returned to the onboarding screen. This cannot be undone."
+          confirmLabel="Reset App"
+          danger
+          onConfirm={handleReset}
+          onCancel={() => setConfirmReset(false)}
+        />
+      )}
+    </div>
+  );
+}

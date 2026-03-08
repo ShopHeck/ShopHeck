@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Sport, WeightClass, ExperienceLevel, UserRole } from '../types';
 import { addDays, format } from 'date-fns';
@@ -14,9 +14,14 @@ const SPORTS: Sport[] = ['Boxing', 'MMA', 'Muay Thai', 'Kickboxing', 'Wrestling'
 
 const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Beginner', 'Amateur', 'Semi-Pro', 'Professional'];
 
-export default function Onboarding() {
-  const { dispatch } = useApp();
-  const [step, setStep] = useState(0);
+interface Props {
+  campOnly?: boolean;
+  onClose?: () => void;
+}
+
+export default function Onboarding({ campOnly = false, onClose }: Props) {
+  const { state, dispatch } = useApp();
+  const [step, setStep] = useState(campOnly ? 1 : 0);
   const [role, setRole] = useState<UserRole>('fighter');
 
   // Profile
@@ -54,37 +59,138 @@ export default function Onboarding() {
     const campWeeksNum = parseInt(campWeeks);
     const startDate = format(addDays(fightDateObj, -(campWeeksNum * 7)), 'yyyy-MM-dd');
 
-    dispatch({
-      type: 'CREATE_PROFILE',
-      payload: {
-        name: name.trim(),
-        age: parseInt(age),
-        sport,
-        weightClass,
-        experienceLevel: experience,
-        role,
-        gym: gym.trim() || undefined,
-      },
-    });
+    if (!campOnly) {
+      dispatch({
+        type: 'CREATE_PROFILE',
+        payload: {
+          name: name.trim(),
+          age: parseInt(age),
+          sport,
+          weightClass,
+          experienceLevel: experience,
+          role,
+          gym: gym.trim() || undefined,
+        },
+      });
+    }
 
-    if (role === 'fighter') {
+    if (campOnly || role === 'fighter') {
+      const user = state.currentUser;
       dispatch({
         type: 'CREATE_CAMP',
         payload: {
           fightDate,
           opponent: opponent.trim() || undefined,
-          weightClass,
+          weightClass: campOnly ? (user?.weightClass ?? weightClass) : weightClass,
           currentWeight: parseFloat(currentWeight),
           targetWeight: parseFloat(targetWeight),
           rounds: parseInt(rounds),
           roundDuration: parseInt(roundDuration),
-          sport,
-          experienceLevel: experience,
+          sport: campOnly ? (user?.sport ?? sport) : sport,
+          experienceLevel: campOnly ? (user?.experienceLevel ?? experience) : experience,
           campWeeks: campWeeksNum,
           startDate,
         },
       });
     }
+
+    onClose?.();
+  }
+
+  if (campOnly) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-dark-800 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-dark-400 max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-4 border-b border-dark-500 flex-shrink-0">
+            <h2 className="text-base font-bold text-white">
+              {step === 1 ? 'New Fight Camp' : 'Camp Generated!'}
+            </h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 px-4 py-4">
+            {/* Step 1: Camp setup */}
+            {step === 1 && (
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label className="label">Fight Date *</label>
+                  <input className="input" type="date" min={minDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Opponent (Optional)</label>
+                  <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Rounds</label>
+                    <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
+                      {[3,4,5,6,8,10,12,15].map(n => <option key={n} value={n}>{n} rounds</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Round Duration</label>
+                    <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                      <option value="3">3 minutes</option>
+                      <option value="5">5 minutes</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Current Weight (lbs) *</label>
+                    <input className="input" type="number" placeholder="e.g. 160" value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">Target Weight (lbs) *</label>
+                    <input className="input" type="number" placeholder="e.g. 155" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Camp Length</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['6','8','10'].map(w => (
+                      <button key={w} onClick={() => setCampWeeks(w)}
+                        className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${campWeeks === w ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
+                        {w} Weeks
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={handleCampNext}
+                  disabled={!fightDate || !currentWeight || !targetWeight}
+                  className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  Generate Camp <Flame size={16} />
+                </button>
+              </div>
+            )}
+            {/* Step 2: Confirm */}
+            {step === 2 && (
+              <div className="flex flex-col gap-5 text-center">
+                <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                  <Flame size={32} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white">Camp Generated!</h3>
+                  <p className="text-gray-400 text-sm mt-1">Your {campWeeks}-week program is ready.</p>
+                </div>
+                <div className="bg-dark-600 rounded-xl border border-dark-400 p-4 text-left space-y-2">
+                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span></div>
+                </div>
+                <button onClick={handleFinish} className="btn-primary flex items-center justify-center gap-2">
+                  Start Camp <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

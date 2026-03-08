@@ -7,10 +7,18 @@ import WorkoutLogger from './components/WorkoutLogger';
 import WeightTracker from './components/WeightTracker';
 import ProgressCharts from './components/ProgressCharts';
 import CoachDashboard from './components/CoachDashboard';
+import Settings from './components/Settings';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
+import type { SessionType } from './types';
 
-type View = 'dashboard' | 'planner' | 'log' | 'weight' | 'progress' | 'fighters';
+type View = 'dashboard' | 'planner' | 'log' | 'weight' | 'progress' | 'fighters' | 'settings';
+
+export interface LogPrefill {
+  sessionType: SessionType;
+  title: string;
+  duration: number;
+}
 
 const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   dashboard: { title: 'Fight Camp' },
@@ -19,11 +27,14 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   weight: { title: 'Weight Tracker', subtitle: 'Cut Monitoring' },
   progress: { title: 'Progress', subtitle: 'Charts & Benchmarks' },
   fighters: { title: 'Fighters', subtitle: 'Coach View' },
+  settings: { title: 'Settings' },
 };
 
 function AppShell() {
   const { state } = useApp();
   const [view, setView] = useState<View>('dashboard');
+  const [showNewCamp, setShowNewCamp] = useState(false);
+  const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
 
   if (!state.currentUser) {
     return <Onboarding />;
@@ -37,6 +48,11 @@ function AppShell() {
     ? `${state.currentUser.name} · ${camp.weightClass}`
     : state.currentUser.name;
 
+  function navigateToLog(prefill?: LogPrefill) {
+    if (prefill) setLogPrefill(prefill);
+    setView('log');
+  }
+
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
       <Header
@@ -45,21 +61,42 @@ function AppShell() {
       />
 
       <main className="flex-1 max-w-lg mx-auto w-full overflow-y-auto pb-20">
-        {view === 'dashboard' && !isCoach && camp && <Dashboard onNavigate={(v) => setView(v as View)} />}
+        {view === 'dashboard' && !isCoach && camp && (
+          <Dashboard onNavigate={(v, prefill?) => {
+            if (v === 'log' && prefill) navigateToLog(prefill);
+            else setView(v as View);
+          }} />
+        )}
         {view === 'dashboard' && !isCoach && !camp && (
-          <div className="flex flex-col items-center justify-center h-full py-20 px-8 text-center">
-            <p className="text-gray-400">No active fight camp. Create one to get started.</p>
+          <div className="flex flex-col items-center justify-center py-20 px-8 text-center gap-4">
+            <p className="text-gray-400">No active fight camp.</p>
+            <button onClick={() => setView('settings')} className="btn-primary">Set Up a Camp</button>
           </div>
         )}
         {view === 'dashboard' && isCoach && <CoachDashboard />}
-        {view === 'planner' && <WeeklyPlanner />}
-        {view === 'log' && <WorkoutLogger />}
+        {view === 'planner' && (
+          <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} />
+        )}
+        {view === 'log' && (
+          <WorkoutLogger
+            prefill={logPrefill}
+            onPrefillConsumed={() => setLogPrefill(null)}
+          />
+        )}
         {view === 'weight' && <WeightTracker />}
         {view === 'progress' && <ProgressCharts />}
         {view === 'fighters' && <CoachDashboard />}
+        {view === 'settings' && (
+          <Settings onNewCamp={() => setShowNewCamp(true)} />
+        )}
       </main>
 
       <BottomNav active={view} onChange={(v) => setView(v as View)} />
+
+      {/* New Camp — reuse Onboarding camp step */}
+      {showNewCamp && (
+        <Onboarding campOnly onClose={() => setShowNewCamp(false)} />
+      )}
     </div>
   );
 }

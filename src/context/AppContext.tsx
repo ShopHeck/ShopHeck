@@ -10,6 +10,10 @@ import {
   addConditioningTest,
   addWeightEntry,
   deleteWorkoutLog,
+  deleteSparringLog,
+  deleteWeightEntry,
+  updateProfile,
+  deleteCamp,
   setSchedule,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
@@ -17,13 +21,18 @@ import { generateTrainingCamp } from '../utils/campGenerator';
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
   | { type: 'CREATE_PROFILE'; payload: Omit<FighterProfile, 'id' | 'createdAt'> }
+  | { type: 'UPDATE_PROFILE'; payload: FighterProfile }
   | { type: 'CREATE_CAMP'; payload: Omit<FightCamp, 'id' | 'createdAt'> }
+  | { type: 'UPDATE_CAMP'; payload: FightCamp }
+  | { type: 'DELETE_CAMP'; payload: string }
   | { type: 'SET_ACTIVE_CAMP'; payload: string }
   | { type: 'LOG_WORKOUT'; payload: Omit<WorkoutLog, 'id' | 'createdAt'> }
   | { type: 'LOG_SPARRING'; payload: Omit<SparringLog, 'id' | 'createdAt'> }
   | { type: 'LOG_CONDITIONING'; payload: Omit<ConditioningTest, 'id' | 'createdAt'> }
   | { type: 'LOG_WEIGHT'; payload: Omit<WeightEntry, 'id' | 'createdAt'> }
   | { type: 'DELETE_WORKOUT'; payload: string }
+  | { type: 'DELETE_SPARRING'; payload: string }
+  | { type: 'DELETE_WEIGHT'; payload: string }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -33,18 +42,30 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'CREATE_PROFILE': {
       const profile = createProfile(action.payload);
-      const fighters = action.payload.role === 'coach'
-        ? state.fighters
-        : [...state.fighters.filter(f => f.id !== profile.id), profile];
+      const fighters = action.payload.role === 'fighter'
+        ? [...state.fighters.filter(f => f.id !== profile.id), profile]
+        : state.fighters;
       return { ...state, currentUser: profile, fighters };
     }
+
+    case 'UPDATE_PROFILE':
+      return updateProfile(state, action.payload);
 
     case 'CREATE_CAMP': {
       const camp = createCamp(action.payload);
       const schedule = generateTrainingCamp(camp);
-      let next = setSchedule({ ...state, camps: [...state.camps, camp], activeCamp: camp }, schedule);
-      return next;
+      return setSchedule({ ...state, camps: [...state.camps, camp], activeCamp: camp }, schedule);
     }
+
+    case 'UPDATE_CAMP': {
+      const camps = state.camps.map(c => c.id === action.payload.id ? action.payload : c);
+      const activeCamp = state.activeCamp?.id === action.payload.id ? action.payload : state.activeCamp;
+      const schedule = activeCamp ? generateTrainingCamp(activeCamp) : state.trainingSchedule;
+      return setSchedule({ ...state, camps, activeCamp }, schedule);
+    }
+
+    case 'DELETE_CAMP':
+      return deleteCamp(state, action.payload);
 
     case 'SET_ACTIVE_CAMP': {
       const camp = state.camps.find(c => c.id === action.payload) || null;
@@ -68,8 +89,14 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_WORKOUT':
       return deleteWorkoutLog(state, action.payload);
 
+    case 'DELETE_SPARRING':
+      return deleteSparringLog(state, action.payload);
+
+    case 'DELETE_WEIGHT':
+      return deleteWeightEntry(state, action.payload);
+
     case 'RESET':
-      return { ...loadState(), currentUser: null, activeCamp: null };
+      return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [] };
 
     default:
       return state;

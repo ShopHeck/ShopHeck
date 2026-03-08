@@ -76,10 +76,35 @@ export function deleteWorkoutLog(state: AppState, id: string): AppState {
   return { ...state, workoutLogs: state.workoutLogs.filter(l => l.id !== id) };
 }
 
-export function updateCamp(state: AppState, camp: FightCamp): AppState {
-  const camps = state.camps.map(c => c.id === camp.id ? camp : c);
-  const activeCamp = state.activeCamp?.id === camp.id ? camp : state.activeCamp;
-  return { ...state, camps, activeCamp };
+export function deleteSparringLog(state: AppState, id: string): AppState {
+  return { ...state, sparringLogs: state.sparringLogs.filter(l => l.id !== id) };
+}
+
+export function deleteWeightEntry(state: AppState, id: string): AppState {
+  return { ...state, weightEntries: state.weightEntries.filter(e => e.id !== id) };
+}
+
+export function updateProfile(state: AppState, profile: FighterProfile): AppState {
+  const fighters = state.fighters.map(f => f.id === profile.id ? profile : f);
+  const currentUser = state.currentUser?.id === profile.id ? profile : state.currentUser;
+  return { ...state, fighters, currentUser };
+}
+
+export function deleteCamp(state: AppState, campId: string): AppState {
+  const camps = state.camps.filter(c => c.id !== campId);
+  const activeCamp = state.activeCamp?.id === campId
+    ? (camps[camps.length - 1] ?? null)
+    : state.activeCamp;
+  // Cascade: remove all logs associated with deleted camp
+  return {
+    ...state,
+    camps,
+    activeCamp,
+    workoutLogs: state.workoutLogs.filter(l => l.campId !== campId),
+    sparringLogs: state.sparringLogs.filter(l => l.campId !== campId),
+    conditioningTests: state.conditioningTests.filter(t => t.campId !== campId),
+    weightEntries: state.weightEntries.filter(e => e.campId !== campId),
+  };
 }
 
 export function setSchedule(state: AppState, schedule: TrainingWeek[]): AppState {

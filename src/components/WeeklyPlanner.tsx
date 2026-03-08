@@ -25,7 +25,13 @@ const PHASE_COLORS: Record<string, string> = {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export default function WeeklyPlanner() {
+import type { LogPrefill } from '../App';
+
+interface Props {
+  onLogSession: (prefill: LogPrefill) => void;
+}
+
+export default function WeeklyPlanner({ onLogSession }: Props) {
   const { state } = useApp();
   const { activeCamp, trainingSchedule, workoutLogs } = state;
 
@@ -177,6 +183,18 @@ export default function WeeklyPlanner() {
                         </div>
                         <p className="text-xs text-gray-400 mt-2 leading-relaxed">{session.description}</p>
                         {session.notes && <p className="text-xs text-gray-500 mt-1 italic">{session.notes}</p>}
+                        {!isLogged && (
+                          <button
+                            onClick={() => onLogSession({
+                              sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                              title: session.title,
+                              duration: session.duration,
+                            })}
+                            className="mt-3 text-xs font-semibold text-brand-400 bg-black/30 hover:bg-black/50 border border-brand-700/50 px-3 py-1.5 rounded-lg transition-all"
+                          >
+                            + Log this session
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

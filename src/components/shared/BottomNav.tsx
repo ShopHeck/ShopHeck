@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users } from 'lucide-react';
+import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users, Settings } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 interface Props {
@@ -15,13 +15,14 @@ export default function BottomNav({ active, onChange }: Props) {
         { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { id: 'fighters', icon: Users, label: 'Fighters' },
         { id: 'progress', icon: BarChart3, label: 'Progress' },
+        { id: 'settings', icon: Settings, label: 'Settings' },
       ]
     : [
-        { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { id: 'planner', icon: Calendar, label: 'Planner' },
+        { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
+        { id: 'planner', icon: Calendar, label: 'Plan' },
         { id: 'log', icon: Dumbbell, label: 'Log' },
         { id: 'weight', icon: Scale, label: 'Weight' },
-        { id: 'progress', icon: BarChart3, label: 'Progress' },
+        { id: 'settings', icon: Settings, label: 'Settings' },
       ];
 
   return (

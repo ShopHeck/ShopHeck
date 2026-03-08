@@ -15,8 +15,10 @@ const INTENSITY_DOTS: Record<string, number> = {
   Low: 1, Medium: 2, High: 3, 'Very High': 4,
 };
 
+import type { LogPrefill } from '../App';
+
 interface Props {
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, prefill?: LogPrefill) => void;
 }
 
 export default function Dashboard({ onNavigate }: Props) {
@@ -190,7 +192,11 @@ export default function Dashboard({ onNavigate }: Props) {
                     <p className="text-xs text-gray-500">{session.duration} min</p>
                   </div>
                   <button
-                    onClick={() => onNavigate('log')}
+                    onClick={() => onNavigate('log', {
+                      sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                      title: session.title,
+                      duration: session.duration,
+                    })}
                     className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors flex-shrink-0"
                   >
                     Log

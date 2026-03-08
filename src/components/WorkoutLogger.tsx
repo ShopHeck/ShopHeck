@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Plus, Dumbbell, Trash2, Clock, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
 import type { SessionType } from '../types';
+import type { LogPrefill } from '../App';
 
 const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
   { value: 'conditioning', label: 'Conditioning', emoji: '🔥' },
@@ -20,11 +21,18 @@ const TAB_CONFIG = [
   { id: 'conditioning', label: 'Tests' },
 ];
 
-export default function WorkoutLogger() {
+interface Props {
+  prefill?: LogPrefill | null;
+  onPrefillConsumed?: () => void;
+}
+
+export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const { state, dispatch } = useApp();
   const { activeCamp, workoutLogs, sparringLogs, conditioningTests } = state;
   const [tab, setTab] = useState<'workout' | 'sparring' | 'conditioning'>('workout');
   const [showModal, setShowModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteSparConfirmId, setDeleteSparConfirmId] = useState<string | null>(null);
   const [showSparModal, setShowSparModal] = useState(false);
   const [showCondModal, setShowCondModal] = useState(false);
 
@@ -45,6 +53,17 @@ export default function WorkoutLogger() {
   const [sFocus, setSFocus] = useState('');
   const [sPerf, setSPerf] = useState<1|2|3|4|5>(3);
   const [sNotes, setSNotes] = useState('');
+
+  // Apply prefill from planner shortcut
+  useEffect(() => {
+    if (prefill) {
+      setWType(prefill.sessionType);
+      setWTitle(prefill.title);
+      setWDuration(String(prefill.duration));
+      setShowModal(true);
+      onPrefillConsumed?.();
+    }
+  }, [prefill]);
 
   // Conditioning form
   const [cDate, setCDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -174,7 +193,7 @@ export default function WorkoutLogger() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold text-white text-sm">{log.title}</p>
-                      <button onClick={() => dispatch({ type: 'DELETE_WORKOUT', payload: log.id })}
+                      <button onClick={() => setDeleteConfirmId(log.id)}
                         className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
                         <Trash2 size={14} />
                       </button>
@@ -209,8 +228,8 @@ export default function WorkoutLogger() {
             campSparring.map(log => (
               <div key={log.id} className="card">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-white">{log.rounds} rounds</span>
                       <span className="text-xs text-gray-500">×{log.roundDuration}min</span>
                       <span className={`badge text-xs text-white ${PERF_COLORS[log.performance]}`}>{PERF_LABELS[log.performance]}</span>
@@ -221,6 +240,10 @@ export default function WorkoutLogger() {
                     {log.focus && <p className="text-xs text-gray-400 mt-1">Focus: {log.focus}</p>}
                     {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
                   </div>
+                  <button onClick={() => setDeleteSparConfirmId(log.id)}
+                    className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))
@@ -400,6 +423,52 @@ export default function WorkoutLogger() {
             <button onClick={logCondTest} disabled={!cValue} className="btn-primary w-full disabled:opacity-50">Save Test Result</button>
           </div>
         </Modal>
+      )}
+
+      {/* Delete Workout Confirm */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)} />
+          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
+            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={22} className="text-red-400" />
+            </div>
+            <h3 className="text-base font-bold text-white text-center mb-2">Delete Workout?</h3>
+            <p className="text-sm text-gray-400 text-center mb-6">This workout log will be permanently deleted.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+              <button
+                onClick={() => { dispatch({ type: 'DELETE_WORKOUT', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Sparring Confirm */}
+      {deleteSparConfirmId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteSparConfirmId(null)} />
+          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
+            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={22} className="text-red-400" />
+            </div>
+            <h3 className="text-base font-bold text-white text-center mb-2">Delete Sparring Log?</h3>
+            <p className="text-sm text-gray-400 text-center mb-6">This sparring session will be permanently deleted.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteSparConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+              <button
+                onClick={() => { dispatch({ type: 'DELETE_SPARRING', payload: deleteSparConfirmId }); setDeleteSparConfirmId(null); }}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
