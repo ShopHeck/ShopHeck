@@ -1,6 +1,7 @@
-import { BarChart3, TrendingUp, Activity, Zap } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Zap, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
+import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import {
   LineChart,
   Line,
@@ -35,9 +36,115 @@ function ChartTooltip({ active, payload, label }: CustomTooltipProps) {
   return null;
 }
 
+function shareStats(opts: {
+  name: string; sport: string; weightClass: string;
+  sessions: number; hours: number; sparringRounds: number;
+  avgRpe: string; adherence: number; daysOut: number; progress: number;
+  opponent?: string;
+}) {
+  const canvas = document.createElement('canvas');
+  const W = 800, H = 480;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0a0a0a');
+  bg.addColorStop(1, '#1a0a00');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Orange accent bar
+  ctx.fillStyle = '#f97316';
+  ctx.fillRect(0, 0, W, 5);
+
+  // App name
+  ctx.fillStyle = '#f97316';
+  ctx.font = 'bold 18px system-ui, sans-serif';
+  ctx.fillText('FIGHT CAMP', 40, 48);
+
+  // Fighter name
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 40px system-ui, sans-serif';
+  ctx.fillText(opts.name, 40, 100);
+
+  // Tags
+  ctx.font = '14px system-ui, sans-serif';
+  ctx.fillStyle = '#9ca3af';
+  ctx.fillText(`${opts.sport} · ${opts.weightClass}`, 40, 128);
+  if (opts.opponent) {
+    ctx.fillStyle = '#f97316';
+    ctx.fillText(`vs ${opts.opponent}`, 40, 150);
+  }
+
+  // Divider
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(40, 170); ctx.lineTo(W - 40, 170);
+  ctx.stroke();
+
+  // Stats grid
+  const stats = [
+    { label: 'SESSIONS', value: String(opts.sessions), color: '#f97316' },
+    { label: 'TRAINING HRS', value: `${opts.hours}h`, color: '#a78bfa' },
+    { label: 'SPAR ROUNDS', value: String(opts.sparringRounds), color: '#facc15' },
+    { label: 'AVG RPE', value: opts.avgRpe, color: '#34d399' },
+    { label: 'ADHERENCE', value: `${opts.adherence}%`, color: '#60a5fa' },
+    { label: 'DAYS OUT', value: String(opts.daysOut), color: '#f87171' },
+  ];
+
+  const colW = (W - 80) / 3;
+  stats.forEach((s, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const x = 40 + col * colW;
+    const y = 200 + row * 110;
+
+    ctx.fillStyle = s.color;
+    ctx.font = 'bold 36px system-ui, sans-serif';
+    ctx.fillText(s.value, x, y + 40);
+
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText(s.label, x, y + 60);
+  });
+
+  // Progress bar
+  const barY = H - 60;
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.roundRect(40, barY, W - 80, 12, 6);
+  ctx.fill();
+
+  const grad = ctx.createLinearGradient(40, 0, W - 40, 0);
+  grad.addColorStop(0, '#b45309'); grad.addColorStop(1, '#f97316');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(40, barY, (W - 80) * (opts.progress / 100), 12, 6);
+  ctx.fill();
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '12px system-ui, sans-serif';
+  ctx.fillText(`Camp Progress: ${opts.progress}%`, 40, H - 20);
+
+  canvas.toBlob(async blob => {
+    if (!blob) return;
+    const file = new File([blob], 'fight-camp-stats.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: `${opts.name}'s Fight Camp Stats` });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'fight-camp-stats.png'; a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, 'image/png');
+}
+
 export default function ProgressCharts() {
   const { state } = useApp();
-  const { activeCamp, workoutLogs, sparringLogs, conditioningTests, trainingSchedule, completedSessions } = state;
+  const { activeCamp, workoutLogs, sparringLogs, conditioningTests, trainingSchedule, completedSessions, currentUser } = state;
 
   if (!activeCamp) return null;
 
@@ -127,10 +234,41 @@ export default function ProgressCharts() {
     ? (campWorkouts.reduce((s, l) => s + l.rpe, 0) / campWorkouts.length).toFixed(1)
     : '–';
 
+  const allDone = weeklyAdherence.reduce((s, w) => s + w.done, 0);
+  const allTotal = weeklyAdherence.reduce((s, w) => s + w.total, 0);
+  const overallAdherence = allTotal > 0 ? Math.round((allDone / allTotal) * 100) : 0;
+
+  function handleShare() {
+    shareStats({
+      name: currentUser?.name ?? 'Fighter',
+      sport: activeCamp!.sport,
+      weightClass: activeCamp!.weightClass,
+      sessions: campWorkouts.length,
+      hours: Math.round(totalMinutes / 60),
+      sparringRounds: totalSparringRounds,
+      avgRpe: avgRpe === '–' ? '0' : avgRpe,
+      adherence: overallAdherence,
+      daysOut: getDaysUntilFight(activeCamp!.fightDate),
+      progress: getCampProgress(activeCamp!),
+      opponent: activeCamp!.opponent,
+    });
+  }
+
   return (
     <div className="space-y-4 pb-4">
+      {/* Share button */}
+      <div className="mx-4 mt-4">
+        <button
+          onClick={handleShare}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-dark-700 border border-dark-500 text-sm font-semibold text-gray-300 hover:border-brand-600 hover:text-brand-400 transition-all active:scale-98"
+        >
+          <Share2 size={16} />
+          Share Camp Stats
+        </button>
+      </div>
+
       {/* Summary Cards */}
-      <div className="mx-4 mt-4 grid grid-cols-2 gap-3">
+      <div className="mx-4 grid grid-cols-2 gap-3">
         <div className="stat-card">
           <Activity size={16} className="text-brand-500" />
           <div className="text-xl font-black text-white">{campWorkouts.length}</div>
@@ -151,18 +289,13 @@ export default function ProgressCharts() {
           <div className="text-xl font-black text-white">{avgRpe}</div>
           <div className="text-xs text-gray-500">avg RPE</div>
         </div>
-        {hasAnyAdherence && (() => {
-          const allDone = weeklyAdherence.reduce((s, w) => s + w.done, 0);
-          const allTotal = weeklyAdherence.reduce((s, w) => s + w.total, 0);
-          const overallPct = allTotal > 0 ? Math.round((allDone / allTotal) * 100) : 0;
-          return (
-            <div className="stat-card col-span-2">
-              <Activity size={16} className="text-brand-400" />
-              <div className="text-xl font-black text-white">{overallPct}%</div>
-              <div className="text-xs text-gray-500">overall adherence ({allDone}/{allTotal} planned)</div>
-            </div>
-          );
-        })()}
+        {hasAnyAdherence && (
+          <div className="stat-card col-span-2">
+            <Activity size={16} className="text-brand-400" />
+            <div className="text-xl font-black text-white">{overallAdherence}%</div>
+            <div className="text-xs text-gray-500">overall adherence ({allDone}/{allTotal} planned)</div>
+          </div>
+        )}
       </div>
 
       {/* Weekly Adherence Chart */}

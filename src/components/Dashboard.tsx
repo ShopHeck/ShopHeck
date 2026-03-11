@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -265,6 +265,37 @@ export default function Dashboard({ onNavigate }: Props) {
               <div className="text-xs text-gray-500">target</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Tools */}
+      <div className="mx-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tools</p>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => onNavigate('gameplan')}
+            className="card flex items-center gap-3 hover:border-red-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-red-900/30 flex items-center justify-center flex-shrink-0">
+              <Shield size={18} className="text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Game Plan</p>
+              <p className="text-xs text-gray-500">Fight strategy</p>
+            </div>
+          </button>
+          <button
+            onClick={() => onNavigate('nutrition')}
+            className="card flex items-center gap-3 hover:border-blue-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+              <Droplets size={18} className="text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Nutrition</p>
+              <p className="text-xs text-gray-500">Water & meals</p>
+            </div>
+          </button>
         </div>
       </div>
     </div>

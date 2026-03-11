@@ -123,6 +123,36 @@ export interface FighterProfile {
   createdAt: string;
 }
 
+export interface GamePlan {
+  campId: string;
+  opponentName?: string;
+  opponentStance?: 'Orthodox' | 'Southpaw' | 'Switch';
+  opponentHeight?: string;
+  opponentReach?: string;
+  styleNotes: string;
+  earlyRoundPlan: string;
+  midRoundPlan: string;
+  lateRoundPlan: string;
+  keyTechniques: string;
+  thingsToAvoid: string;
+  cornerInstructions: string;
+  updatedAt: string;
+}
+
+export interface NutritionLog {
+  id: string;
+  campId: string;
+  date: string; // YYYY-MM-DD
+  waterOz: number;
+  mealRatings: {
+    breakfast?: 'good' | 'ok' | 'poor';
+    lunch?: 'good' | 'ok' | 'poor';
+    dinner?: 'good' | 'ok' | 'poor';
+  };
+  notes: string;
+  createdAt: string;
+}
+
 export interface AppState {
   currentUser: FighterProfile | null;
   activeCamp: FightCamp | null;
@@ -135,4 +165,7 @@ export interface AppState {
   fighters: FighterProfile[];
   /** Key: `${campId}-${weekNum}-${dayOfWeek}-${sessionIndex}` */
   completedSessions: Record<string, boolean>;
+  /** Key: campId */
+  gamePlans: Record<string, GamePlan>;
+  nutritionLogs: NutritionLog[];
 }

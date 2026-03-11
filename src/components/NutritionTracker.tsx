@@ -1,0 +1,315 @@
+import { useState } from 'react';
+import { Droplets, Plus, Minus, Trash2, UtensilsCrossed } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { format, parseISO, subDays } from 'date-fns';
+import type { NutritionLog } from '../types';
+
+type MealRating = 'good' | 'ok' | 'poor';
+type Meal = 'breakfast' | 'lunch' | 'dinner';
+
+const DAILY_GOAL_OZ = 64;
+const GLASS_OZ = 8;
+
+const MEAL_LABELS: Record<Meal, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+};
+
+const MEAL_COLORS: Record<MealRating, string> = {
+  good: 'bg-green-700 border-green-600 text-white',
+  ok: 'bg-yellow-700 border-yellow-600 text-white',
+  poor: 'bg-red-800 border-red-700 text-white',
+};
+
+const MEAL_IDLE: Record<MealRating, string> = {
+  good: 'bg-dark-600 border-dark-400 text-gray-400 hover:border-green-700',
+  ok: 'bg-dark-600 border-dark-400 text-gray-400 hover:border-yellow-700',
+  poor: 'bg-dark-600 border-dark-400 text-gray-400 hover:border-red-800',
+};
+
+function todayStr() {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+export default function NutritionTracker() {
+  const { state, dispatch } = useApp();
+  const { activeCamp, nutritionLogs } = state;
+
+  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [notes, setNotes] = useState('');
+  const [showNotes, setShowNotes] = useState(false);
+
+  if (!activeCamp) {
+    return (
+      <div className="mx-4 mt-4 card text-center py-12">
+        <Droplets size={40} className="text-gray-600 mx-auto mb-3" />
+        <p className="text-gray-400 font-semibold">No active fight camp</p>
+        <p className="text-sm text-gray-600 mt-1">Set up a fight camp to track nutrition</p>
+      </div>
+    );
+  }
+
+  const campLogs = nutritionLogs.filter(n => n.campId === activeCamp.id);
+  const todayLog = campLogs.find(n => n.date === selectedDate);
+
+  const waterOz = todayLog?.waterOz ?? 0;
+  const glasses = Math.floor(waterOz / GLASS_OZ);
+  const waterPct = Math.min(100, Math.round((waterOz / DAILY_GOAL_OZ) * 100));
+  const waterColor = waterPct >= 100 ? 'text-green-400' : waterPct >= 60 ? 'text-brand-400' : 'text-blue-400';
+  const barColor = waterPct >= 100 ? 'from-green-700 to-green-500' : 'from-blue-700 to-blue-400';
+
+  function updateLog(patch: Partial<Omit<NutritionLog, 'id' | 'createdAt' | 'campId' | 'date'>>) {
+    dispatch({
+      type: 'LOG_NUTRITION',
+      payload: {
+        campId: activeCamp!.id,
+        date: selectedDate,
+        waterOz: todayLog?.waterOz ?? 0,
+        mealRatings: todayLog?.mealRatings ?? {},
+        notes: todayLog?.notes ?? '',
+        ...patch,
+      },
+    });
+  }
+
+  function addWater(delta: number) {
+    updateLog({ waterOz: Math.max(0, waterOz + delta) });
+  }
+
+  function setMeal(meal: Meal, rating: MealRating) {
+    const current = todayLog?.mealRatings ?? {};
+    // Toggle off if already selected
+    const next = current[meal] === rating
+      ? { ...current, [meal]: undefined }
+      : { ...current, [meal]: rating };
+    updateLog({ mealRatings: next });
+  }
+
+  function saveNotes() {
+    updateLog({ notes });
+    setShowNotes(false);
+  }
+
+  function deleteLog(id: string) {
+    dispatch({ type: 'DELETE_NUTRITION', payload: id });
+  }
+
+  // Last 7 days history
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = format(subDays(new Date(), i), 'yyyy-MM-dd');
+    return { date: d, log: campLogs.find(n => n.date === d) };
+  });
+
+  const mealScore = (log?: NutritionLog) => {
+    if (!log) return null;
+    const ratings = Object.values(log.mealRatings).filter(Boolean) as MealRating[];
+    if (!ratings.length) return null;
+    const score = ratings.reduce((s, r) => s + (r === 'good' ? 2 : r === 'ok' ? 1 : 0), 0);
+    const max = ratings.length * 2;
+    const pct = score / max;
+    return pct >= 0.7 ? 'good' : pct >= 0.4 ? 'ok' : 'poor';
+  };
+
+  return (
+    <div className="space-y-4 pb-6">
+      {/* Header */}
+      <div className="mx-4 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tracking Date</p>
+          <input
+            type="date"
+            className="input w-auto text-sm py-1.5 px-3"
+            value={selectedDate}
+            max={todayStr()}
+            onChange={e => {
+              setSelectedDate(e.target.value);
+              setNotes(campLogs.find(n => n.date === e.target.value)?.notes ?? '');
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Hydration */}
+      <section className="mx-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Droplets size={14} className="text-blue-400" />
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Hydration</p>
+        </div>
+        <div className="card">
+          {/* Water progress */}
+          <div className="flex items-end justify-between mb-3">
+            <div>
+              <span className={`text-4xl font-black ${waterColor}`}>{waterOz}</span>
+              <span className="text-gray-500 text-sm ml-1">/ {DAILY_GOAL_OZ} oz</span>
+            </div>
+            <div className="text-right">
+              <div className={`text-2xl font-black ${waterColor}`}>{waterPct}%</div>
+              <div className="text-xs text-gray-500">of daily goal</div>
+            </div>
+          </div>
+          <div className="h-3 bg-dark-500 rounded-full overflow-hidden mb-4">
+            <div
+              className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-300`}
+              style={{ width: `${waterPct}%` }}
+            />
+          </div>
+
+          {/* Glass buttons */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {Array.from({ length: 8 }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => addWater(i < glasses ? -GLASS_OZ : GLASS_OZ)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90 ${
+                  i < glasses
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-dark-600 text-gray-600 hover:bg-dark-500'
+                }`}
+                title={i < glasses ? 'Remove glass' : 'Add glass'}
+              >
+                💧
+              </button>
+            ))}
+          </div>
+
+          {/* +/- custom */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Adjust oz</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => addWater(-8)}
+                disabled={waterOz < 8}
+                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all"
+              >
+                <Minus size={14} />
+              </button>
+              <span className="text-sm text-gray-400 w-16 text-center">8 oz / glass</span>
+              <button
+                onClick={() => addWater(8)}
+                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white transition-all"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Meal Quality */}
+      <section className="mx-4">
+        <div className="flex items-center gap-2 mb-2">
+          <UtensilsCrossed size={14} className="text-gray-500" />
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meal Quality</p>
+        </div>
+        <div className="card space-y-3">
+          {(['breakfast', 'lunch', 'dinner'] as Meal[]).map(meal => {
+            const current = todayLog?.mealRatings[meal];
+            return (
+              <div key={meal} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-white w-24">{MEAL_LABELS[meal]}</span>
+                <div className="flex gap-2">
+                  {(['good', 'ok', 'poor'] as MealRating[]).map(rating => (
+                    <button
+                      key={rating}
+                      onClick={() => setMeal(meal, rating)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-95 ${
+                        current === rating ? MEAL_COLORS[rating] : MEAL_IDLE[rating]
+                      }`}
+                    >
+                      {rating === 'good' ? '✓ Good' : rating === 'ok' ? '~ OK' : '✗ Poor'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Notes */}
+      <section className="mx-4">
+        {showNotes ? (
+          <div className="card space-y-3">
+            <label className="label">Notes</label>
+            <textarea
+              className="input resize-none"
+              rows={3}
+              placeholder="e.g. Felt dehydrated before sparring, had a cheat meal at lunch..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button onClick={saveNotes} className="btn-primary flex-1 py-2 text-sm">Save Notes</button>
+              <button onClick={() => setShowNotes(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setNotes(todayLog?.notes ?? '');
+              setShowNotes(true);
+            }}
+            className="w-full card text-left text-sm text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            {todayLog?.notes
+              ? <span className="text-gray-300">{todayLog.notes}</span>
+              : '+ Add nutrition notes...'}
+          </button>
+        )}
+      </section>
+
+      {/* 7-day history */}
+      <section className="mx-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Last 7 Days</p>
+        <div className="card divide-y divide-dark-600">
+          {last7.map(({ date, log }) => {
+            const score = mealScore(log);
+            const isToday = date === todayStr();
+            const isSelected = date === selectedDate;
+            return (
+              <button
+                key={date}
+                onClick={() => {
+                  setSelectedDate(date);
+                  setNotes(log?.notes ?? '');
+                }}
+                className={`w-full flex items-center justify-between py-2.5 px-1 transition-colors ${isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-16 text-left">
+                    {isToday ? 'Today' : format(parseISO(date), 'EEE M/d')}
+                  </span>
+                  {log ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-400 text-xs font-semibold">{log.waterOz}oz</span>
+                      {score && (
+                        <span className={`badge text-xs ${
+                          score === 'good' ? 'bg-green-900/40 text-green-400' :
+                          score === 'ok' ? 'bg-yellow-900/40 text-yellow-400' :
+                          'bg-red-900/40 text-red-400'
+                        }`}>
+                          {score === 'good' ? '✓ On track' : score === 'ok' ? '~ OK' : 'Needs work'}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-600 text-xs">No data</span>
+                  )}
+                </div>
+                {log && (
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteLog(log.id); }}
+                    className="text-gray-600 hover:text-red-400 transition-colors p-1"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}

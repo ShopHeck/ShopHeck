@@ -8,11 +8,14 @@ import WeightTracker from './components/WeightTracker';
 import ProgressCharts from './components/ProgressCharts';
 import CoachDashboard from './components/CoachDashboard';
 import Settings from './components/Settings';
+import RoundTimer from './components/RoundTimer';
+import GamePlanBuilder from './components/GamePlanBuilder';
+import NutritionTracker from './components/NutritionTracker';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import type { SessionType } from './types';
 
-type View = 'dashboard' | 'planner' | 'log' | 'weight' | 'progress' | 'fighters' | 'settings';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -24,10 +27,13 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   dashboard: { title: 'Fight Camp' },
   planner: { title: 'Weekly Planner', subtitle: 'Training Schedule' },
   log: { title: 'Training Log', subtitle: 'Workouts & Sparring' },
+  timer: { title: 'Round Timer', subtitle: 'Training Intervals' },
   weight: { title: 'Weight Tracker', subtitle: 'Cut Monitoring' },
   progress: { title: 'Progress', subtitle: 'Charts & Benchmarks' },
   fighters: { title: 'Fighters', subtitle: 'Coach View' },
   settings: { title: 'Settings' },
+  gameplan: { title: 'Game Plan', subtitle: 'Fight Strategy' },
+  nutrition: { title: 'Nutrition', subtitle: 'Hydration & Meals' },
 };
 
 function AppShell() {
@@ -83,8 +89,11 @@ function AppShell() {
             onPrefillConsumed={() => setLogPrefill(null)}
           />
         )}
+        {view === 'timer' && <RoundTimer />}
         {view === 'weight' && <WeightTracker />}
+        {view === 'nutrition' && <NutritionTracker />}
         {view === 'progress' && <ProgressCharts />}
+        {view === 'gameplan' && <GamePlanBuilder />}
         {view === 'fighters' && <CoachDashboard />}
         {view === 'settings' && (
           <Settings onNewCamp={() => setShowNewCamp(true)} />

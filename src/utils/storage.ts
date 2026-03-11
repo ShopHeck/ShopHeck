@@ -1,4 +1,4 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog } from '../types';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -13,6 +13,8 @@ export const defaultState: AppState = {
   weightEntries: [],
   fighters: [],
   completedSessions: {},
+  gamePlans: {},
+  nutritionLogs: [],
 };
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
@@ -120,4 +122,26 @@ export function deleteCamp(state: AppState, campId: string): AppState {
 
 export function setSchedule(state: AppState, schedule: TrainingWeek[]): AppState {
   return { ...state, trainingSchedule: schedule };
+}
+
+export function saveGamePlan(state: AppState, plan: GamePlan): AppState {
+  return { ...state, gamePlans: { ...state.gamePlans, [plan.campId]: plan } };
+}
+
+export function upsertNutritionLog(state: AppState, log: Omit<NutritionLog, 'id' | 'createdAt'>): AppState {
+  const existing = state.nutritionLogs.find(n => n.campId === log.campId && n.date === log.date);
+  if (existing) {
+    return {
+      ...state,
+      nutritionLogs: state.nutritionLogs.map(n =>
+        n.id === existing.id ? { ...existing, ...log, updatedAt: new Date().toISOString() } : n
+      ),
+    };
+  }
+  const newLog: NutritionLog = { ...log, id: generateId(), createdAt: new Date().toISOString() };
+  return { ...state, nutritionLogs: [newLog, ...state.nutritionLogs] };
+}
+
+export function deleteNutritionLog(state: AppState, id: string): AppState {
+  return { ...state, nutritionLogs: state.nutritionLogs.filter(n => n.id !== id) };
 }

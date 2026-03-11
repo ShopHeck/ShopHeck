@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog } from '../types';
 import {
   loadState,
   saveState,
@@ -16,6 +16,9 @@ import {
   deleteCamp,
   setSchedule,
   toggleSessionComplete,
+  saveGamePlan,
+  upsertNutritionLog,
+  deleteNutritionLog,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 
@@ -35,6 +38,9 @@ type Action =
   | { type: 'DELETE_SPARRING'; payload: string }
   | { type: 'DELETE_WEIGHT'; payload: string }
   | { type: 'TOGGLE_SESSION'; payload: string }
+  | { type: 'SAVE_GAME_PLAN'; payload: GamePlan }
+  | { type: 'LOG_NUTRITION'; payload: Omit<NutritionLog, 'id' | 'createdAt'> }
+  | { type: 'DELETE_NUTRITION'; payload: string }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -99,6 +105,15 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'TOGGLE_SESSION':
       return toggleSessionComplete(state, action.payload);
+
+    case 'SAVE_GAME_PLAN':
+      return saveGamePlan(state, action.payload);
+
+    case 'LOG_NUTRITION':
+      return upsertNutritionLog(state, action.payload);
+
+    case 'DELETE_NUTRITION':
+      return deleteNutritionLog(state, action.payload);
 
     case 'RESET':
       return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [] };
