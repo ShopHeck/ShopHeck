@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut } from 'lucide-react';
+import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -48,11 +49,24 @@ function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger = fals
 
 interface Props {
   onNewCamp: () => void;
+  onNavigate?: (view: string) => void;
 }
 
-export default function Settings({ onNewCamp }: Props) {
+export default function Settings({ onNewCamp, onNavigate }: Props) {
   const { state, dispatch } = useApp();
   const { currentUser, camps, activeCamp } = state;
+
+  // AI key
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [editingKey, setEditingKey] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+  const hasApiKey = !!getApiKey();
+
+  function handleSaveKey() {
+    saveApiKeyUtil(apiKeyDraft.trim());
+    setKeySaved(true);
+    setTimeout(() => { setKeySaved(false); setEditingKey(false); setApiKeyDraft(''); }, 1200);
+  }
 
   // Profile editing
   const [editingProfile, setEditingProfile] = useState(false);
@@ -292,6 +306,94 @@ export default function Settings({ onNewCamp }: Props) {
           )}
         </div>
       )}
+
+      {/* Integrations */}
+      <div className="mx-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Integrations</p>
+        <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          {/* AI Insights */}
+          <button
+            onClick={() => onNavigate?.('aiinsights')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Brain size={15} className="text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">AI Coach Insights</p>
+              <p className="text-xs text-gray-600">Claude Opus · {hasApiKey ? 'API key set' : 'API key required'}</p>
+            </div>
+            <ChevronRight size={15} className="text-gray-600" />
+          </button>
+
+          {/* API Key */}
+          <div className="px-4 py-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Key size={14} className="text-yellow-500" />
+                <p className="text-sm font-medium text-white">Anthropic API Key</p>
+              </div>
+              {hasApiKey ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-400 font-semibold">✓ Set</span>
+                  <button
+                    onClick={() => { clearApiKey(); setEditingKey(false); }}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-600">Not set</span>
+              )}
+            </div>
+            {editingKey ? (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  className="input font-mono text-sm"
+                  placeholder="sk-ant-..."
+                  value={apiKeyDraft}
+                  onChange={e => setApiKeyDraft(e.target.value)}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveKey}
+                    disabled={!apiKeyDraft.trim().startsWith('sk-')}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${keySaved ? 'bg-green-700 text-white' : 'btn-primary'}`}
+                  >
+                    {keySaved ? '✓ Saved' : 'Save Key'}
+                  </button>
+                  <button onClick={() => setEditingKey(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingKey(true)}
+                className="text-xs text-brand-500 hover:text-brand-400 transition-colors"
+              >
+                {hasApiKey ? 'Update key' : 'Add API key →'}
+              </button>
+            )}
+          </div>
+
+          {/* Apple Health */}
+          <button
+            onClick={() => onNavigate?.('health')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-red-950/40 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Heart size={15} className="text-red-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Apple Health</p>
+              <p className="text-xs text-gray-600">Import workouts & weight · Export data</p>
+            </div>
+            <ChevronRight size={15} className="text-gray-600" />
+          </button>
+        </div>
+      </div>
 
       {/* App Settings */}
       <div className="mx-4">

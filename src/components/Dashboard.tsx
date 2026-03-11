@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Heart } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -273,6 +273,18 @@ export default function Dashboard({ onNavigate }: Props) {
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tools</p>
         <div className="grid grid-cols-2 gap-3">
           <button
+            onClick={() => onNavigate('aiinsights')}
+            className="card flex items-center gap-3 hover:border-purple-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+              <Brain size={18} className="text-purple-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">AI Insights</p>
+              <p className="text-xs text-gray-500">Coach analysis</p>
+            </div>
+          </button>
+          <button
             onClick={() => onNavigate('gameplan')}
             className="card flex items-center gap-3 hover:border-red-800 transition-colors text-left"
           >
@@ -294,6 +306,18 @@ export default function Dashboard({ onNavigate }: Props) {
             <div>
               <p className="text-sm font-semibold text-white">Nutrition</p>
               <p className="text-xs text-gray-500">Water & meals</p>
+            </div>
+          </button>
+          <button
+            onClick={() => onNavigate('health')}
+            className="card flex items-center gap-3 hover:border-red-900 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-red-950/40 flex items-center justify-center flex-shrink-0">
+              <Heart size={18} className="text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Apple Health</p>
+              <p className="text-xs text-gray-500">Sync & export</p>
             </div>
           </button>
         </div>

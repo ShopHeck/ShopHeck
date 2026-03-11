@@ -11,11 +11,13 @@ import Settings from './components/Settings';
 import RoundTimer from './components/RoundTimer';
 import GamePlanBuilder from './components/GamePlanBuilder';
 import NutritionTracker from './components/NutritionTracker';
+import AIInsights from './components/AIInsights';
+import AppleHealthSync from './components/AppleHealthSync';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import type { SessionType } from './types';
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -34,6 +36,8 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   settings: { title: 'Settings' },
   gameplan: { title: 'Game Plan', subtitle: 'Fight Strategy' },
   nutrition: { title: 'Nutrition', subtitle: 'Hydration & Meals' },
+  aiinsights: { title: 'AI Insights', subtitle: 'Coach Analysis' },
+  health: { title: 'Apple Health', subtitle: 'Sync & Export' },
 };
 
 function AppShell() {
@@ -94,9 +98,11 @@ function AppShell() {
         {view === 'nutrition' && <NutritionTracker />}
         {view === 'progress' && <ProgressCharts />}
         {view === 'gameplan' && <GamePlanBuilder />}
+        {view === 'aiinsights' && <AIInsights />}
+        {view === 'health' && <AppleHealthSync />}
         {view === 'fighters' && <CoachDashboard />}
         {view === 'settings' && (
-          <Settings onNewCamp={() => setShowNewCamp(true)} />
+          <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
         )}
       </main>
 
