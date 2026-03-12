@@ -24,18 +24,98 @@ function fmt(sec: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function beep(ctx: AudioContext, freq: number, duration: number, volume = 0.4) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.frequency.value = freq;
-  osc.type = 'sine';
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + duration);
+// ─── Audio synthesis ──────────────────────────────────────────────────────────
+
+/**
+ * Boxing bell: strike transient + 5 harmonic sine oscillators with individual
+ * exponential decays, producing a realistic resonant ring.
+ */
+function ringBell(ctx: AudioContext, volume = 0.72) {
+  const t = ctx.currentTime;
+
+  // Strike transient — short filtered noise burst
+  const transientLen = Math.floor(ctx.sampleRate * 0.014);
+  const transientBuf = ctx.createBuffer(1, transientLen, ctx.sampleRate);
+  const td = transientBuf.getChannelData(0);
+  for (let i = 0; i < transientLen; i++) {
+    td[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / transientLen, 1.5);
+  }
+  const transientSrc = ctx.createBufferSource();
+  transientSrc.buffer = transientBuf;
+  const tGain = ctx.createGain();
+  tGain.gain.setValueAtTime(volume * 0.45, t);
+  transientSrc.connect(tGain);
+  tGain.connect(ctx.destination);
+  transientSrc.start(t);
+
+  // Bell harmonics — each partial decays independently
+  const harmonics = [
+    { freq: 840,  vol: 1.00, decay: 2.3 },
+    { freq: 1080, vol: 0.55, decay: 1.7 },
+    { freq: 1680, vol: 0.25, decay: 1.1 },
+    { freq: 2160, vol: 0.12, decay: 0.75 },
+    { freq: 2520, vol: 0.06, decay: 0.50 },
+  ];
+  harmonics.forEach(h => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(h.freq, t);
+    g.gain.setValueAtTime(volume * h.vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + h.decay);
+    osc.start(t);
+    osc.stop(t + h.decay + 0.05);
+  });
 }
+
+/**
+ * Wooden clapper / trainer clap: `count` sharp bandpass-filtered noise bursts
+ * scheduled precisely in Web Audio time so there's no setTimeout drift.
+ */
+function playClapper(ctx: AudioContext, count = 5) {
+  const t = ctx.currentTime;
+  for (let i = 0; i < count; i++) {
+    const start = t + i * 0.13;
+    const bufLen = Math.floor(ctx.sampleRate * 0.035);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let j = 0; j < bufLen; j++) {
+      data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / bufLen, 2.5);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1200 + i * 25; // slight pitch drift per hit
+    filter.Q.value = 1.8;
+    src.connect(filter);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.8, start);
+    filter.connect(g);
+    g.connect(ctx.destination);
+    src.start(start);
+    src.stop(start + 0.036);
+  }
+}
+
+/** Subtle high tick used for the 3-2-1 countdown. */
+function playTick(ctx: AudioContext) {
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.value = 1050;
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+  osc.start(t);
+  osc.stop(t + 0.08);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RoundTimer() {
   const [selectedPreset, setSelectedPreset] = useState(0);
@@ -50,10 +130,18 @@ export default function RoundTimer() {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref so the interval callback can always read the latest phase
+  const phaseRef = useRef<Phase>('idle');
+
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   const getAudioCtx = useCallback(() => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    }
+    // Resume if suspended (required by browser autoplay policy after user gesture)
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
     }
     return audioCtxRef.current;
   }, []);
@@ -91,30 +179,26 @@ export default function RoundTimer() {
             setCurrentRound(currentRound => {
               if (currentPhase === 'work') {
                 if (currentRound >= rounds) {
-                  // Done
+                  // Session complete — triple bell
                   setIsRunning(false);
-                  beep(ctx, 880, 0.15);
-                  setTimeout(() => beep(ctx, 880, 0.15), 200);
-                  setTimeout(() => beep(ctx, 1100, 0.3), 400);
+                  ringBell(ctx, 0.75);
+                  setTimeout(() => ringBell(ctx, 0.65), 850);
+                  setTimeout(() => ringBell(ctx, 0.55), 1700);
                   return currentRound;
                 }
-                // Start rest
-                beep(ctx, 660, 0.2);
-                setTimeout(() => beep(ctx, 440, 0.2), 250);
+                // End of round — single bell, transition to rest
+                ringBell(ctx, 0.72);
                 setTimeLeft(restSec);
                 return currentRound;
               } else {
-                // Start next work round
-                beep(ctx, 880, 0.1);
-                setTimeout(() => beep(ctx, 880, 0.1), 150);
-                setTimeout(() => beep(ctx, 880, 0.1), 300);
+                // End of rest — bell signals new round start
+                ringBell(ctx, 0.72);
                 setTimeLeft(workSec);
                 return currentRound + 1;
               }
             });
             if (currentPhase === 'work') {
-              const nextRound = currentRound;
-              if (nextRound >= rounds) return 'done';
+              if (currentRound >= rounds) return 'done';
               return 'rest';
             }
             return 'work';
@@ -122,10 +206,16 @@ export default function RoundTimer() {
           return 0;
         }
 
-        // Countdown beeps at 3, 2, 1
+        const ctx = getAudioCtx();
+
+        // 10-second warning clapper — fires as display transitions from 11 → 10
+        if (prev === 11 && phaseRef.current === 'work') {
+          playClapper(ctx, 5);
+        }
+
+        // Subtle 3-2-1 countdown ticks
         if (prev <= 4 && prev > 1) {
-          const ctx = getAudioCtx();
-          beep(ctx, 440, 0.08, 0.2);
+          playTick(ctx);
         }
 
         return prev - 1;
@@ -145,15 +235,16 @@ export default function RoundTimer() {
       reset();
       return;
     }
-    if (phase === 'idle') setPhase('work');
+    if (phase === 'idle') {
+      // Bell signals the very start of the session
+      ringBell(getAudioCtx(), 0.72);
+      setPhase('work');
+    }
     setIsRunning(r => !r);
   };
 
   const adjust = (setter: React.Dispatch<React.SetStateAction<number>>, delta: number, min: number, max: number) => {
     setter(v => Math.max(min, Math.min(max, v + delta)));
-    if (!isRunning && phase === 'idle') {
-      // Keep timeLeft in sync with workSec when adjusting work time
-    }
   };
 
   // When workSec changes while idle, keep timeLeft synced
