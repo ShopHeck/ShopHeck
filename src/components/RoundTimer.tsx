@@ -301,21 +301,22 @@ export default function RoundTimer() {
         )}
 
         {/* Timer ring */}
-        <div className={`w-52 h-52 rounded-full border-4 ${ringBg} flex items-center justify-center bg-dark-800 transition-colors duration-500 relative`}>
+        <div className={`w-52 h-52 rounded-full border-4 ${ringBg} flex items-center justify-center bg-dark-800 transition-colors duration-500`}>
           <span className={`text-6xl font-black tabular-nums tracking-tight ${ringColor} transition-colors duration-300`}>
             {phase === 'done' ? '✓' : fmt(timeLeft)}
           </span>
-          {/* Reaction prompt during rest */}
-          {reactionMode && phase === 'rest' && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-full">
-              <ReactionPrompt sport={state.currentUser?.sport} active={phase === 'rest'} isPro={!!isPro} />
-            </div>
-          )}
         </div>
 
         {/* Phase badge when running */}
         {(phase === 'work' || phase === 'rest' || phase === 'prep') && (
           <span className={`badge text-sm font-bold px-3 py-1 mt-3 ${phaseBg}`}>{phaseLabel}</span>
+        )}
+
+        {/* Reaction prompt — below badge during rest */}
+        {reactionMode && phase === 'rest' && (
+          <div className="mt-2 text-center">
+            <ReactionPrompt sport={state.currentUser?.sport} active={phase === 'rest'} isPro={!!isPro} />
+          </div>
         )}
 
         {/* Round dots */}

@@ -172,29 +172,68 @@ function ringSessionComplete(ctx: AudioContext) {
   ringBell(ctx, 0.80, 1.30);
 }
 
-function playClapper(ctx: AudioContext, count = 5) {
+/**
+ * Three sharp wooden-stick claps spaced 220ms apart.
+ * Models two hardwood blocks struck together: fast transient click,
+ * narrow-band wood resonance ~950 Hz, very short decay.
+ */
+function playClapper(ctx: AudioContext) {
+  const sr = ctx.sampleRate;
   const base = ctx.currentTime;
-  for (let i = 0; i < count; i++) {
-    const t = base + i * 0.13;
-    const bufLen = Math.floor(ctx.sampleRate * 0.035);
-    const buf  = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let j = 0; j < bufLen; j++) {
-      data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / bufLen, 2.5);
+
+  for (let i = 0; i < 3; i++) {
+    const t = base + i * 0.22;
+
+    // 1) Sharp click transient — 3 ms of shaped noise through high-pass
+    const clickLen = Math.floor(sr * 0.003);
+    const clickBuf = ctx.createBuffer(1, clickLen, sr);
+    const cd = clickBuf.getChannelData(0);
+    for (let j = 0; j < clickLen; j++) {
+      cd[j] = (Math.random() * 2 - 1) * Math.exp(-j / (clickLen * 0.2));
     }
-    const src    = ctx.createBufferSource();
-    const filter = ctx.createBiquadFilter();
-    const g      = ctx.createGain();
-    src.buffer = buf;
-    filter.type = 'bandpass';
-    filter.frequency.value = 1200 + i * 25;
-    filter.Q.value = 1.8;
-    g.gain.setValueAtTime(1.1, t);
-    src.connect(filter);
-    filter.connect(g);
-    g.connect(ctx.destination);
-    src.start(t);
-    src.stop(t + 0.036);
+    const clickSrc = ctx.createBufferSource();
+    clickSrc.buffer = clickBuf;
+    const clickHp = ctx.createBiquadFilter();
+    clickHp.type = 'highpass';
+    clickHp.frequency.value = 3000;
+    const clickG = ctx.createGain();
+    clickG.gain.setValueAtTime(3.5, t);
+    clickSrc.connect(clickHp);
+    clickHp.connect(clickG);
+    clickG.connect(ctx.destination);
+    clickSrc.start(t);
+
+    // 2) Wood-body resonance — 80 ms noise through tight bandpass at ~950 Hz
+    const bodyLen = Math.floor(sr * 0.08);
+    const bodyBuf = ctx.createBuffer(1, bodyLen, sr);
+    const bd = bodyBuf.getChannelData(0);
+    for (let j = 0; j < bodyLen; j++) {
+      bd[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bodyLen * 0.07));
+    }
+    const bodySrc = ctx.createBufferSource();
+    bodySrc.buffer = bodyBuf;
+    const bodyBp = ctx.createBiquadFilter();
+    bodyBp.type = 'bandpass';
+    bodyBp.frequency.value = 950;
+    bodyBp.Q.value = 6;
+    const bodyG = ctx.createGain();
+    bodyG.gain.setValueAtTime(2.2, t);
+    bodySrc.connect(bodyBp);
+    bodyBp.connect(bodyG);
+    bodyG.connect(ctx.destination);
+    bodySrc.start(t);
+
+    // 3) Short pitched tap — sine at 950 Hz, decays in 35 ms
+    const osc = ctx.createOscillator();
+    const oscG = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 950;
+    oscG.gain.setValueAtTime(0.5, t);
+    oscG.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+    osc.connect(oscG);
+    oscG.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.04);
   }
 }
 
@@ -248,6 +287,7 @@ export function useRoundTimer() {
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef   = useRef<AudioContext | null>(null);
   const warningFiredRef = useRef(false); // prevent double-fire per phase
+  const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
   const hapticRef     = useRef(true);
 
@@ -398,6 +438,7 @@ export function useRoundTimer() {
       return;
     }
     warningFiredRef.current = false;
+    lastTickRef.current = -1;
 
     intervalRef.current = setInterval(() => {
       const remaining = Math.ceil((deadlineRef.current - Date.now()) / 1000);
@@ -418,6 +459,7 @@ export function useRoundTimer() {
           setPhase('work'); phaseRef.current = 'work';
           setTimeLeft(workSecRef.current);
           warningFiredRef.current = false;
+          lastTickRef.current = -1;
 
         } else if (ph === 'work') {
           if (round >= roundsRef.current) {
@@ -471,13 +513,14 @@ export function useRoundTimer() {
         !warningFiredRef.current
       ) {
         warningFiredRef.current = true;
-        playClapper(ctx, 5);
+        playClapper(ctx);
         vibrate(HAPTIC.warning);
         if (voiceRef.current) speak(`${warningSecRef.current} seconds`);
       }
 
-      // 3-2-1 countdown ticks
-      if (remaining <= 3 && phaseRef.current === 'work') {
+      // 3-2-1 countdown ticks — fire once per distinct second value
+      if (remaining <= 3 && phaseRef.current === 'work' && remaining !== lastTickRef.current) {
+        lastTickRef.current = remaining;
         playTick(ctx);
         vibrate(HAPTIC.tick);
         if (voiceRef.current) speak(String(remaining));
