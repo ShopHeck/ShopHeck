@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key } from 'lucide-react';
+import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
@@ -54,7 +54,7 @@ interface Props {
 
 export default function Settings({ onNewCamp, onNavigate }: Props) {
   const { state, dispatch } = useApp();
-  const { currentUser, camps, activeCamp } = state;
+  const { currentUser, camps, activeCamp, coaches } = state;
 
   // AI key
   const [apiKeyDraft, setApiKeyDraft] = useState('');
@@ -300,6 +300,62 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       )}
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* My Coach — fighters only */}
+      {currentUser?.role === 'fighter' && (
+        <div className="mx-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">My Coach</p>
+            {coaches.length > 0 && currentUser.coachId && (
+              <button
+                onClick={() => dispatch({ type: 'LINK_COACH', payload: null })}
+                className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+              >
+                Unlink
+              </button>
+            )}
+          </div>
+          {coaches.length === 0 ? (
+            <div className="card text-center py-6">
+              <Users size={24} className="text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No coaches in the system yet</p>
+              <p className="text-xs text-gray-600 mt-1">A coach needs to create a profile on this device first</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {coaches.map(coach => {
+                const isLinked = currentUser.coachId === coach.id;
+                return (
+                  <button
+                    key={coach.id}
+                    onClick={() => dispatch({ type: 'LINK_COACH', payload: isLinked ? null : coach.id })}
+                    className={`w-full card flex items-center gap-3 transition-all text-left ${isLinked ? 'border-purple-700' : 'hover:border-dark-300'}`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isLinked ? 'bg-purple-900/50' : 'bg-dark-600'}`}>
+                      <span className={`font-black text-base ${isLinked ? 'text-purple-400' : 'text-gray-400'}`}>{coach.name.charAt(0)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-semibold text-sm ${isLinked ? 'text-white' : 'text-gray-300'}`}>{coach.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {coach.gym && <span className="text-xs text-gray-600">{coach.gym}</span>}
+                        <span className="badge bg-dark-500 text-gray-500 text-xs">{coach.sport}</span>
+                      </div>
+                    </div>
+                    {isLinked ? (
+                      <div className="flex items-center gap-1 text-purple-400">
+                        <UserCheck size={16} />
+                        <span className="text-xs font-semibold">Linked</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-600">Link</span>
+                    )}
+                  </button>
                 );
               })}
             </div>

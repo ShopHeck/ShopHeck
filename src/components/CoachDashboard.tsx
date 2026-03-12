@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Users, ChevronRight, Activity, Scale, Zap, User, Search } from 'lucide-react';
+import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
+import type { CoachNoteCategory } from '../types';
 import {
   LineChart,
   Line,
@@ -31,12 +32,23 @@ function ChartTooltip({ active, payload, label }: CustomTooltipProps) {
   return null;
 }
 
+const CATEGORY_STYLES: Record<CoachNoteCategory, { label: string; cls: string }> = {
+  technique:    { label: 'Technique',    cls: 'bg-brand-900/40 text-brand-400' },
+  conditioning: { label: 'Conditioning', cls: 'bg-yellow-900/40 text-yellow-400' },
+  mental:       { label: 'Mental',       cls: 'bg-purple-900/40 text-purple-400' },
+  nutrition:    { label: 'Nutrition',    cls: 'bg-green-900/40 text-green-400' },
+  general:      { label: 'General',      cls: 'bg-dark-500 text-gray-400' },
+};
 
 export default function CoachDashboard() {
-  const { state } = useApp();
-  const { fighters, camps, workoutLogs, sparringLogs, weightEntries } = state;
+  const { state, dispatch } = useApp();
+  const { fighters, camps, workoutLogs, sparringLogs, weightEntries, currentUser, coachNotes } = state;
   const [selectedFighter, setSelectedFighter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const [noteCategory, setNoteCategory] = useState<CoachNoteCategory>('general');
+  const [showAllNotes, setShowAllNotes] = useState(false);
 
   const activeFighters = fighters.filter(f => f.role === 'fighter');
   const filtered = activeFighters.filter(f =>
@@ -45,9 +57,25 @@ export default function CoachDashboard() {
   );
 
   const fighter = selectedFighter ? fighters.find(f => f.id === selectedFighter) : null;
-
-  // For demo, just use the most recent camp
   const activeCamp = camps[camps.length - 1];
+
+  function submitNote() {
+    if (!noteContent.trim() || !fighter || !activeCamp || !currentUser) return;
+    dispatch({
+      type: 'ADD_COACH_NOTE',
+      payload: {
+        coachId: currentUser.id,
+        coachName: currentUser.name,
+        fighterId: fighter.id,
+        campId: activeCamp.id,
+        category: noteCategory,
+        content: noteContent.trim(),
+      },
+    });
+    setNoteContent('');
+    setNoteCategory('general');
+    setShowNoteForm(false);
+  }
 
   if (selectedFighter && activeCamp) {
     const campWorkouts = workoutLogs.filter(l => l.campId === activeCamp.id);
@@ -74,17 +102,22 @@ export default function CoachDashboard() {
       ...campWeights.map(e => ({ date: format(parseISO(e.date), 'M/d'), weight: e.weight })),
     ];
 
+    const fighterNotes = coachNotes
+      .filter(n => n.fighterId === selectedFighter && n.campId === activeCamp.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const visibleNotes = showAllNotes ? fighterNotes : fighterNotes.slice(0, 3);
+
     return (
       <div className="space-y-4 pb-4">
         <div className="mx-4 mt-4">
-          <button onClick={() => setSelectedFighter(null)} className="flex items-center gap-2 text-brand-500 text-sm font-medium mb-4">
+          <button onClick={() => { setSelectedFighter(null); setShowNoteForm(false); }} className="flex items-center gap-2 text-brand-500 text-sm font-medium mb-4">
             ← Back to Fighters
           </button>
 
           {/* Fighter Header */}
           <div className="card flex items-center gap-4">
             <div className="w-14 h-14 bg-brand-900/50 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <User size={28} className="text-brand-400" />
+              <span className="text-brand-400 font-black text-2xl">{fighter?.name.charAt(0)}</span>
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-black text-white">{fighter?.name}</h2>
@@ -92,6 +125,7 @@ export default function CoachDashboard() {
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.sport}</span>
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.weightClass}</span>
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.experienceLevel}</span>
+                {fighter?.gym && <span className="text-xs text-gray-600">{fighter.gym}</span>}
               </div>
             </div>
           </div>
@@ -140,6 +174,107 @@ export default function CoachDashboard() {
             <div className="text-lg font-black text-white">{currentW}</div>
             <div className="text-xs text-gray-500">lbs now</div>
           </div>
+        </div>
+
+        {/* Coach Notes Section */}
+        <div className="mx-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Coach Notes</p>
+            <button
+              onClick={() => setShowNoteForm(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors"
+            >
+              <MessageSquarePlus size={14} />
+              Add Note
+            </button>
+          </div>
+
+          {/* Note Form */}
+          {showNoteForm && (
+            <div className="card mb-3 space-y-3">
+              {/* Category picker */}
+              <div className="flex gap-1.5 flex-wrap">
+                {(Object.keys(CATEGORY_STYLES) as CoachNoteCategory[]).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setNoteCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                      noteCategory === cat
+                        ? `${CATEGORY_STYLES[cat].cls} border-current`
+                        : 'bg-dark-600 text-gray-500 border-dark-500 hover:border-dark-300'
+                    }`}
+                  >
+                    {CATEGORY_STYLES[cat].label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className="input w-full min-h-[90px] text-sm resize-none"
+                placeholder="Write your coaching feedback, observations, or instructions..."
+                value={noteContent}
+                onChange={e => setNoteContent(e.target.value)}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setShowNoteForm(false); setNoteContent(''); }}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitNote}
+                  disabled={!noteContent.trim()}
+                  className="btn-primary px-4 py-2 text-sm disabled:opacity-40"
+                >
+                  Post Note
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Notes List */}
+          {fighterNotes.length === 0 ? (
+            <div className="card text-center py-6">
+              <MessageSquarePlus size={24} className="text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No notes yet</p>
+              <p className="text-xs text-gray-600 mt-1">Add coaching feedback to keep your fighter on track</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {visibleNotes.map(note => (
+                <div key={note.id} className="card">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`badge text-xs font-semibold ${CATEGORY_STYLES[note.category].cls}`}>
+                          {CATEGORY_STYLES[note.category].label}
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          {format(parseISO(note.createdAt), 'MMM d, h:mm a')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300 leading-relaxed">{note.content}</p>
+                    </div>
+                    <button
+                      onClick={() => dispatch({ type: 'DELETE_COACH_NOTE', payload: note.id })}
+                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {fighterNotes.length > 3 && (
+                <button
+                  onClick={() => setShowAllNotes(v => !v)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  <ChevronDown size={14} className={`transition-transform ${showAllNotes ? 'rotate-180' : ''}`} />
+                  {showAllNotes ? 'Show less' : `Show ${fighterNotes.length - 3} more notes`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Weekly Sessions Chart */}
@@ -270,9 +405,10 @@ export default function CoachDashboard() {
         ) : (
           <div className="space-y-3">
             {filtered.map(f => {
-              const fCamp = camps[camps.length - 1]; // Demo: latest camp
+              const fCamp = camps[camps.length - 1];
               const fWorkouts = workoutLogs.filter(l => fCamp && l.campId === fCamp.id);
               const fSparring = sparringLogs.filter(l => fCamp && l.campId === fCamp.id);
+              const unreadNotes = coachNotes.filter(n => n.fighterId === f.id && fCamp && n.campId === fCamp.id).length;
 
               return (
                 <button
@@ -288,6 +424,9 @@ export default function CoachDashboard() {
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-white">{f.name}</p>
                         {f.gym && <span className="text-xs text-gray-600">· {f.gym}</span>}
+                        {unreadNotes > 0 && (
+                          <span className="ml-auto badge bg-brand-700 text-white text-xs px-2">{unreadNotes} note{unreadNotes !== 1 ? 's' : ''}</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="badge bg-dark-500 text-gray-500 text-xs">{f.sport}</span>
@@ -319,6 +458,14 @@ export default function CoachDashboard() {
           </div>
         )}
       </div>
+
+      {/* Coaches list to be linked — only shown when no fighters exist */}
+      {activeFighters.length === 0 && (
+        <div className="mx-4 card text-center py-8">
+          <User size={32} className="text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Fighters will appear here once they create accounts and link you as their coach in their Settings.</p>
+        </div>
+      )}
     </div>
   );
 }

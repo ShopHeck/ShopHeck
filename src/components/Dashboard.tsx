@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Heart } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Heart, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -23,7 +23,7 @@ interface Props {
 
 export default function Dashboard({ onNavigate }: Props) {
   const { state } = useApp();
-  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs } = state;
+  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser } = state;
 
   if (!activeCamp) return null;
 
@@ -49,6 +49,10 @@ export default function Dashboard({ onNavigate }: Props) {
   const todayDayOfWeek = today.getDay();
   const todaySessions = currentWeek?.days.find(d => d.dayOfWeek === todayDayOfWeek);
   const recentLogs = workoutLogs.filter(l => l.campId === activeCamp.id).slice(0, 3);
+
+  const latestCoachNote = coachNotes
+    .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
 
   return (
     <div className="space-y-4 pb-4">
@@ -90,6 +94,26 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Coach Note Banner */}
+      {latestCoachNote && (
+        <div className="mx-4">
+          <div className="bg-gradient-to-r from-purple-900/40 to-dark-700 border border-purple-800/50 rounded-xl p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-900/60 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <MessageSquare size={15} className="text-purple-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold text-purple-400">{latestCoachNote.coachName}</span>
+                <span className="text-xs text-gray-600">·</span>
+                <span className="text-xs text-gray-600">{format(parseISO(latestCoachNote.createdAt), 'MMM d')}</span>
+                <span className="badge text-xs bg-dark-600 text-gray-400 ml-auto capitalize">{latestCoachNote.category}</span>
+              </div>
+              <p className="text-sm text-gray-300 leading-relaxed line-clamp-3">{latestCoachNote.content}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current Phase */}
       {currentWeek && (

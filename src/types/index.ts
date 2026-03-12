@@ -120,6 +120,20 @@ export interface FighterProfile {
   gym?: string;
   record?: string;
   avatar?: string;
+  coachId?: string; // fighter links to their coach's profile id
+  createdAt: string;
+}
+
+export type CoachNoteCategory = 'technique' | 'conditioning' | 'mental' | 'nutrition' | 'general';
+
+export interface CoachNote {
+  id: string;
+  coachId: string;
+  coachName: string;
+  fighterId: string;
+  campId: string;
+  category: CoachNoteCategory;
+  content: string;
   createdAt: string;
 }
 
@@ -163,9 +177,11 @@ export interface AppState {
   conditioningTests: ConditioningTest[];
   weightEntries: WeightEntry[];
   fighters: FighterProfile[];
+  coaches: FighterProfile[];
   /** Key: `${campId}-${weekNum}-${dayOfWeek}-${sessionIndex}` */
   completedSessions: Record<string, boolean>;
   /** Key: campId */
   gamePlans: Record<string, GamePlan>;
   nutritionLogs: NutritionLog[];
+  coachNotes: CoachNote[];
 }

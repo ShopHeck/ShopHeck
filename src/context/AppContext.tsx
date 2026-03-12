@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote } from '../types';
 import {
   loadState,
   saveState,
@@ -19,6 +19,9 @@ import {
   saveGamePlan,
   upsertNutritionLog,
   deleteNutritionLog,
+  addCoachNote,
+  deleteCoachNote,
+  linkCoach,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 
@@ -41,6 +44,9 @@ type Action =
   | { type: 'SAVE_GAME_PLAN'; payload: GamePlan }
   | { type: 'LOG_NUTRITION'; payload: Omit<NutritionLog, 'id' | 'createdAt'> }
   | { type: 'DELETE_NUTRITION'; payload: string }
+  | { type: 'ADD_COACH_NOTE'; payload: Omit<CoachNote, 'id' | 'createdAt'> }
+  | { type: 'DELETE_COACH_NOTE'; payload: string }
+  | { type: 'LINK_COACH'; payload: string | null }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -53,7 +59,10 @@ function reducer(state: AppState, action: Action): AppState {
       const fighters = action.payload.role === 'fighter'
         ? [...state.fighters.filter(f => f.id !== profile.id), profile]
         : state.fighters;
-      return { ...state, currentUser: profile, fighters };
+      const coaches = action.payload.role === 'coach'
+        ? [...state.coaches.filter(c => c.id !== profile.id), profile]
+        : state.coaches;
+      return { ...state, currentUser: profile, fighters, coaches };
     }
 
     case 'UPDATE_PROFILE':
@@ -115,8 +124,17 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_NUTRITION':
       return deleteNutritionLog(state, action.payload);
 
+    case 'ADD_COACH_NOTE':
+      return addCoachNote(state, action.payload);
+
+    case 'DELETE_COACH_NOTE':
+      return deleteCoachNote(state, action.payload);
+
+    case 'LINK_COACH':
+      return linkCoach(state, action.payload);
+
     case 'RESET':
-      return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [] };
+      return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [], coaches: [] };
 
     default:
       return state;

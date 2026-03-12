@@ -1,4 +1,4 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote } from '../types';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -12,9 +12,11 @@ export const defaultState: AppState = {
   conditioningTests: [],
   weightEntries: [],
   fighters: [],
+  coaches: [],
   completedSessions: {},
   gamePlans: {},
   nutritionLogs: [],
+  coachNotes: [],
 };
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
@@ -99,8 +101,9 @@ export function deleteWeightEntry(state: AppState, id: string): AppState {
 
 export function updateProfile(state: AppState, profile: FighterProfile): AppState {
   const fighters = state.fighters.map(f => f.id === profile.id ? profile : f);
+  const coaches = state.coaches.map(c => c.id === profile.id ? profile : c);
   const currentUser = state.currentUser?.id === profile.id ? profile : state.currentUser;
-  return { ...state, fighters, currentUser };
+  return { ...state, fighters, coaches, currentUser };
 }
 
 export function deleteCamp(state: AppState, campId: string): AppState {
@@ -144,4 +147,19 @@ export function upsertNutritionLog(state: AppState, log: Omit<NutritionLog, 'id'
 
 export function deleteNutritionLog(state: AppState, id: string): AppState {
   return { ...state, nutritionLogs: state.nutritionLogs.filter(n => n.id !== id) };
+}
+
+export function addCoachNote(state: AppState, note: Omit<CoachNote, 'id' | 'createdAt'>): AppState {
+  const newNote: CoachNote = { ...note, id: generateId(), createdAt: new Date().toISOString() };
+  return { ...state, coachNotes: [newNote, ...state.coachNotes] };
+}
+
+export function deleteCoachNote(state: AppState, id: string): AppState {
+  return { ...state, coachNotes: state.coachNotes.filter(n => n.id !== id) };
+}
+
+export function linkCoach(state: AppState, coachId: string | null): AppState {
+  if (!state.currentUser) return state;
+  const updated = { ...state.currentUser, coachId: coachId ?? undefined };
+  return updateProfile(state, updated);
 }
