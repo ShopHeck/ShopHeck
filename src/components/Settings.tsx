@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users } from 'lucide-react';
+import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy } from 'lucide-react';
+import UpgradeModal from './shared/UpgradeModal';
+import { isPro, isCoachPro } from '../utils/subscription';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
@@ -55,6 +57,10 @@ interface Props {
 export default function Settings({ onNewCamp, onNavigate }: Props) {
   const { state, dispatch } = useApp();
   const { currentUser, camps, activeCamp, coaches } = state;
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const sub = state.subscription;
+  const userIsPro = isPro(sub);
+  const userIsCoachPro = isCoachPro(sub);
 
   // AI key
   const [apiKeyDraft, setApiKeyDraft] = useState('');
@@ -363,6 +369,43 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         </div>
       )}
 
+      {/* Subscription */}
+      <div className="mx-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Subscription</p>
+        {userIsPro ? (
+          <div className="card">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${userIsCoachPro ? 'bg-purple-900/40' : 'bg-brand-900/40'}`}>
+                {userIsCoachPro ? <Trophy size={18} className="text-purple-400" /> : <Zap size={18} className="text-brand-400" />}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-white">
+                  {userIsCoachPro ? 'Coach Pro' : 'Fighter Pro'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {sub.expiresAt
+                    ? `Renews ${new Date(sub.expiresAt).toLocaleDateString()}`
+                    : 'Active'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card bg-gradient-to-br from-brand-900/20 to-dark-700">
+            <div className="flex items-center gap-3 mb-3">
+              <Zap size={18} className="text-brand-400" />
+              <span className="text-sm font-bold text-white">Upgrade to Pro</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              Unlock Gym Display, custom presets, voice announcements, reaction training, session history, AI insights and more.
+            </p>
+            <button onClick={() => setShowUpgrade(true)} className="btn-primary w-full text-sm py-2.5">
+              View Plans
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Integrations */}
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Integrations</p>
@@ -616,6 +659,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           onCancel={() => setConfirmReset(false)}
         />
       )}
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

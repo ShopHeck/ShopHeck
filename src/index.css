@@ -78,4 +78,21 @@
   .nav-item.active {
     @apply text-brand-500;
   }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes phase-flash {
+  0%   { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+
+.phase-flash {
+  animation: phase-flash 0.6s ease-out forwards;
 }

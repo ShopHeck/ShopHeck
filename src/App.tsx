@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { TimerProvider, useTimerContext } from './context/TimerContext';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import WeeklyPlanner from './components/WeeklyPlanner';
@@ -40,6 +41,16 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   health: { title: 'Apple Health', subtitle: 'Sync & Export' },
 };
 
+function FlashOverlay() {
+  const { signal } = useTimerContext();
+  if (!signal.flashColor) return null;
+  return (
+    <div
+      className={`fixed inset-0 ${signal.flashColor} pointer-events-none z-50 phase-flash`}
+    />
+  );
+}
+
 function AppShell() {
   const { state } = useApp();
   const [view, setView] = useState<View>('dashboard');
@@ -65,9 +76,12 @@ function AppShell() {
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
+      <FlashOverlay />
       <Header
         title={view === 'dashboard' ? 'Fight Camp' : title}
         subtitle={view === 'dashboard' ? dashSubtitle : subtitle}
+        currentView={view}
+        onNavigate={v => setView(v as View)}
       />
 
       <main className="flex-1 max-w-lg mx-auto w-full overflow-y-auto pb-20">
@@ -118,8 +132,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppShell />
-    </AppProvider>
+    <TimerProvider>
+      <AppProvider>
+        <AppShell />
+      </AppProvider>
+    </TimerProvider>
   );
 }

@@ -1,4 +1,11 @@
-import { Flame, Settings, ChevronLeft } from 'lucide-react';
+import { Flame, Settings, ChevronLeft, Timer } from 'lucide-react';
+import { useTimerContext } from '../../context/TimerContext';
+
+function fmt(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface Props {
   title: string;
@@ -6,9 +13,14 @@ interface Props {
   onBack?: () => void;
   onSettings?: () => void;
   subtitle?: string;
+  currentView?: string;
+  onNavigate?: (view: string) => void;
 }
 
-export default function Header({ title, showBack, onBack, onSettings, subtitle }: Props) {
+export default function Header({ title, showBack, onBack, onSettings, subtitle, currentView, onNavigate }: Props) {
+  const { signal } = useTimerContext();
+  const showTimerPill = signal.isRunning && currentView !== 'timer' && onNavigate;
+
   return (
     <header className="sticky top-0 z-40 bg-dark-800/90 backdrop-blur border-b border-dark-500">
       <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
@@ -28,6 +40,16 @@ export default function Header({ title, showBack, onBack, onSettings, subtitle }
           <h1 className="text-base font-bold text-white truncate">{title}</h1>
           {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
         </div>
+
+        {showTimerPill && (
+          <button
+            onClick={() => onNavigate!('timer')}
+            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 rounded-full px-3 py-1 text-xs font-bold text-white transition-colors active:scale-95"
+          >
+            <Timer size={11} />
+            R{signal.currentRound}/{signal.rounds} · {fmt(signal.timeLeft)}
+          </button>
+        )}
 
         {onSettings && (
           <button onClick={onSettings} className="text-gray-400 hover:text-white transition-colors p-1">

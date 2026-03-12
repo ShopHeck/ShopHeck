@@ -1,4 +1,5 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset } from '../types';
+import { DEFAULT_SUBSCRIPTION } from './subscription';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -17,6 +18,7 @@ export const defaultState: AppState = {
   gamePlans: {},
   nutritionLogs: [],
   coachNotes: [],
+  subscription: DEFAULT_SUBSCRIPTION,
 };
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
@@ -162,4 +164,19 @@ export function linkCoach(state: AppState, coachId: string | null): AppState {
   if (!state.currentUser) return state;
   const updated = { ...state.currentUser, coachId: coachId ?? undefined };
   return updateProfile(state, updated);
+}
+
+// ─── Custom Timer Presets ─────────────────────────────────────────────────
+
+const PRESETS_KEY = 'fightcamp_timer_presets';
+
+export function loadCustomPresets(): CustomTimerPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+export function saveCustomPresets(presets: CustomTimerPreset[]): void {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)); } catch { /* noop */ }
 }

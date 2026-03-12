@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState } from '../types';
+import { processStripeReturn, saveSubscription } from '../utils/subscription';
 import {
   loadState,
   saveState,
@@ -47,6 +48,7 @@ type Action =
   | { type: 'ADD_COACH_NOTE'; payload: Omit<CoachNote, 'id' | 'createdAt'> }
   | { type: 'DELETE_COACH_NOTE'; payload: string }
   | { type: 'LINK_COACH'; payload: string | null }
+  | { type: 'SET_SUBSCRIPTION'; payload: SubscriptionState }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -133,6 +135,11 @@ function reducer(state: AppState, action: Action): AppState {
     case 'LINK_COACH':
       return linkCoach(state, action.payload);
 
+    case 'SET_SUBSCRIPTION': {
+      saveSubscription(action.payload);
+      return { ...state, subscription: action.payload };
+    }
+
     case 'RESET':
       return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [], coaches: [] };
 
@@ -150,6 +157,13 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState);
+
+  // Process Stripe Payment Link return on mount
+  useEffect(() => {
+    const sub = processStripeReturn();
+    if (sub) dispatch({ type: 'SET_SUBSCRIPTION', payload: sub });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     saveState(state);

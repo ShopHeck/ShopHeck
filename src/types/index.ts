@@ -167,6 +167,30 @@ export interface NutritionLog {
   createdAt: string;
 }
 
+// ─── Subscription ────────────────────────────────────────────────────────
+
+export type SubscriptionTier = 'free' | 'fighter_pro' | 'coach_pro';
+
+export interface SubscriptionState {
+  tier: SubscriptionTier;
+  /** ISO date string when the sub expires; null = free forever */
+  expiresAt: string | null;
+  source: 'none' | 'stripe_payment_link' | 'stripe_jwt';
+}
+
+// ─── Timer ───────────────────────────────────────────────────────────────
+
+export interface CustomTimerPreset {
+  id: string;
+  label: string;
+  rounds: number;
+  workSec: number;
+  restSec: number;
+  createdAt: string;
+}
+
+// ─── App State ────────────────────────────────────────────────────────────
+
 export interface AppState {
   currentUser: FighterProfile | null;
   activeCamp: FightCamp | null;
@@ -184,4 +208,5 @@ export interface AppState {
   gamePlans: Record<string, GamePlan>;
   nutritionLogs: NutritionLog[];
   coachNotes: CoachNote[];
+  subscription: SubscriptionState;
 }
