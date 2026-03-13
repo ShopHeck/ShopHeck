@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getRandomPrompt } from '../utils/reactionPrompts';
 import type { Sport } from '../types';
 
@@ -10,22 +10,29 @@ interface Props {
 
 export default function ReactionPrompt({ sport, active, isPro }: Props) {
   const [prompt, setPrompt] = useState(() => getRandomPrompt(sport, isPro));
+  const [fade, setFade] = useState(true);
+  const prevRef = useRef(prompt);
 
   useEffect(() => {
     if (!active) return;
-    // New prompt every 4 seconds during rest
     const id = setInterval(() => {
-      setPrompt(getRandomPrompt(sport, isPro));
-    }, 4000);
+      let next = getRandomPrompt(sport, isPro);
+      // avoid repeating the same sentence back-to-back
+      if (next === prevRef.current) next = getRandomPrompt(sport, isPro);
+      prevRef.current = next;
+      setFade(false);
+      setTimeout(() => { setPrompt(next); setFade(true); }, 300);
+    }, 5000);
     return () => clearInterval(id);
   }, [active, sport, isPro]);
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <p className="text-[10px] font-semibold tracking-[0.15em] text-brand-500/70 uppercase mb-1">Next</p>
-      <p className="text-lg font-black tracking-widest text-brand-400 text-center leading-tight animate-pulse">
-        {prompt}
-      </p>
+    <div
+      className="px-4 text-center transition-opacity duration-300"
+      style={{ opacity: fade ? 1 : 0 }}
+    >
+      <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-1">Coach says</p>
+      <p className="text-sm font-semibold text-gray-200 leading-snug">{prompt}</p>
     </div>
   );
 }

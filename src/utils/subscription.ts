@@ -2,8 +2,9 @@ import type { SubscriptionState, SubscriptionTier } from '../types';
 
 const SUB_KEY = 'fightcamp_subscription';
 
+// DEV: set to 'coach_pro' for testing all features — flip back to 'free' before launch
 export const DEFAULT_SUBSCRIPTION: SubscriptionState = {
-  tier: 'free',
+  tier: 'coach_pro',
   expiresAt: null,
   source: 'none',
 };

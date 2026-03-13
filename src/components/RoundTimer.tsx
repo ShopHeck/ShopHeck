@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Play, Pause, RotateCcw, ChevronUp, ChevronDown,
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
@@ -90,10 +90,12 @@ export default function RoundTimer() {
   const {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
     voiceEnabled, hapticEnabled, reactionMode,
+    workColor, restColor,
     phase, currentRound, timeLeft, isRunning,
     handleStartPause, reset, selectPreset,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
     setVoiceEnabled, setHapticEnabled, setReactionMode,
+    setWorkColor, setRestColor,
   } = timer;
 
   // Simple absolute-value adjuster for settings rows
@@ -184,19 +186,17 @@ export default function RoundTimer() {
   }
 
   // ── Derived UI ────────────────────────────────────────────────────────────
-  const ringColor =
-    phase === 'rest' ? 'text-blue-400' :
-    phase === 'done' ? 'text-green-400' :
-    phase === 'prep' ? 'text-yellow-400' :
-    phase === 'work' ? 'text-brand-500' :
-    'text-gray-500';
+  // Active color: work=user's workColor, rest=user's restColor, prep=yellow, done=green, idle=gray
+  const activeColor =
+    phase === 'work' ? workColor :
+    phase === 'rest' ? restColor :
+    phase === 'prep' ? '#eab308' :
+    phase === 'done' ? '#22c55e' : '#4b5563';
 
-  const ringBg =
-    phase === 'rest' ? 'border-blue-500/50' :
-    phase === 'done' ? 'border-green-500/50' :
-    phase === 'prep' ? 'border-yellow-500/50' :
-    phase === 'work' ? 'border-brand-500/50' :
-    'border-dark-400';
+  // Ring border uses activeColor at 50% opacity (append '80' hex for alpha)
+  const ringBorderStyle = { borderColor: `${activeColor}80` };
+  // Clock text uses activeColor
+  const ringTextStyle = { color: activeColor };
 
   const phaseLabel =
     phase === 'idle' ? 'Ready'     :
@@ -208,8 +208,13 @@ export default function RoundTimer() {
     phase === 'rest' ? 'bg-blue-900/40 text-blue-300'     :
     phase === 'done' ? 'bg-green-900/40 text-green-300'   :
     phase === 'prep' ? 'bg-yellow-900/40 text-yellow-300' :
-    phase === 'work' ? 'bg-brand-900/40 text-brand-300'   :
     'bg-dark-600 text-gray-400';
+
+  // For work/rest phases, derive a tinted badge from the user's chosen color
+  const phaseBadgeStyle: React.CSSProperties | undefined =
+    (phase === 'work' || phase === 'rest')
+      ? { backgroundColor: `${activeColor}25`, color: activeColor }
+      : undefined;
 
   return (
     <div className="pb-4">
@@ -301,15 +306,21 @@ export default function RoundTimer() {
         )}
 
         {/* Timer ring */}
-        <div className={`w-52 h-52 rounded-full border-4 ${ringBg} flex items-center justify-center bg-dark-800 transition-colors duration-500`}>
-          <span className={`text-6xl font-black tabular-nums tracking-tight ${ringColor} transition-colors duration-300`}>
+        <div
+          className="w-52 h-52 rounded-full border-4 flex items-center justify-center bg-dark-800 transition-colors duration-500"
+          style={ringBorderStyle}
+        >
+          <span className="text-6xl font-black tabular-nums tracking-tight transition-colors duration-300" style={ringTextStyle}>
             {phase === 'done' ? '✓' : fmt(timeLeft)}
           </span>
         </div>
 
         {/* Phase badge when running */}
-        {(phase === 'work' || phase === 'rest' || phase === 'prep') && (
-          <span className={`badge text-sm font-bold px-3 py-1 mt-3 ${phaseBg}`}>{phaseLabel}</span>
+        {(phase === 'work' || phase === 'rest') && (
+          <span className="badge text-sm font-bold px-3 py-1 mt-3" style={phaseBadgeStyle}>{phaseLabel}</span>
+        )}
+        {phase === 'prep' && (
+          <span className="badge text-sm font-bold px-3 py-1 mt-3 bg-yellow-900/40 text-yellow-300">{phaseLabel}</span>
         )}
 
         {/* Reaction prompt — below badge during rest */}
@@ -325,11 +336,13 @@ export default function RoundTimer() {
             {Array.from({ length: Math.min(rounds, 20) }).map((_, i) => (
               <div
                 key={i}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  i < currentRound - 1 ? 'bg-brand-600' :
-                  i === currentRound - 1 ? 'bg-brand-400 scale-125' :
-                  'bg-dark-500'
-                }`}
+                className={`w-2 h-2 rounded-full transition-all ${i === currentRound - 1 ? 'scale-125' : ''}`}
+                style={{
+                  backgroundColor:
+                    i < currentRound - 1  ? `${workColor}99` :
+                    i === currentRound - 1 ? workColor :
+                    '#2a2a2a',
+                }}
               />
             ))}
           </div>
@@ -451,6 +464,42 @@ export default function RoundTimer() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Ring Colors */}
+        <div className="card space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ring Colors</p>
+          {[
+            {
+              label: 'Work',
+              current: workColor,
+              set: setWorkColor,
+              swatches: ['#22c55e', '#3b82f6', '#06b6d4', '#a855f7', '#f97316', '#f1f5f9'],
+            },
+            {
+              label: 'Rest',
+              current: restColor,
+              set: setRestColor,
+              swatches: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6', '#a855f7', '#94a3b8'],
+            },
+          ].map(row => (
+            <div key={row.label} className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white w-10">{row.label}</span>
+              <div className="flex gap-2">
+                {row.swatches.map(hex => (
+                  <button
+                    key={hex}
+                    onClick={() => row.set(hex)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all active:scale-95 ${
+                      row.current === hex ? 'border-white scale-110' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: hex }}
+                    aria-label={hex}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Warning Time */}

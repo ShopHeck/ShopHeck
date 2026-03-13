@@ -43,6 +43,8 @@ interface TimerSave {
   voiceEnabled: boolean;
   hapticEnabled: boolean;
   reactionMode: boolean;
+  workColor: string;
+  restColor: string;
   phase: Phase;
   currentRound: number;
   isRunning: boolean;
@@ -56,6 +58,8 @@ const DEFAULTS: Partial<TimerSave> = {
   voiceEnabled: false,
   hapticEnabled: true,
   reactionMode: false,
+  workColor: '#22c55e',
+  restColor: '#ef4444',
 };
 
 function saveTimer(s: TimerSave) {
@@ -266,6 +270,8 @@ export function useRoundTimer() {
   const [voiceEnabled,  setVoiceEnabled]  = useState(false);
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [reactionMode,  setReactionMode]  = useState(false);
+  const [workColor, setWorkColor] = useState('#22c55e');
+  const [restColor, setRestColor] = useState('#ef4444');
 
   // Timer engine state
   const [phase,        setPhase]        = useState<Phase>('idle');
@@ -334,14 +340,14 @@ export function useRoundTimer() {
     if (phase === 'idle') return;
     saveTimer({
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-      voiceEnabled, hapticEnabled, reactionMode,
+      voiceEnabled, hapticEnabled, reactionMode, workColor, restColor,
       phase, currentRound, isRunning,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
     });
   }, [phase, currentRound, isRunning, timeLeft,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-      voiceEnabled, hapticEnabled, reactionMode]);
+      voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
   // ── Restore on mount ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -357,6 +363,8 @@ export function useRoundTimer() {
     setVoiceEnabled(saved.voiceEnabled);
     setHapticEnabled(saved.hapticEnabled);
     setReactionMode(saved.reactionMode);
+    if (saved.workColor) setWorkColor(saved.workColor);
+    if (saved.restColor) setRestColor(saved.restColor);
 
     if (saved.isRunning) {
       const fwd = fastForward(saved);
@@ -597,6 +605,7 @@ export function useRoundTimer() {
     // Settings
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
     voiceEnabled, hapticEnabled, reactionMode,
+    workColor, restColor,
     // Timer state
     phase, currentRound, timeLeft, isRunning,
     // Actions
@@ -610,5 +619,7 @@ export function useRoundTimer() {
     setVoiceEnabled,
     setHapticEnabled,
     setReactionMode,
+    setWorkColor,
+    setRestColor,
   };
 }
