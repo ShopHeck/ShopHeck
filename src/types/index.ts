@@ -71,6 +71,7 @@ export interface WorkoutLog {
   notes: string;
   completed: boolean;
   createdAt: string;
+  mep?: number; // MyZone Effort Points earned during session
 }
 
 export interface SparringLog {
@@ -109,6 +110,13 @@ export interface WeightEntry {
   createdAt: string;
 }
 
+export interface MacroEntry {
+  calories: number;
+  protein: number; // grams
+  carbs: number;   // grams
+  fat: number;     // grams
+}
+
 export interface FighterProfile {
   id: string;
   name: string;
@@ -122,6 +130,9 @@ export interface FighterProfile {
   avatar?: string;
   coachId?: string; // fighter links to their coach's profile id
   createdAt: string;
+  macroTargets?: MacroEntry;
+  maxHR?: number;   // override for 220-age estimate
+  mepTarget?: number; // daily MyZone Effort Points target
 }
 
 export type CoachNoteCategory = 'technique' | 'conditioning' | 'mental' | 'nutrition' | 'general';
@@ -165,6 +176,7 @@ export interface NutritionLog {
   };
   notes: string;
   createdAt: string;
+  macros?: MacroEntry;
 }
 
 // ─── Subscription ────────────────────────────────────────────────────────

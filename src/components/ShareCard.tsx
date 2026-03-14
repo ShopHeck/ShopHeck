@@ -1,0 +1,270 @@
+import { useEffect, useRef, useState } from 'react';
+import { X, Share2, Download } from 'lucide-react';
+import { format, parseISO, differenceInDays } from 'date-fns';
+import type { WorkoutLog, FightCamp, FighterProfile } from '../types';
+
+interface Props {
+  log: WorkoutLog;
+  camp: FightCamp;
+  user: FighterProfile;
+  onClose: () => void;
+}
+
+const SESSION_EMOJIS: Record<string, string> = {
+  conditioning: '🔥',
+  skill: '🥊',
+  sparring: '⚡',
+  strength: '💪',
+  recovery: '🧘',
+  rest: '😴',
+};
+
+const SESSION_LABELS: Record<string, string> = {
+  conditioning: 'Conditioning',
+  skill: 'Skill Work',
+  sparring: 'Sparring',
+  strength: 'Strength',
+  recovery: 'Recovery',
+  rest: 'Rest',
+};
+
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  w: number, h: number,
+  r: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTMLCanvasElement {
+  const W = 1080, H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0a0a0a');
+  bg.addColorStop(1, '#111827');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle top accent line
+  ctx.fillStyle = '#ea580c';
+  ctx.fillRect(0, 0, W, 8);
+
+  const cx = W / 2;
+
+  // FIGHT CAMP brand
+  ctx.fillStyle = '#ea580c';
+  ctx.font = 'bold 52px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.letterSpacing = '0.15em';
+  ctx.fillText('FIGHT CAMP', cx, 140);
+
+  // Athlete name
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '40px system-ui, sans-serif';
+  ctx.fillText(user.name.toUpperCase(), cx, 210);
+
+  // Camp day calculation
+  const campStart = parseISO(camp.startDate);
+  const logDate = parseISO(log.date);
+  const dayNum = Math.max(1, differenceInDays(logDate, campStart) + 1);
+  const totalDays = camp.campWeeks * 7;
+  const daysToFight = Math.max(0, differenceInDays(parseISO(camp.fightDate), new Date()));
+
+  // Big day number
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold 320px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(String(dayNum), cx, 680);
+
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = 'bold 72px system-ui, sans-serif';
+  ctx.fillText(`of ${totalDays} days`, cx, 770);
+
+  // Progress bar
+  const barX = 120, barY = 820, barW = W - 240, barH = 20;
+  const progress = Math.min(1, dayNum / totalDays);
+  ctx.fillStyle = '#1f2937';
+  drawRoundRect(ctx, barX, barY, barW, barH, 10);
+  ctx.fill();
+  ctx.fillStyle = '#ea580c';
+  drawRoundRect(ctx, barX, barY, Math.max(barH, barW * progress), barH, 10);
+  ctx.fill();
+
+  // Session card
+  const cardX = 80, cardY = 890, cardW = W - 160, cardH = 420;
+  ctx.fillStyle = '#1a1a1a';
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, 40);
+  ctx.fill();
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 2;
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, 40);
+  ctx.stroke();
+
+  // Session type badge
+  const emoji = SESSION_EMOJIS[log.sessionType] ?? '🏋️';
+  const typeLabel = SESSION_LABELS[log.sessionType] ?? log.sessionType;
+  ctx.fillStyle = '#ea580c22';
+  drawRoundRect(ctx, cx - 160, cardY + 50, 320, 80, 40);
+  ctx.fill();
+  ctx.fillStyle = '#ea580c';
+  ctx.font = 'bold 40px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${emoji}  ${typeLabel.toUpperCase()}`, cx, cardY + 103);
+
+  // Session title
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 72px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  // Truncate long titles
+  const title = log.title.length > 18 ? log.title.slice(0, 17) + '…' : log.title;
+  ctx.fillText(title, cx, cardY + 225);
+
+  // Stats row
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = '48px system-ui, sans-serif';
+  ctx.fillText(`${log.duration} min  ·  RPE ${log.rpe}/10`, cx, cardY + 320);
+
+  // Date
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '36px system-ui, sans-serif';
+  ctx.fillText(format(logDate, 'MMMM d, yyyy').toUpperCase(), cx, cardY + 390);
+
+  // Opponent / fight info
+  const fightDate = format(parseISO(camp.fightDate), 'MMM d, yyyy');
+  const fightLabel = camp.opponent
+    ? `vs. ${camp.opponent}  ·  ${fightDate}`
+    : `Fight Date: ${fightDate}`;
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '42px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(fightLabel, cx, 1430);
+
+  // Days to fight countdown
+  if (daysToFight > 0) {
+    ctx.fillStyle = daysToFight < 14 ? '#ef4444' : daysToFight < 28 ? '#f97316' : '#22c55e';
+    ctx.font = 'bold 56px system-ui, sans-serif';
+    ctx.fillText(`${daysToFight} days to fight`, cx, 1510);
+  }
+
+  // Bottom brand watermark
+  ctx.fillStyle = '#374151';
+  ctx.font = '36px system-ui, sans-serif';
+  ctx.fillText('fightcamp.app', cx, H - 80);
+
+  return canvas;
+}
+
+export default function ShareCard({ log, camp, user, onClose }: Props) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = buildCard(log, camp, user);
+    canvasRef.current = canvas;
+    setDataUrl(canvas.toDataURL('image/png'));
+  }, [log, camp, user]);
+
+  async function handleShare() {
+    if (!canvasRef.current) return;
+    setSharing(true);
+    try {
+      canvasRef.current.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], 'fight-camp-session.png', { type: 'image/png' });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `Day ${Math.max(1, differenceInDays(parseISO(log.date), parseISO(camp.startDate)) + 1)} — ${log.title}`,
+          });
+        } else {
+          // Fallback: download
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'fight-camp-session.png';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }
+        setSharing(false);
+      }, 'image/png');
+    } catch {
+      setSharing(false);
+    }
+  }
+
+  function handleDownload() {
+    if (!dataUrl) return;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'fight-camp-session.png';
+    a.click();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
+      <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-white">Share Session</p>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Preview */}
+        {dataUrl ? (
+          <img
+            src={dataUrl}
+            alt="Share card preview"
+            className="w-full rounded-xl border border-dark-500"
+            style={{ aspectRatio: '9/16', objectFit: 'cover' }}
+          />
+        ) : (
+          <div className="w-full bg-dark-700 rounded-xl flex items-center justify-center" style={{ aspectRatio: '9/16' }}>
+            <p className="text-gray-500 text-sm">Generating…</p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleShare}
+            disabled={!dataUrl || sharing}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
+          >
+            <Share2 size={16} />
+            {sharing ? 'Sharing…' : 'Share'}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={!dataUrl}
+            className="btn-secondary px-4 flex items-center justify-center disabled:opacity-50"
+          >
+            <Download size={16} />
+          </button>
+        </div>
+
+        <button onClick={onClose} className="text-center text-xs text-gray-500 hover:text-gray-300 transition-colors">
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}

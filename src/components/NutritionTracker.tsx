@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Droplets, Plus, Minus, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Droplets, Plus, Minus, Trash2, UtensilsCrossed, Flame, Settings2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { format, parseISO, subDays } from 'date-fns';
-import type { NutritionLog } from '../types';
+import { format, parseISO, subDays, differenceInDays } from 'date-fns';
+import type { NutritionLog, MacroEntry } from '../types';
 
 type MealRating = 'good' | 'ok' | 'poor';
 type Meal = 'breakfast' | 'lunch' | 'dinner';
@@ -32,13 +32,42 @@ function todayStr() {
   return format(new Date(), 'yyyy-MM-dd');
 }
 
+function MacroBar({ label, actual, target, color }: {
+  label: string; actual: number; target: number; color: string;
+}) {
+  const pct = target > 0 ? Math.min(130, Math.round((actual / target) * 100)) : 0;
+  const barColor = pct > 115 ? '#ef4444' : pct > 100 ? '#eab308' : color;
+  const unit = label === 'Calories' ? 'kcal' : 'g';
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-medium text-gray-400">{label}</span>
+        <span className="text-xs text-gray-400">
+          <span style={{ color: barColor }} className="font-semibold">{actual}</span>
+          {target > 0 && <span className="text-gray-600"> / {target}{unit}</span>}
+        </span>
+      </div>
+      <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${Math.min(100, pct)}%`, backgroundColor: barColor }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function NutritionTracker() {
   const { state, dispatch } = useApp();
-  const { activeCamp, nutritionLogs } = state;
+  const { activeCamp, nutritionLogs, currentUser } = state;
 
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
+  const [showMacroEntry, setShowMacroEntry] = useState(false);
+  const [showTargetEditor, setShowTargetEditor] = useState(false);
+  const [macroInput, setMacroInput] = useState<MacroEntry>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [targetInput, setTargetInput] = useState<MacroEntry>({ calories: 2000, protein: 150, carbs: 200, fat: 65 });
 
   if (!activeCamp) {
     return (
@@ -93,6 +122,42 @@ export default function NutritionTracker() {
 
   function deleteLog(id: string) {
     dispatch({ type: 'DELETE_NUTRITION', payload: id });
+  }
+
+  function saveMacros() {
+    updateLog({ macros: macroInput });
+    setShowMacroEntry(false);
+  }
+
+  function openMacroEntry() {
+    setMacroInput(todayLog?.macros ?? { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    setShowMacroEntry(true);
+  }
+
+  function openTargetEditor() {
+    setTargetInput(currentUser?.macroTargets ?? { calories: 2000, protein: 150, carbs: 200, fat: 65 });
+    setShowTargetEditor(true);
+  }
+
+  function saveTargets() {
+    if (currentUser) {
+      dispatch({ type: 'UPDATE_PROFILE', payload: { ...currentUser, macroTargets: targetInput } });
+    }
+    setShowTargetEditor(false);
+  }
+
+  function autoSuggestTargets() {
+    if (!activeCamp || !currentUser) return;
+    const daysToFight = differenceInDays(parseISO(activeCamp.fightDate), new Date());
+    const bodyWeightLbs = activeCamp.currentWeight;
+    // Calorie deficit based on proximity to fight
+    const deficit = daysToFight < 14 ? 500 : daysToFight < 28 ? 200 : 0;
+    const maintenanceCals = Math.round(bodyWeightLbs * 15); // rough maintenance
+    const calories = Math.max(1200, maintenanceCals - deficit);
+    const protein = Math.round(bodyWeightLbs * 1); // 1g per lb
+    const fat = Math.round((calories * 0.25) / 9);  // 25% of cals from fat
+    const carbs = Math.round((calories - protein * 4 - fat * 9) / 4);
+    setTargetInput({ calories, protein, carbs: Math.max(0, carbs), fat });
   }
 
   // Last 7 days history
@@ -225,6 +290,93 @@ export default function NutritionTracker() {
             );
           })}
         </div>
+      </section>
+
+      {/* Macros */}
+      <section className="mx-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Flame size={14} className="text-brand-400" />
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Macros</p>
+          </div>
+          <button onClick={openTargetEditor} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            <Settings2 size={12} />
+            {currentUser?.macroTargets ? 'Edit Targets' : 'Set Targets'}
+          </button>
+        </div>
+
+        {showTargetEditor ? (
+          <div className="card space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Daily Targets</p>
+              <button onClick={autoSuggestTargets} className="text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+                Auto-suggest from camp
+              </button>
+            </div>
+            {([
+              { key: 'calories', label: 'Calories (kcal)' },
+              { key: 'protein',  label: 'Protein (g)' },
+              { key: 'carbs',    label: 'Carbs (g)' },
+              { key: 'fat',      label: 'Fat (g)' },
+            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+              <div key={key}>
+                <label className="label">{label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={targetInput[key] || ''}
+                  onChange={e => setTargetInput(t => ({ ...t, [key]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <button onClick={saveTargets} className="btn-primary flex-1 py-2 text-sm">Save Targets</button>
+              <button onClick={() => setShowTargetEditor(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+          </div>
+        ) : showMacroEntry ? (
+          <div className="card space-y-3">
+            <p className="text-sm font-semibold text-white">Today's Intake</p>
+            {([
+              { key: 'calories', label: 'Calories (kcal)' },
+              { key: 'protein',  label: 'Protein (g)' },
+              { key: 'carbs',    label: 'Carbs (g)' },
+              { key: 'fat',      label: 'Fat (g)' },
+            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+              <div key={key}>
+                <label className="label">{label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={macroInput[key] || ''}
+                  onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <button onClick={saveMacros} className="btn-primary flex-1 py-2 text-sm">Save</button>
+              <button onClick={() => setShowMacroEntry(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="card space-y-3">
+            {currentUser?.macroTargets ? (
+              <>
+                <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color="#f97316" />
+                <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color="#22c55e" />
+                <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color="#3b82f6" />
+                <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color="#a855f7" />
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-2">Set targets to track your macros</p>
+            )}
+            <button onClick={openMacroEntry} className="w-full text-sm text-brand-400 hover:text-brand-300 font-semibold py-1 transition-colors">
+              {todayLog?.macros ? 'Edit today\'s intake' : '+ Log today\'s macros'}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Notes */}

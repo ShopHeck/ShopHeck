@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Play, Pause, RotateCcw, ChevronUp, ChevronDown,
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
-  Plus, X
+  Plus, X, Bluetooth, BluetoothOff
 } from 'lucide-react';
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
 import { loadCustomPresets, saveCustomPresets, generateId } from '../utils/storage';
@@ -11,6 +11,8 @@ import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
+import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 
 // ─── Custom Preset Modal ───────────────────────────────────────────────────
 
@@ -98,6 +100,12 @@ export default function RoundTimer() {
     setWorkColor, setRestColor,
   } = timer;
 
+  // Bluetooth HR
+  const maxHR = state.currentUser?.maxHR ?? Math.max(160, 220 - (state.currentUser?.age ?? 25));
+  const hr = useBluetoothHR(maxHR);
+  const { mep, resetMEP } = useMyZoneMEP(hr.zone, isRunning);
+  const mepTarget = state.currentUser?.mepTarget ?? 65;
+
   // Simple absolute-value adjuster for settings rows
   const adj = (setter: (v: number) => void, current: number, delta: number, min: number, max: number) => {
     setter(Math.max(min, Math.min(max, current + delta)));
@@ -139,10 +147,21 @@ export default function RoundTimer() {
         rpe: 7,
         notes: `${rounds} rounds, ${fmt(workSec)} work / ${fmt(restSec)} rest`,
         completed: true,
+        ...(hr.connected && mep > 0 ? { mep } : {}),
       },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // Reset MEP when a new session starts (phase goes from idle/done to prep/work)
+  const prevPhaseRef = React.useRef(phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    if ((prev === 'idle' || prev === 'done') && (phase === 'prep' || phase === 'work')) {
+      resetMEP();
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, resetMEP]);
 
   const savePreset = useCallback((p: Omit<CustomTimerPreset, 'id' | 'createdAt'>) => {
     const newPreset: CustomTimerPreset = { ...p, id: generateId(), createdAt: new Date().toISOString() };
@@ -330,6 +349,25 @@ export default function RoundTimer() {
           </div>
         )}
 
+        {/* Live HR / MEP row */}
+        {hr.connected && hr.hr !== null && phase !== 'idle' && (
+          <div
+            className="mt-3 flex items-center gap-3 px-4 py-2 rounded-2xl"
+            style={{ backgroundColor: `${ZONE_COLORS[hr.zone]}18`, border: `1px solid ${ZONE_COLORS[hr.zone]}40` }}
+          >
+            <span className="text-sm font-bold tabular-nums" style={{ color: ZONE_COLORS[hr.zone] }}>
+              {hr.hr} bpm
+            </span>
+            <span className="text-xs text-gray-500">{ZONE_LABELS[hr.zone]}</span>
+            {mep > 0 && (
+              <>
+                <span className="text-gray-600">·</span>
+                <span className="text-xs font-semibold text-gray-300">{mep} MEP</span>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Round dots */}
         {phase !== 'idle' && phase !== 'done' && phase !== 'prep' && (
           <div className="flex gap-2 mt-3">
@@ -349,7 +387,14 @@ export default function RoundTimer() {
         )}
 
         {phase === 'done' && (
-          <p className="text-green-400 font-semibold mt-4 text-lg">Session complete!</p>
+          <div className="mt-4 text-center">
+            <p className="text-green-400 font-semibold text-lg">Session complete!</p>
+            {hr.connected && mep > 0 && (
+              <p className="text-sm mt-1" style={{ color: mep >= mepTarget ? '#22c55e' : '#9ca3af' }}>
+                {mep} MEP {mep >= mepTarget ? `✓ target hit (${mepTarget})` : `/ ${mepTarget} target`}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -373,6 +418,26 @@ export default function RoundTimer() {
         >
           {isRunning ? <Pause size={30} /> : <Play size={30} className="translate-x-0.5" />}
         </button>
+        {/* Bluetooth HR button */}
+        {hr.supported && (
+          <button
+            onClick={hr.connected ? hr.disconnect : hr.connect}
+            disabled={hr.connecting}
+            title={hr.connected ? `Connected: ${hr.deviceName}` : 'Connect HR device'}
+            className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+              hr.connected
+                ? 'bg-green-900/30 border-green-700 text-green-400 hover:border-green-500'
+                : 'bg-dark-700 border-dark-500 text-gray-400 hover:text-white hover:border-dark-300'
+            }`}
+          >
+            {hr.connecting
+              ? <span className="text-[9px] font-bold text-gray-400">…</span>
+              : hr.connected
+              ? <Bluetooth size={20} />
+              : <BluetoothOff size={20} />
+            }
+          </button>
+        )}
         {/* Fullscreen button */}
         <ProGate required="fighter_pro" inline>
           <button

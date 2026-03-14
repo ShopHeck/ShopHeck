@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy } from 'lucide-react';
+import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
+import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
 import { useApp } from '../context/AppContext';
@@ -61,6 +62,25 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const sub = state.subscription;
   const userIsPro = isPro(sub);
   const userIsCoachPro = isCoachPro(sub);
+
+  // Bluetooth HR
+  const maxHRDefault = Math.max(160, 220 - (currentUser?.age ?? 25));
+  const hr = useBluetoothHR(currentUser?.maxHR ?? maxHRDefault);
+  const [editingMaxHR, setEditingMaxHR] = useState(false);
+  const [maxHRDraft, setMaxHRDraft] = useState(String(currentUser?.maxHR ?? maxHRDefault));
+  const [editingMEP, setEditingMEP] = useState(false);
+  const [mepDraft, setMepDraft] = useState(String(currentUser?.mepTarget ?? 65));
+
+  function saveMaxHR() {
+    if (!currentUser) return;
+    dispatch({ type: 'UPDATE_PROFILE', payload: { ...currentUser, maxHR: parseInt(maxHRDraft) || maxHRDefault } });
+    setEditingMaxHR(false);
+  }
+  function saveMEPTarget() {
+    if (!currentUser) return;
+    dispatch({ type: 'UPDATE_PROFILE', payload: { ...currentUser, mepTarget: parseInt(mepDraft) || 65 } });
+    setEditingMEP(false);
+  }
 
   // AI key
   const [apiKeyDraft, setApiKeyDraft] = useState('');
@@ -405,6 +425,106 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
         )}
       </div>
+
+      {/* Bluetooth & Devices */}
+      {hr.supported && (
+        <div className="mx-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Bluetooth &amp; Devices</p>
+          <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+            {/* Connect / disconnect */}
+            <div className="px-4 py-3.5 flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${hr.connected ? 'bg-green-900/30' : 'bg-dark-600'}`}>
+                {hr.connected
+                  ? <Bluetooth size={15} className="text-green-400" />
+                  : <BluetoothOff size={15} className="text-gray-500" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white">
+                  {hr.connected ? hr.deviceName ?? 'HR Device' : 'Heart Rate Device'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {hr.connected && hr.hr !== null
+                    ? <span style={{ color: ZONE_COLORS[hr.zone] }}>
+                        {hr.hr} bpm · {ZONE_LABELS[hr.zone]}
+                      </span>
+                    : hr.connected
+                    ? 'Connected — waiting for data'
+                    : 'MyZone, Polar, Garmin, or any BLE HR belt'
+                  }
+                </p>
+              </div>
+              <button
+                onClick={hr.connected ? hr.disconnect : hr.connect}
+                disabled={hr.connecting}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                  hr.connected
+                    ? 'bg-dark-600 text-gray-400 hover:text-white'
+                    : 'bg-brand-600 hover:bg-brand-500 text-white'
+                }`}
+              >
+                {hr.connecting ? '…' : hr.connected ? 'Disconnect' : 'Connect'}
+              </button>
+            </div>
+
+            {/* Max HR */}
+            <div className="px-4 py-3.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">Max Heart Rate</p>
+                  <p className="text-xs text-gray-500">Used for zone calculation</p>
+                </div>
+                {editingMaxHR ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={100} max={220}
+                      className="input w-20 text-center py-1.5 text-sm"
+                      value={maxHRDraft}
+                      onChange={e => setMaxHRDraft(e.target.value)}
+                    />
+                    <button onClick={saveMaxHR} className="text-xs font-semibold text-green-400 hover:text-green-300 transition-colors">Save</button>
+                    <button onClick={() => setEditingMaxHR(false)} className="text-xs text-gray-500 hover:text-white transition-colors">✕</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setMaxHRDraft(String(currentUser?.maxHR ?? maxHRDefault)); setEditingMaxHR(true); }}
+                    className="text-sm font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+                    {currentUser?.maxHR ?? maxHRDefault} bpm
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* MEP Target */}
+            <div className="px-4 py-3.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white">Daily MEP Target</p>
+                  <p className="text-xs text-gray-500">MyZone Effort Points per session</p>
+                </div>
+                {editingMEP ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={10} max={300}
+                      className="input w-20 text-center py-1.5 text-sm"
+                      value={mepDraft}
+                      onChange={e => setMepDraft(e.target.value)}
+                    />
+                    <button onClick={saveMEPTarget} className="text-xs font-semibold text-green-400 hover:text-green-300 transition-colors">Save</button>
+                    <button onClick={() => setEditingMEP(false)} className="text-xs text-gray-500 hover:text-white transition-colors">✕</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setMepDraft(String(currentUser?.mepTarget ?? 65)); setEditingMEP(true); }}
+                    className="text-sm font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+                    {currentUser?.mepTarget ?? 65} MEP
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Integrations */}
       <div className="mx-4">

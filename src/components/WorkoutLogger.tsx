@@ -4,7 +4,8 @@ import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
-import type { SessionType } from '../types';
+import ShareCard from './ShareCard';
+import type { SessionType, WorkoutLog } from '../types';
 import type { LogPrefill } from '../App';
 
 const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
@@ -35,6 +36,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [deleteSparConfirmId, setDeleteSparConfirmId] = useState<string | null>(null);
   const [showSparModal, setShowSparModal] = useState(false);
   const [showCondModal, setShowCondModal] = useState(false);
+  const [shareLog, setShareLog] = useState<WorkoutLog | null>(null);
 
   // Workout form
   const [wDate, setWDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -95,22 +97,23 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
 
   function logWorkout() {
     if (!wTitle.trim()) return;
-    dispatch({
-      type: 'LOG_WORKOUT',
-      payload: {
-        campId: camp.id,
-        date: wDate,
-        weekNumber: currentWeekNum,
-        dayLabel: format(parseISO(wDate), 'EEEE'),
-        sessionType: wType,
-        title: wTitle.trim(),
-        duration: parseInt(wDuration),
-        rpe: parseInt(wRpe),
-        notes: wNotes,
-        completed: true,
-      },
-    });
+    const payload: Omit<WorkoutLog, 'id' | 'createdAt'> = {
+      campId: camp.id,
+      date: wDate,
+      weekNumber: currentWeekNum,
+      dayLabel: format(parseISO(wDate), 'EEEE'),
+      sessionType: wType,
+      title: wTitle.trim(),
+      duration: parseInt(wDuration),
+      rpe: parseInt(wRpe),
+      notes: wNotes,
+      completed: true,
+    };
+    dispatch({ type: 'LOG_WORKOUT', payload });
+    // Build a temp log object for the share card (id/createdAt not needed for display)
+    const tempLog: WorkoutLog = { ...payload, id: 'temp', createdAt: new Date().toISOString() };
     setWTitle(''); setWNotes(''); setShowModal(false);
+    setShareLog(tempLog);
   }
 
   function logSparring() {
@@ -154,6 +157,14 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
 
   return (
     <div className="space-y-4 pb-4">
+      {shareLog && state.currentUser && (
+        <ShareCard
+          log={shareLog}
+          camp={camp}
+          user={state.currentUser}
+          onClose={() => setShareLog(null)}
+        />
+      )}
       {/* Tab bar */}
       <div className="mx-4 mt-4">
         <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
