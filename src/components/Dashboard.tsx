@@ -1,6 +1,7 @@
 import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Heart, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
+import { computeReadiness } from '../utils/readiness';
 import { format, parseISO } from 'date-fns';
 
 const PHASE_COLORS: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function Dashboard({ onNavigate }: Props) {
   const todaySessions = currentWeek?.days.find(d => d.dayOfWeek === todayDayOfWeek);
   const recentLogs = workoutLogs.filter(l => l.campId === activeCamp.id).slice(0, 3);
 
+  const readiness = computeReadiness(state);
   const latestCoachNote = coachNotes
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
@@ -94,6 +96,53 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Readiness Card */}
+      {readiness && (
+        <div className="mx-4">
+          <button
+            onClick={() => onNavigate('readiness')}
+            className="card w-full text-left hover:border-dark-300 transition-colors group"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fight Readiness</p>
+              <ChevronRight size={15} className="text-gray-600 group-hover:text-gray-400 transition-colors" />
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Score ring */}
+              <div className="relative flex-shrink-0 w-16 h-16">
+                <svg viewBox="0 0 40 40" className="w-full h-full -rotate-[126deg]">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 16 * 0.75} ${2 * Math.PI * 16}`} />
+                  <circle cx="20" cy="20" r="16" fill="none" strokeWidth="4" strokeLinecap="round"
+                    stroke={readiness.statusColor}
+                    strokeDasharray={`${2 * Math.PI * 16 * 0.75 * (readiness.overall / 100)} ${2 * Math.PI * 16}`} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-sm font-black text-white">{readiness.overall}</span>
+                </div>
+              </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-black text-white leading-tight" style={{ color: readiness.statusColor }}>
+                  {readiness.status}
+                </p>
+                <div className="mt-1.5 h-1.5 bg-dark-500 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${readiness.overall}%`, backgroundColor: readiness.statusColor }}
+                  />
+                </div>
+                {readiness.insights[0] && (
+                  <p className="text-xs text-gray-500 mt-1.5 leading-snug line-clamp-2">
+                    {readiness.insights[0]}
+                  </p>
+                )}
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Coach Note Banner */}
       {latestCoachNote && (
