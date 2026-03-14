@@ -172,7 +172,6 @@ export default function AIInsights() {
       const stream = client.messages.stream({
         model: 'claude-opus-4-6',
         max_tokens: 2048,
-        thinking: { type: 'adaptive' },
         messages: [{ role: 'user', content: prompt }],
       });
 
@@ -186,6 +185,7 @@ export default function AIInsights() {
         }
       }
     } catch (err) {
+      setInsights('');
       if (err instanceof Anthropic.AuthenticationError) {
         setError('Invalid API key. Please check your key in settings.');
         setShowKeyInput(true);

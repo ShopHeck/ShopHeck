@@ -219,9 +219,9 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
-      <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5">
+      <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5" style={{ maxHeight: 'calc(100dvh - 2rem)' }}>
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <p className="text-sm font-semibold text-white">Share Session</p>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <X size={18} />
@@ -233,17 +233,17 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
           <img
             src={dataUrl}
             alt="Share card preview"
-            className="w-full rounded-xl border border-dark-500"
-            style={{ aspectRatio: '9/16', objectFit: 'cover' }}
+            className="rounded-xl border border-dark-500 mx-auto flex-1 min-h-0 object-contain"
+            style={{ maxHeight: '60dvh', width: 'auto' }}
           />
         ) : (
-          <div className="w-full bg-dark-700 rounded-xl flex items-center justify-center" style={{ aspectRatio: '9/16' }}>
+          <div className="flex-1 min-h-0 bg-dark-700 rounded-xl flex items-center justify-center" style={{ maxHeight: '60dvh' }}>
             <p className="text-gray-500 text-sm">Generating…</p>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-shrink-0">
           <button
             onClick={handleShare}
             disabled={!dataUrl || sharing}
@@ -261,7 +261,7 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
           </button>
         </div>
 
-        <button onClick={onClose} className="text-center text-xs text-gray-500 hover:text-gray-300 transition-colors">
+        <button onClick={onClose} className="text-center text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
           Skip
         </button>
       </div>

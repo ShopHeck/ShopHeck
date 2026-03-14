@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { X, Check, Zap, Trophy } from 'lucide-react';
 
 interface Props {
@@ -24,13 +25,16 @@ const COACH_PRO_FEATURES = [
   'Team analytics overview',
 ];
 
-// ─── Stripe Payment Link placeholders ─────────────────────────────────────
-// Replace these with real Stripe Payment Link URLs after creating them in the
-// Stripe dashboard.  Append success_url params to trigger processStripeReturn().
-const FIGHTER_PRO_LINK = '#upgrade-fighter-pro';
-const COACH_PRO_LINK   = '#upgrade-coach-pro';
-
 export default function UpgradeModal({ onClose }: Props) {
+  const [notice, setNotice] = useState('');
+
+  function handleSubscribe(tier: 'fighter' | 'coach') {
+    // TODO: Replace with real Stripe Payment Link URLs once created in Stripe dashboard.
+    // URL should include ?tier=fighter_pro&stripe_session={CHECKOUT_SESSION_ID} on success
+    // so processStripeReturn() can unlock the subscription client-side.
+    setNotice(`${tier === 'fighter' ? 'Fighter Pro' : 'Coach Pro'} payments are coming soon — stay tuned!`);
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4" onClick={onClose}>
       <div
@@ -71,13 +75,12 @@ export default function UpgradeModal({ onClose }: Props) {
                 <span className="text-xs text-gray-400">/mo</span>
                 <p className="text-xs text-gray-500">or $59.99/yr (save 37%)</p>
               </div>
-              <a
-                href={FIGHTER_PRO_LINK}
-                onClick={onClose}
+              <button
+                onClick={() => handleSubscribe('fighter')}
                 className="btn-primary text-sm py-2 px-4"
               >
                 Start Free Trial
-              </a>
+              </button>
             </div>
           </div>
 
@@ -102,15 +105,18 @@ export default function UpgradeModal({ onClose }: Props) {
                 <span className="text-xs text-gray-400">/mo</span>
                 <p className="text-xs text-gray-500">or $149.99/yr (save 37%)</p>
               </div>
-              <a
-                href={COACH_PRO_LINK}
-                onClick={onClose}
+              <button
+                onClick={() => handleSubscribe('coach')}
                 className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95"
               >
                 Start Free Trial
-              </a>
+              </button>
             </div>
           </div>
+
+          {notice && (
+            <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
+          )}
 
           <p className="text-center text-xs text-gray-600">
             Cancel anytime. No commitment required.
