@@ -16,6 +16,7 @@ import AIInsights from './components/AIInsights';
 import AppleHealthSync from './components/AppleHealthSync';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
+import AdBanner from './components/shared/AdBanner';
 import type { SessionType } from './types';
 
 type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health';
@@ -123,6 +124,7 @@ function AppShell() {
         )}
       </main>
 
+      <AdBanner />
       <BottomNav active={view} onChange={(v) => setView(v as View)} />
 
       {/* New Camp — reuse Onboarding camp step */}

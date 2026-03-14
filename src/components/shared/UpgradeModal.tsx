@@ -25,14 +25,35 @@ const COACH_PRO_FEATURES = [
   'Team analytics overview',
 ];
 
+// Stripe Payment Link URLs — set via .env (see .env.example)
+// Each link's success URL must include: ?tier=fighter_pro&stripe_session={CHECKOUT_SESSION_ID}
+const LINKS = {
+  fighter: {
+    monthly: import.meta.env.VITE_STRIPE_FIGHTER_PRO_MONTHLY as string | undefined,
+    annual:  import.meta.env.VITE_STRIPE_FIGHTER_PRO_ANNUAL  as string | undefined,
+  },
+  coach: {
+    monthly: import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined,
+    annual:  import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL  as string | undefined,
+  },
+};
+
+const PRICES = {
+  fighter: { monthly: '$7.99', annual: '$59.99', annualMonthly: '$5.00', saving: '37%' },
+  coach:   { monthly: '$19.99', annual: '$149.99', annualMonthly: '$12.50', saving: '37%' },
+};
+
 export default function UpgradeModal({ onClose }: Props) {
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
 
   function handleSubscribe(tier: 'fighter' | 'coach') {
-    // TODO: Replace with real Stripe Payment Link URLs once created in Stripe dashboard.
-    // URL should include ?tier=fighter_pro&stripe_session={CHECKOUT_SESSION_ID} on success
-    // so processStripeReturn() can unlock the subscription client-side.
-    setNotice(`${tier === 'fighter' ? 'Fighter Pro' : 'Coach Pro'} payments are coming soon — stay tuned!`);
+    const url = LINKS[tier][billing];
+    if (url) {
+      window.location.href = url;
+    } else {
+      setNotice('Payment links not yet configured — check back soon!');
+    }
   }
 
   return (
@@ -50,6 +71,24 @@ export default function UpgradeModal({ onClose }: Props) {
           <button onClick={onClose} className="text-gray-500 hover:text-white p-1 transition-colors">
             <X size={20} />
           </button>
+        </div>
+
+        {/* Billing toggle */}
+        <div className="px-5 pb-3">
+          <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setBilling('monthly')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBilling('annual')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
+            >
+              Annual <span className="text-brand-400">Save 37%</span>
+            </button>
+          </div>
         </div>
 
         <div className="px-5 pb-5 space-y-4">
@@ -71,9 +110,18 @@ export default function UpgradeModal({ onClose }: Props) {
             </ul>
             <div className="flex items-center justify-between pt-1">
               <div>
-                <span className="text-xl font-black text-white">$7.99</span>
-                <span className="text-xs text-gray-400">/mo</span>
-                <p className="text-xs text-gray-500">or $59.99/yr (save 37%)</p>
+                {billing === 'monthly' ? (
+                  <>
+                    <span className="text-xl font-black text-white">{PRICES.fighter.monthly}</span>
+                    <span className="text-xs text-gray-400">/mo</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl font-black text-white">{PRICES.fighter.annual}</span>
+                    <span className="text-xs text-gray-400">/yr</span>
+                    <p className="text-xs text-brand-400">{PRICES.fighter.annualMonthly}/mo · save {PRICES.fighter.saving}</p>
+                  </>
+                )}
               </div>
               <button
                 onClick={() => handleSubscribe('fighter')}
@@ -101,9 +149,18 @@ export default function UpgradeModal({ onClose }: Props) {
             </ul>
             <div className="flex items-center justify-between pt-1">
               <div>
-                <span className="text-xl font-black text-white">$19.99</span>
-                <span className="text-xs text-gray-400">/mo</span>
-                <p className="text-xs text-gray-500">or $149.99/yr (save 37%)</p>
+                {billing === 'monthly' ? (
+                  <>
+                    <span className="text-xl font-black text-white">{PRICES.coach.monthly}</span>
+                    <span className="text-xs text-gray-400">/mo</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl font-black text-white">{PRICES.coach.annual}</span>
+                    <span className="text-xs text-gray-400">/yr</span>
+                    <p className="text-xs text-purple-400">{PRICES.coach.annualMonthly}/mo · save {PRICES.coach.saving}</p>
+                  </>
+                )}
               </div>
               <button
                 onClick={() => handleSubscribe('coach')}

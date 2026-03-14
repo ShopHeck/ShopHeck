@@ -4,7 +4,7 @@ const SUB_KEY = 'fightcamp_subscription';
 
 // DEV: set to 'coach_pro' for testing all features — flip back to 'free' before launch
 export const DEFAULT_SUBSCRIPTION: SubscriptionState = {
-  tier: 'coach_pro',
+  tier: 'free',
   expiresAt: null,
   source: 'none',
 };
