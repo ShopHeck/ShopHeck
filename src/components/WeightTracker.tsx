@@ -248,7 +248,15 @@ export default function WeightTracker() {
 
       {/* Log Weight Modal */}
       {showModal && (
-        <Modal title="Log Weight" onClose={() => setShowModal(false)}>
+        <Modal
+          title="Log Weight"
+          onClose={() => setShowModal(false)}
+          footer={
+            <button onClick={logWeight} disabled={!weight} className="btn-primary w-full disabled:opacity-50">
+              Save Weight
+            </button>
+          }
+        >
           <div className="space-y-4">
             <div>
               <label className="label">Date</label>
@@ -287,9 +295,6 @@ export default function WeightTracker() {
                 onChange={e => setNotes(e.target.value)}
               />
             </div>
-            <button onClick={logWeight} disabled={!weight} className="btn-primary w-full disabled:opacity-50">
-              Save Weight
-            </button>
           </div>
         </Modal>
       )}

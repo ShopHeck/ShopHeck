@@ -640,7 +640,15 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {/* Edit Profile Modal */}
       {editingProfile && (
-        <Modal title="Edit Profile" onClose={() => setEditingProfile(false)}>
+        <Modal title="Edit Profile" onClose={() => setEditingProfile(false)} footer={
+          <button
+            onClick={saveProfile}
+            disabled={!pName.trim() || !pAge}
+            className={`btn-primary w-full flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${profileSaved ? 'bg-green-700 hover:bg-green-600' : ''}`}
+          >
+            {profileSaved ? <><Check size={16} /> Saved!</> : 'Save Profile'}
+          </button>
+        }>
           <div className="space-y-4">
             <div>
               <label className="label">Full Name</label>
@@ -686,20 +694,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <label className="label">Record (e.g. 5-2-0)</label>
               <input className="input" value={pRecord} onChange={e => setPRecord(e.target.value)} placeholder="W-L-D" />
             </div>
-            <button
-              onClick={saveProfile}
-              disabled={!pName.trim() || !pAge}
-              className={`btn-primary w-full flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${profileSaved ? 'bg-green-700 hover:bg-green-600' : ''}`}
-            >
-              {profileSaved ? <><Check size={16} /> Saved!</> : 'Save Profile'}
-            </button>
           </div>
         </Modal>
       )}
 
       {/* Edit Camp Modal */}
       {editingCamp && (
-        <Modal title="Edit Fight Camp" onClose={() => setEditingCamp(null)}>
+        <Modal title="Edit Fight Camp" onClose={() => setEditingCamp(null)} footer={
+          <button
+            onClick={saveCamp}
+            disabled={!cFightDate || !cCurrentWeight || !cTargetWeight}
+            className="btn-primary w-full disabled:opacity-50"
+          >
+            Save Changes
+          </button>
+        }>
           <div className="space-y-4">
             <div>
               <label className="label">Fight Date</label>
@@ -745,13 +754,6 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 Camp length stays at <span className="text-white font-medium">{editingCamp.campWeeks} weeks</span>. Start date will be recalculated from the fight date.
               </p>
             </div>
-            <button
-              onClick={saveCamp}
-              disabled={!cFightDate || !cCurrentWeight || !cTargetWeight}
-              className="btn-primary w-full disabled:opacity-50"
-            >
-              Save Changes
-            </button>
           </div>
         </Modal>
       )}

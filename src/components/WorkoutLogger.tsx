@@ -296,7 +296,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
 
       {/* Log Workout Modal */}
       {showModal && (
-        <Modal title="Log Workout" onClose={() => setShowModal(false)}>
+        <Modal title="Log Workout" onClose={() => setShowModal(false)} footer={
+          <button onClick={logWorkout} disabled={!wTitle.trim()} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
+        }>
           <div className="space-y-4">
             <div>
               <label className="label">Date</label>
@@ -338,14 +340,15 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Notes</label>
               <textarea className="input resize-none" rows={2} placeholder="How did it feel? What went well?" value={wNotes} onChange={e => setWNotes(e.target.value)} />
             </div>
-            <button onClick={logWorkout} disabled={!wTitle.trim()} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
           </div>
         </Modal>
       )}
 
       {/* Log Sparring Modal */}
       {showSparModal && (
-        <Modal title="Log Sparring" onClose={() => setShowSparModal(false)}>
+        <Modal title="Log Sparring" onClose={() => setShowSparModal(false)} footer={
+          <button onClick={logSparring} className="btn-primary w-full">Save Sparring</button>
+        }>
           <div className="space-y-4">
             <div>
               <label className="label">Date</label>
@@ -400,14 +403,15 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Notes</label>
               <textarea className="input resize-none" rows={2} placeholder="What worked? What to improve?" value={sNotes} onChange={e => setSNotes(e.target.value)} />
             </div>
-            <button onClick={logSparring} className="btn-primary w-full">Save Sparring Log</button>
           </div>
         </Modal>
       )}
 
       {/* Log Conditioning Test Modal */}
       {showCondModal && (
-        <Modal title="Log Conditioning Test" onClose={() => setShowCondModal(false)}>
+        <Modal title="Log Conditioning Test" onClose={() => setShowCondModal(false)} footer={
+          <button onClick={logCondTest} disabled={!cValue} className="btn-primary w-full disabled:opacity-50">Save Test Result</button>
+        }>
           <div className="space-y-4">
             <div>
               <label className="label">Date</label>
@@ -431,7 +435,6 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Notes</label>
               <textarea className="input resize-none" rows={2} placeholder="Conditions, how you felt, etc." value={cNotes} onChange={e => setCNotes(e.target.value)} />
             </div>
-            <button onClick={logCondTest} disabled={!cValue} className="btn-primary w-full disabled:opacity-50">Save Test Result</button>
           </div>
         </Modal>
       )}
