@@ -75,7 +75,7 @@ function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex flex-col">
+    <div className="h-screen overflow-hidden bg-dark-900 flex flex-col">
       <FlashOverlay />
       <Header
         title={view === 'dashboard' ? 'Fight Camp' : title}
@@ -84,7 +84,10 @@ function AppShell() {
         onNavigate={v => setView(v as View)}
       />
 
-      <main className="flex-1 max-w-lg mx-auto w-full overflow-y-auto pb-20">
+      <main
+        className="flex-1 max-w-lg mx-auto w-full overflow-y-auto"
+        style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         {view === 'dashboard' && !isCoach && camp && (
           <Dashboard onNavigate={(v, prefill?) => {
             if (v === 'log' && prefill) navigateToLog(prefill);
