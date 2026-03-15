@@ -292,6 +292,7 @@ export function useRoundTimer() {
   const deadlineRef   = useRef(0);
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef   = useRef<AudioContext | null>(null);
+  const keepAliveRef  = useRef<OscillatorNode | null>(null);
   const warningFiredRef = useRef(false); // prevent double-fire per phase
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
@@ -328,6 +329,29 @@ export function useRoundTimer() {
     if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
     return audioCtxRef.current;
   }, []);
+
+  // Keep AudioContext alive while running — prevents mobile browser auto-suspension
+  useEffect(() => {
+    if (!isRunning) {
+      if (keepAliveRef.current) {
+        try { keepAliveRef.current.stop(); keepAliveRef.current.disconnect(); } catch { /* noop */ }
+        keepAliveRef.current = null;
+      }
+      return;
+    }
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0; // completely silent
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    keepAliveRef.current = osc;
+    return () => {
+      try { osc.stop(); osc.disconnect(); gain.disconnect(); } catch { /* noop */ }
+      if (keepAliveRef.current === osc) keepAliveRef.current = null;
+    };
+  }, [isRunning, getAudioCtx]);
 
   // Flash helper — sets flashColor in context for 600ms
   const flash = useCallback((color: string) => {

@@ -31,7 +31,7 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
     setter(v => Math.max(min, Math.min(max, v + d)));
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col"
         style={{ maxHeight: 'calc(100dvh - 2rem)' }}
