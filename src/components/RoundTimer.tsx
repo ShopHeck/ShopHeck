@@ -32,53 +32,61 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center p-4" onClick={onClose}>
-      <div className="bg-dark-800 rounded-2xl border border-dark-500 p-5 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
+      <div
+        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col"
+        style={{ maxHeight: 'calc(100dvh - 2rem)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Fixed header */}
+        <div className="flex items-center justify-between p-5 flex-shrink-0 border-b border-dark-600">
           <h3 className="text-base font-bold text-white">New Preset</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X size={18} /></button>
         </div>
 
-        <div>
-          <label className="label">Name</label>
-          <input
-            className="input"
-            value={label}
-            onChange={e => setLabel(e.target.value)}
-            placeholder="e.g. Thai Clinch"
-            maxLength={20}
-          />
-        </div>
-
-        {[
-          { label: 'Rounds', value: rounds, setter: setRounds, step: 1, min: 1, max: 30 },
-          { label: 'Work (sec)', value: workSec, setter: setWorkSec, step: 15, min: 15, max: 1800 },
-          { label: 'Rest (sec)', value: restSec, setter: setRestSec, step: 5, min: 5, max: 600 },
-        ].map(row => (
-          <div key={row.label} className="flex items-center justify-between">
-            <span className="text-sm text-gray-300">{row.label}</span>
-            <div className="flex items-center gap-3">
-              <button onClick={() => adj(row.setter, -row.step, row.min, row.max)}
-                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
-                <ChevronDown size={16} />
-              </button>
-              <span className="text-sm font-bold text-white w-10 text-center">
-                {row.label === 'Rounds' ? row.value : fmt(row.value)}
-              </span>
-              <button onClick={() => adj(row.setter, row.step, row.min, row.max)}
-                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
-                <ChevronUp size={16} />
-              </button>
-            </div>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+          <div>
+            <label className="label">Name</label>
+            <input
+              className="input"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. Thai Clinch"
+              maxLength={20}
+            />
           </div>
-        ))}
 
-        <button
-          onClick={() => { if (label.trim()) { onSave({ label: label.trim(), rounds, workSec, restSec }); } }}
-          disabled={!label.trim()}
-          className="btn-primary w-full disabled:opacity-40"
-        >
-          Save Preset
-        </button>
+          {[
+            { label: 'Rounds', value: rounds, setter: setRounds, step: 1, min: 1, max: 30 },
+            { label: 'Work (sec)', value: workSec, setter: setWorkSec, step: 15, min: 15, max: 1800 },
+            { label: 'Rest (sec)', value: restSec, setter: setRestSec, step: 5, min: 5, max: 600 },
+          ].map(row => (
+            <div key={row.label} className="flex items-center justify-between">
+              <span className="text-sm text-gray-300">{row.label}</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => adj(row.setter, -row.step, row.min, row.max)}
+                  className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
+                  <ChevronDown size={16} />
+                </button>
+                <span className="text-sm font-bold text-white w-10 text-center">
+                  {row.label === 'Rounds' ? row.value : fmt(row.value)}
+                </span>
+                <button onClick={() => adj(row.setter, row.step, row.min, row.max)}
+                  className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
+                  <ChevronUp size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={() => { if (label.trim()) { onSave({ label: label.trim(), rounds, workSec, restSec }); } }}
+            disabled={!label.trim()}
+            className="btn-primary w-full disabled:opacity-40"
+          >
+            Save Preset
+          </button>
+        </div>
       </div>
     </div>
   );
