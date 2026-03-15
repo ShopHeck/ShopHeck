@@ -724,6 +724,24 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <label className="label">Opponent (Optional)</label>
               <input className="input" placeholder="Opponent's name" value={cOpponent} onChange={e => setCOpponent(e.target.value)} />
             </div>
+            {/* BKFC Format Preset */}
+            <button
+              type="button"
+              onClick={() => { setCRounds('5'); setCRoundDuration('2'); }}
+              className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${cRounds === '5' && cRoundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-600 hover:border-red-800/60'}`}
+            >
+              <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Flame size={16} className="text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">BKFC Format</p>
+                <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+              </div>
+              {cRounds === '5' && cRoundDuration === '2' && (
+                <Check size={16} className="text-red-400 flex-shrink-0" />
+              )}
+            </button>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Rounds</label>
@@ -734,6 +752,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <div>
                 <label className="label">Round Duration</label>
                 <select className="select" value={cRoundDuration} onChange={e => setCRoundDuration(e.target.value)}>
+                  <option value="2">2 minutes</option>
                   <option value="3">3 minutes</option>
                   <option value="5">5 minutes</option>
                 </select>

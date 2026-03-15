@@ -61,41 +61,78 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
   const { intensity, sparringRounds, conditioningLoad } = phase;
 
   const highIntensity = intensity === 'High' || intensity === 'Very High';
-  const sportSkillLabel = sport === 'MMA' ? 'MMA Technique' : sport === 'Boxing' ? 'Boxing' : sport;
+  const isBKFC = sport === 'Bare Knuckle';
+  const sportSkillLabel = isBKFC ? 'Bare Knuckle' : sport === 'MMA' ? 'MMA Technique' : sport === 'Boxing' ? 'Boxing' : sport;
+
+  // ── BKFC-specific session content ─────────────────────────────────────
+  // BKFC = 5×2 min rounds, 1 min rest. High-intensity, non-stop action.
+  // Training pillars: 2-min burst conditioning, knuckle toughening,
+  //   head movement (no gloves = unforgiving), dirty boxing, mental toughness.
+
+  const bkfcConditioningDesc = conditioningLoad >= 4
+    ? `${phase.phase === 'Peak' ? '10' : '8'}×2min max-effort rounds on heavy bag or assault bike, exactly 1min rest — mirror the BKFC fight clock. No coasting. Simulate pressure from round 1.`
+    : '40min steady-state run or bike at 60–70% max HR. Build the aerobic engine that powers your 2-min bursts.';
+
+  const bkfcSkillDesc = 'Shadow boxing warm-up (10min). Pad work — close-range hooks, uppercuts, check hooks (25min). Knuckle conditioning on bare bag — light contact, build gradually (15min). Head movement: slips, rolls, pull-backs (15min).';
+
+  const bkfcCombinationDesc = 'Dirty boxing focus: clinch entries, short punches off the break. Slip-and-counter chains. Footwork for inside fighting range. Body shot combinations — liver, ribs. Defensive instincts at close range where the real damage happens.';
+
+  const bkfcPadWorkDesc = 'Combination pad work at 2-min round pace — no breaks. Counter-punching off head slips. Short-range power shots: check hook, short left hook, overhand right. Head movement against incoming combinations — make punches miss at BK range.';
+
+  const bkfcSparringDesc = (rounds: number, isHard: boolean) =>
+    `${rounds} rounds of ${isHard ? 'competitive BK sparring' : 'technical BK sparring'} (headgear on). Work the inside — body shots, tight hooks, uppercuts. Slip everything. ${isHard ? 'Compete. Pressure relentlessly. Mental toughness is half the fight.' : 'Control range, prioritize head movement, solve problems on your feet.'}`;
+
+  const bkfcStrengthDesc = 'Hand & forearm conditioning: knuckle push-ups (3×20), towel pull-ups, forearm roller, rice bucket grip work. Core explosiveness: med ball slams, rotational throws. Wrist stability work — bare knuckle punching demands it.';
+
+  const bkfcSaturdayDesc = phase.phase === 'Taper'
+    ? 'Light 30min jog, band work, shadow boxing at 50%. Keep hands sharp and loose.'
+    : '50min road work at conversation pace — build the gas tank that sustains 2-min burst output across 5 rounds.';
+
+  // ── Build days ────────────────────────────────────────────────────────
 
   const days: TrainingDay[] = [
     // Monday - Conditioning + Skill
     buildDay(1, 'Monday', [
       {
         type: 'conditioning',
-        title: conditioningLoad >= 4 ? 'High Intensity Intervals' : 'Steady State Cardio',
+        title: isBKFC
+          ? (conditioningLoad >= 4 ? 'BKFC Burst Intervals' : 'Aerobic Base Work')
+          : (conditioningLoad >= 4 ? 'High Intensity Intervals' : 'Steady State Cardio'),
         duration: conditioningLoad >= 4 ? 45 : 40,
-        description: conditioningLoad >= 4
-          ? '6x3min rounds on assault bike, 1min rest. Push the pace each round.'
-          : '40min moderate intensity run or bike. Zone 2 heart rate (60-70% max HR).',
+        description: isBKFC
+          ? bkfcConditioningDesc
+          : conditioningLoad >= 4
+            ? '6x3min rounds on assault bike, 1min rest. Push the pace each round.'
+            : '40min moderate intensity run or bike. Zone 2 heart rate (60-70% max HR).',
       },
       {
         type: 'skill',
         title: `${sportSkillLabel} - Technical Drilling`,
         duration: 75,
-        description: 'Shadow boxing warm-up (15min), pad work combinations (30min), heavy bag rounds (30min).',
+        description: isBKFC
+          ? bkfcSkillDesc
+          : 'Shadow boxing warm-up (15min), pad work combinations (30min), heavy bag rounds (30min).',
       },
     ]),
 
-    // Tuesday - Strength/Sparring
+    // Tuesday - Strength / Sparring
     buildDay(2, 'Tuesday', sparringRounds > 0 ? [
       {
         type: 'sparring',
-        title: 'Sparring Session',
+        title: isBKFC ? 'BK Sparring Session' : 'Sparring Session',
         duration: 90,
-        description: `${sparringRounds} rounds of ${intensity === 'Very High' ? 'competitive' : 'controlled'} sparring. ${intensity === 'Very High' ? 'Fight-pace intensity.' : 'Focus on gameplan execution.'}`,
+        description: isBKFC
+          ? bkfcSparringDesc(sparringRounds, intensity === 'Very High')
+          : `${sparringRounds} rounds of ${intensity === 'Very High' ? 'competitive' : 'controlled'} sparring. ${intensity === 'Very High' ? 'Fight-pace intensity.' : 'Focus on gameplan execution.'}`,
       },
     ] : [
       {
         type: 'strength',
-        title: 'Strength & Power Training',
+        title: isBKFC ? 'Hand Conditioning & Strength' : 'Strength & Power Training',
         duration: 60,
-        description: 'Olympic lifts, plyometrics, and functional strength work. Focus on explosive power.',
+        description: isBKFC
+          ? bkfcStrengthDesc
+          : 'Olympic lifts, plyometrics, and functional strength work. Focus on explosive power.',
       },
     ]),
 
@@ -103,9 +140,11 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
     buildDay(3, 'Wednesday', highIntensity ? [
       {
         type: 'skill',
-        title: `${sportSkillLabel} - Combination Work`,
+        title: isBKFC ? 'Bare Knuckle - Inside Fighting' : `${sportSkillLabel} - Combination Work`,
         duration: 90,
-        description: 'Technical drilling, combination chains, defensive movement, footwork patterns.',
+        description: isBKFC
+          ? bkfcCombinationDesc
+          : 'Technical drilling, combination chains, defensive movement, footwork patterns.',
       },
       {
         type: 'conditioning',
@@ -126,17 +165,25 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
     buildDay(4, 'Thursday', [
       {
         type: 'conditioning',
-        title: conditioningLoad >= 5 ? 'Fight Rounds Conditioning' : 'Circuit Training',
+        title: isBKFC
+          ? 'BKFC Fight Simulation'
+          : (conditioningLoad >= 5 ? 'Fight Rounds Conditioning' : 'Circuit Training'),
         duration: 50,
-        description: conditioningLoad >= 5
-          ? `${phase.phase === 'Peak' ? '12' : '8'}x${sport === 'Boxing' ? '3' : '5'}min rounds on bags, staying in motion. No rest between rounds.`
-          : 'Burpees, sprawls, shadow boxing, jump rope circuit. 5 rounds of 5 exercises.',
+        description: isBKFC
+          ? `${phase.phase === 'Peak' ? '12' : '8'}×2min bag rounds, 1min rest — simulate a full BKFC card. Zero downtime. Stay on the bag for every second of every round.`
+          : conditioningLoad >= 5
+            ? `${phase.phase === 'Peak' ? '12' : '8'}x${sport === 'Boxing' ? '3' : '5'}min rounds on bags, staying in motion. No rest between rounds.`
+            : 'Burpees, sprawls, shadow boxing, jump rope circuit. 5 rounds of 5 exercises.',
       },
       {
         type: 'skill',
-        title: `${sportSkillLabel} - Pad Work Focus`,
+        title: isBKFC
+          ? 'Bare Knuckle - Pad Work & Head Movement'
+          : `${sportSkillLabel} - Pad Work Focus`,
         duration: 75,
-        description: 'Combination pad work, timing drills, counter striking, defensive response training.',
+        description: isBKFC
+          ? bkfcPadWorkDesc
+          : 'Combination pad work, timing drills, counter striking, defensive response training.',
       },
     ]),
 
@@ -144,28 +191,36 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
     buildDay(5, 'Friday', sparringRounds > 0 ? [
       {
         type: 'sparring',
-        title: isAdvanced ? 'Hard Sparring' : 'Technical Sparring',
+        title: isBKFC
+          ? (isAdvanced ? 'Hard BK Sparring' : 'Technical BK Sparring')
+          : (isAdvanced ? 'Hard Sparring' : 'Technical Sparring'),
         duration: 90,
-        description: `${Math.ceil(sparringRounds / 2)} rounds. ${isAdvanced ? 'Go at 80-90% intensity.' : 'Technical focus, 60-70% intensity. Problem solving.'}`,
+        description: isBKFC
+          ? bkfcSparringDesc(Math.ceil(sparringRounds / 2), isAdvanced)
+          : `${Math.ceil(sparringRounds / 2)} rounds. ${isAdvanced ? 'Go at 80-90% intensity.' : 'Technical focus, 60-70% intensity. Problem solving.'}`,
       },
     ] : [
       {
         type: 'skill',
-        title: `${sportSkillLabel} - Bag Work & Combos`,
+        title: isBKFC ? 'Bare Knuckle - Bag Work & Power' : `${sportSkillLabel} - Bag Work & Combos`,
         duration: 90,
-        description: 'Heavy bag volume work. Focus on power combinations, rhythm, and endurance.',
+        description: isBKFC
+          ? 'Heavy bag volume at BKFC pace: 2-min rounds, 1-min rest. Short combinations, body work, inside fighting. Last 2 rounds: bare hands on bag — light contact, build knuckle toughness.'
+          : 'Heavy bag volume work. Focus on power combinations, rhythm, and endurance.',
       },
     ]),
 
-    // Saturday - Long conditioning or light work
+    // Saturday - Conditioning
     buildDay(6, 'Saturday', [
       {
         type: 'conditioning',
-        title: phase.phase === 'Taper' ? 'Light Conditioning' : 'Long Conditioning',
+        title: phase.phase === 'Taper' ? 'Light Conditioning' : (isBKFC ? 'Road Work' : 'Long Conditioning'),
         duration: phase.phase === 'Taper' ? 30 : 60,
-        description: phase.phase === 'Taper'
-          ? 'Easy 30min jog, stretch, light shadow boxing. Keep it relaxed.'
-          : 'Long run (45min) or bike (60min). Maintain conversation pace. Builds aerobic base.',
+        description: isBKFC
+          ? bkfcSaturdayDesc
+          : phase.phase === 'Taper'
+            ? 'Easy 30min jog, stretch, light shadow boxing. Keep it relaxed.'
+            : 'Long run (45min) or bike (60min). Maintain conversation pace. Builds aerobic base.',
       },
     ]),
 
@@ -175,7 +230,9 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
         type: 'recovery',
         title: 'Rest & Recovery',
         duration: 30,
-        description: 'Full rest or gentle yoga/stretching. Ice bath if sore. Prioritize sleep and nutrition.',
+        description: isBKFC
+          ? 'Full rest. Ice hands if needed — knuckle recovery is part of BK training. Prioritize sleep, nutrition, and mental prep.'
+          : 'Full rest or gentle yoga/stretching. Ice bath if sore. Prioritize sleep and nutrition.',
       },
     ], true),
   ];
@@ -194,17 +251,39 @@ export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
     const weekStart = addDays(new Date(startDate), i * 7);
     const weekEnd = addDays(weekStart, 6);
 
+    const isBKFC = sport === 'Bare Knuckle';
     const goals: string[] = [];
     if (phaseConfig.phase === 'Base Building') {
-      goals.push('Complete all conditioning sessions', 'Focus on technical precision', 'Establish sleep/nutrition routine');
+      goals.push(
+        'Complete all conditioning sessions',
+        isBKFC ? 'Begin knuckle conditioning — low volume, build gradually' : 'Focus on technical precision',
+        'Establish sleep/nutrition routine',
+      );
     } else if (phaseConfig.phase === 'Strength & Conditioning') {
-      goals.push('Hit all strength targets', `${phaseConfig.sparringRounds} rounds of sparring`, 'Track conditioning benchmarks');
+      goals.push(
+        isBKFC ? 'Hand & forearm strength work every session' : 'Hit all strength targets',
+        `${phaseConfig.sparringRounds} rounds of ${isBKFC ? 'BK ' : ''}sparring`,
+        'Track conditioning benchmarks',
+      );
     } else if (phaseConfig.phase === 'Fight Specific') {
-      goals.push(`Complete ${phaseConfig.sparringRounds} sparring rounds`, 'Refine fight gameplan', 'Monitor weight daily');
+      goals.push(
+        `Complete ${phaseConfig.sparringRounds} ${isBKFC ? 'BK ' : ''}sparring rounds`,
+        isBKFC ? 'Refine head movement — slip every incoming punch' : 'Refine fight gameplan',
+        'Monitor weight daily',
+      );
     } else if (phaseConfig.phase === 'Peak') {
-      goals.push('Peak performance sparring', 'Maintain weight within 3lbs of target', 'Mental visualization daily');
+      goals.push(
+        isBKFC ? 'Peak BK sparring — compete every round' : 'Peak performance sparring',
+        'Maintain weight within 3lbs of target',
+        isBKFC ? 'Mental toughness drills — embrace discomfort' : 'Mental visualization daily',
+      );
     } else {
-      goals.push('Start weight cut protocol', 'Light drilling only', 'Max 8hrs sleep per night', 'Stay sharp — no contact');
+      goals.push(
+        'Start weight cut protocol',
+        isBKFC ? 'Light pad work only — protect the hands' : 'Light drilling only',
+        'Max 8hrs sleep per night',
+        'Stay sharp — no contact',
+      );
     }
 
     weeks.push({

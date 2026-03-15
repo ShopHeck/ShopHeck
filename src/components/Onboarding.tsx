@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Sport, WeightClass, ExperienceLevel, UserRole } from '../types';
 import { addDays, format } from 'date-fns';
@@ -10,7 +10,7 @@ const WEIGHT_CLASSES: WeightClass[] = [
   'Heavyweight', 'Super Heavyweight',
 ];
 
-const SPORTS: Sport[] = ['Boxing', 'MMA', 'Muay Thai', 'Kickboxing', 'Wrestling', 'BJJ'];
+const SPORTS: Sport[] = ['Boxing', 'MMA', 'Muay Thai', 'Kickboxing', 'Wrestling', 'BJJ', 'Bare Knuckle'];
 
 const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Beginner', 'Amateur', 'Semi-Pro', 'Professional'];
 
@@ -122,6 +122,24 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
                   <label className="label">Opponent (Optional)</label>
                   <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
                 </div>
+                {/* BKFC Format Preset */}
+                <button
+                  type="button"
+                  onClick={() => { setRounds('5'); setRoundDuration('2'); }}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
+                >
+                  <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Flame size={16} className="text-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">BKFC Format</p>
+                    <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+                  </div>
+                  {rounds === '5' && roundDuration === '2' && (
+                    <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
+                  )}
+                </button>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">Rounds</label>
@@ -132,6 +150,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
                   <div>
                     <label className="label">Round Duration</label>
                     <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                      <option value="2">2 minutes</option>
                       <option value="3">3 minutes</option>
                       <option value="5">5 minutes</option>
                     </select>
@@ -353,6 +372,24 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
               />
             </div>
 
+            {/* BKFC Format Preset */}
+            <button
+              type="button"
+              onClick={() => { setRounds('5'); setRoundDuration('2'); }}
+              className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
+            >
+              <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Flame size={16} className="text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">BKFC Format</p>
+                <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+              </div>
+              {rounds === '5' && roundDuration === '2' && (
+                <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
+              )}
+            </button>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Rounds</label>
@@ -365,6 +402,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
               <div>
                 <label className="label">Round Duration</label>
                 <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                  <option value="2">2 minutes</option>
                   <option value="3">3 minutes</option>
                   <option value="5">5 minutes</option>
                 </select>

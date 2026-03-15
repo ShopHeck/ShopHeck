@@ -11,7 +11,7 @@ export type WeightClass =
   | 'Super Heavyweight';
 
 export type ExperienceLevel = 'Beginner' | 'Amateur' | 'Semi-Pro' | 'Professional';
-export type Sport = 'Boxing' | 'MMA' | 'Muay Thai' | 'Kickboxing' | 'Wrestling' | 'BJJ';
+export type Sport = 'Boxing' | 'MMA' | 'Muay Thai' | 'Kickboxing' | 'Wrestling' | 'BJJ' | 'Bare Knuckle';
 export type UserRole = 'fighter' | 'coach';
 
 export interface FightCamp {

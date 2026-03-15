@@ -126,6 +126,24 @@ export const REACTION_PROMPTS: Record<Sport | 'general', string[]> = {
     "Guard retention — hips up, frames out, never flat.",
     "Trust your A-game. Stick to your game plan.",
   ],
+
+  'Bare Knuckle': [
+    "Slip the jab — make every punch miss and come back with the counter.",
+    "Work the inside. Short hooks to the body, tight uppercuts. This is your range.",
+    "Head movement is your armor. No gloves means every punch matters.",
+    "Looking great CHAMP! Embrace the suck!",
+    "Stay in your shell at range — don't give them a clean look.",
+    "Dirty boxing time. Clinch, short shots, break clean.",
+    "Counter off the slip — check hook when they come straight.",
+    "Body work sets up the head. They can't protect everything.",
+    "You're tougher than them. Make every 2-minute round a war.",
+    "Tight guard, tight elbows — protect the nose and eyes.",
+    "Make them reach. The puncher who reaches gets countered.",
+    "Breathe. Relax. Tension kills speed — stay loose.",
+    "Pressure relentlessly. No rest, no mercy. BKFC pace.",
+    "You're built for this. Keep grinding.",
+    "Every slip is a counter opportunity — don't waste it.",
+  ],
 };
 
 export function getRandomPrompt(sport: Sport | undefined, isPro: boolean): string {
