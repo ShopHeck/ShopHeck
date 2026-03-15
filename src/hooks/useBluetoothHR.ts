@@ -5,6 +5,7 @@ export type HRZone = 0 | 1 | 2 | 3 | 4 | 5;
 export interface HRState {
   hr: number | null;
   zone: HRZone;
+  hrv: number | null;   // real-time RMSSD in ms (from RR intervals)
   connected: boolean;
   connecting: boolean;
   supported: boolean;
@@ -49,11 +50,59 @@ export function getZone(hr: number, maxHR: number): HRZone {
   return 0;
 }
 
-function parseHRMeasurement(value: DataView): number {
-  const flags = value.getUint8(0);
-  // bit 0: 0 = uint8 format, 1 = uint16 format
-  return (flags & 0x1) ? value.getUint16(1, true) : value.getUint8(1);
+/**
+ * Parses the Bluetooth Heart Rate Measurement characteristic (0x2A37).
+ *
+ * Byte layout:
+ *   Byte 0   – flags
+ *              bit 0: HR value format  (0 = uint8, 1 = uint16)
+ *              bit 3: energy expended present
+ *              bit 4: RR interval(s) present
+ *   Byte 1 [+2]: HR value
+ *   [2 bytes] : energy expended (if flag bit 3 set) – skipped
+ *   [2 bytes each]: RR intervals in 1/1024 s units (if flag bit 4 set)
+ */
+interface HRMData {
+  hr: number;
+  rrMs: number[]; // RR intervals converted to milliseconds
 }
+
+function parseHRMeasurement(value: DataView): HRMData {
+  const flags = value.getUint8(0);
+  const uint16Format  = flags & 0x01;
+  const energyPresent = (flags >> 3) & 0x01;
+  const rrPresent     = (flags >> 4) & 0x01;
+
+  let offset = 1;
+  const hr = uint16Format ? value.getUint16(offset, true) : value.getUint8(offset);
+  offset += uint16Format ? 2 : 1;
+
+  if (energyPresent) offset += 2;
+
+  const rrMs: number[] = [];
+  if (rrPresent) {
+    while (offset + 1 < value.byteLength) {
+      // RR unit = 1/1024 second → multiply by 1000/1024 to get ms
+      rrMs.push(Math.round(value.getUint16(offset, true) * (1000 / 1024)));
+      offset += 2;
+    }
+  }
+
+  return { hr, rrMs };
+}
+
+/** RMSSD — root mean square of successive differences between adjacent RR intervals. */
+function computeRMSSD(rrBuffer: number[]): number | null {
+  if (rrBuffer.length < 5) return null;
+  let sumSq = 0;
+  for (let i = 1; i < rrBuffer.length; i++) {
+    const diff = rrBuffer[i] - rrBuffer[i - 1];
+    sumSq += diff * diff;
+  }
+  return Math.round(Math.sqrt(sumSq / (rrBuffer.length - 1)));
+}
+
+const RR_BUFFER_SIZE = 64; // ~1 min at 60 bpm
 
 export function useBluetoothHR(maxHR: number): HRState & {
   connect: () => Promise<void>;
@@ -62,21 +111,31 @@ export function useBluetoothHR(maxHR: number): HRState & {
   const [state, setState] = useState<HRState>({
     hr: null,
     zone: 0,
+    hrv: null,
     connected: false,
     connecting: false,
     supported: typeof navigator !== 'undefined' && 'bluetooth' in navigator,
     deviceName: null,
   });
 
-  const deviceRef = useRef<BluetoothDevice | null>(null);
+  const deviceRef         = useRef<BluetoothDevice | null>(null);
   const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const rrBufferRef       = useRef<number[]>([]);
 
   const handleNotification = useCallback((event: Event) => {
     const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
     if (!characteristic.value) return;
-    const hr = parseHRMeasurement(characteristic.value);
+
+    const { hr, rrMs } = parseHRMeasurement(characteristic.value);
     const zone = getZone(hr, maxHR);
-    setState(s => ({ ...s, hr, zone }));
+
+    // Maintain a capped sliding buffer of RR intervals
+    if (rrMs.length > 0) {
+      rrBufferRef.current = [...rrBufferRef.current, ...rrMs].slice(-RR_BUFFER_SIZE);
+    }
+
+    const hrv = computeRMSSD(rrBufferRef.current);
+    setState(s => ({ ...s, hr, zone, hrv }));
   }, [maxHR]);
 
   const disconnect = useCallback(() => {
@@ -89,7 +148,8 @@ export function useBluetoothHR(maxHR: number): HRState & {
       deviceRef.current.gatt.disconnect();
     }
     deviceRef.current = null;
-    setState(s => ({ ...s, hr: null, zone: 0, connected: false, connecting: false, deviceName: null }));
+    rrBufferRef.current = [];
+    setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false, deviceName: null }));
   }, [handleNotification]);
 
   const connect = useCallback(async () => {
@@ -103,30 +163,24 @@ export function useBluetoothHR(maxHR: number): HRState & {
       deviceRef.current = device;
 
       device.addEventListener('gattserverdisconnected', () => {
-        setState(s => ({ ...s, hr: null, zone: 0, connected: false, connecting: false }));
+        rrBufferRef.current = [];
+        setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false }));
       });
 
-      const server = await device.gatt!.connect();
-      const service = await server.getPrimaryService('heart_rate');
-      const characteristic = await service.getCharacteristic('heart_rate_measurement');
-      characteristicRef.current = characteristic;
+      const server     = await device.gatt!.connect();
+      const service    = await server.getPrimaryService('heart_rate');
+      const char       = await service.getCharacteristic('heart_rate_measurement');
+      characteristicRef.current = char;
 
-      characteristic.addEventListener('characteristicvaluechanged', handleNotification);
-      await characteristic.startNotifications();
+      char.addEventListener('characteristicvaluechanged', handleNotification);
+      await char.startNotifications();
 
-      setState(s => ({
-        ...s,
-        connected: true,
-        connecting: false,
-        deviceName: device.name ?? 'HR Device',
-      }));
-    } catch (err) {
-      // User cancelled or error
+      setState(s => ({ ...s, connected: true, connecting: false, deviceName: device.name ?? 'HR Device' }));
+    } catch {
       setState(s => ({ ...s, connecting: false }));
     }
   }, [state.supported, handleNotification]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (characteristicRef.current) {

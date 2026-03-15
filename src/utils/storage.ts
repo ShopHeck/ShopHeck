@@ -1,4 +1,4 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 
 const STORAGE_KEY = 'fightcamp_app';
@@ -19,6 +19,7 @@ export const defaultState: AppState = {
   nutritionLogs: [],
   coachNotes: [],
   subscription: DEFAULT_SUBSCRIPTION,
+  hrvEntries: [],
 };
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
@@ -164,6 +165,21 @@ export function linkCoach(state: AppState, coachId: string | null): AppState {
   if (!state.currentUser) return state;
   const updated = { ...state.currentUser, coachId: coachId ?? undefined };
   return updateProfile(state, updated);
+}
+
+// ─── HRV ─────────────────────────────────────────────────────────────────
+
+export function addHRVEntry(state: AppState, entry: Omit<HRVEntry, 'id' | 'createdAt'>): AppState {
+  const newEntry: HRVEntry = { ...entry, id: generateId(), createdAt: new Date().toISOString() };
+  return { ...state, hrvEntries: [newEntry, ...(state.hrvEntries ?? [])] };
+}
+
+export function deleteHRVEntry(state: AppState, id: string): AppState {
+  return { ...state, hrvEntries: (state.hrvEntries ?? []).filter(e => e.id !== id) };
+}
+
+export function setFitbitConfig(state: AppState, config: FitbitConfig | null): AppState {
+  return { ...state, fitbitConfig: config ?? undefined };
 }
 
 // ─── Custom Timer Presets ─────────────────────────────────────────────────

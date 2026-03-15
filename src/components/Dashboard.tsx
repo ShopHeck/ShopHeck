@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Heart, MessageSquare } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
@@ -382,15 +382,15 @@ export default function Dashboard({ onNavigate }: Props) {
             </div>
           </button>
           <button
-            onClick={() => onNavigate('health')}
-            className="card flex items-center gap-3 hover:border-red-900 transition-colors text-left"
+            onClick={() => onNavigate('trackers')}
+            className="card flex items-center gap-3 hover:border-teal-800 transition-colors text-left"
           >
-            <div className="w-10 h-10 rounded-xl bg-red-950/40 flex items-center justify-center flex-shrink-0">
-              <Heart size={18} className="text-red-400" />
+            <div className="w-10 h-10 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+              <Bluetooth size={18} className="text-teal-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Apple Health</p>
-              <p className="text-xs text-gray-500">Sync & export</p>
+              <p className="text-sm font-semibold text-white">Trackers</p>
+              <p className="text-xs text-gray-500">HR · HRV · Recovery</p>
             </div>
           </button>
         </div>

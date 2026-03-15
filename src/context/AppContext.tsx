@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig } from '../types';
 import { processStripeReturn, saveSubscription } from '../utils/subscription';
 import {
   loadState,
@@ -23,6 +23,9 @@ import {
   addCoachNote,
   deleteCoachNote,
   linkCoach,
+  addHRVEntry,
+  deleteHRVEntry,
+  setFitbitConfig,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 
@@ -49,6 +52,9 @@ type Action =
   | { type: 'DELETE_COACH_NOTE'; payload: string }
   | { type: 'LINK_COACH'; payload: string | null }
   | { type: 'SET_SUBSCRIPTION'; payload: SubscriptionState }
+  | { type: 'LOG_HRV'; payload: Omit<HRVEntry, 'id' | 'createdAt'> }
+  | { type: 'DELETE_HRV'; payload: string }
+  | { type: 'SET_FITBIT_CONFIG'; payload: FitbitConfig | null }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -139,6 +145,15 @@ function reducer(state: AppState, action: Action): AppState {
       saveSubscription(action.payload);
       return { ...state, subscription: action.payload };
     }
+
+    case 'LOG_HRV':
+      return addHRVEntry(state, action.payload);
+
+    case 'DELETE_HRV':
+      return deleteHRVEntry(state, action.payload);
+
+    case 'SET_FITBIT_CONFIG':
+      return setFitbitConfig(state, action.payload);
 
     case 'RESET':
       return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [], coaches: [] };

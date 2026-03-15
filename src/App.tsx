@@ -15,12 +15,13 @@ import NutritionTracker from './components/NutritionTracker';
 import AIInsights from './components/AIInsights';
 import AppleHealthSync from './components/AppleHealthSync';
 import FightReadiness from './components/FightReadiness';
+import FitnessTrackerHub from './components/FitnessTrackerHub';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
 import type { SessionType } from './types';
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -42,6 +43,7 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   aiinsights: { title: 'AI Insights', subtitle: 'Coach Analysis' },
   health: { title: 'Apple Health', subtitle: 'Sync & Export' },
   readiness: { title: 'Fight Readiness', subtitle: 'Camp Analysis' },
+  trackers: { title: 'Fitness Trackers', subtitle: 'HR · HRV · Recovery' },
 };
 
 function FlashOverlay() {
@@ -121,6 +123,7 @@ function AppShell() {
         {view === 'aiinsights' && <AIInsights />}
         {view === 'health' && <AppleHealthSync />}
         {view === 'readiness' && <FightReadiness />}
+        {view === 'trackers' && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
         {view === 'fighters' && <CoachDashboard />}
         {view === 'settings' && (
           <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />

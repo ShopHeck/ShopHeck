@@ -179,6 +179,30 @@ export interface NutritionLog {
   macros?: MacroEntry;
 }
 
+// ─── Fitness Tracker / HRV ───────────────────────────────────────────────
+
+export type HRVSource = 'bluetooth' | 'apple_health' | 'fitbit' | 'garmin' | 'whoop' | 'polar_flow' | 'manual';
+
+export interface HRVEntry {
+  id: string;
+  campId: string;
+  date: string; // YYYY-MM-DD
+  rmssd: number; // ms — the gold-standard HRV metric
+  restingHR?: number; // bpm
+  source: HRVSource;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FitbitConfig {
+  clientId: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: string; // ISO
+  userId?: string;
+  lastSync?: string; // ISO
+}
+
 // ─── Subscription ────────────────────────────────────────────────────────
 
 export type SubscriptionTier = 'free' | 'fighter_pro' | 'coach_pro';
@@ -221,4 +245,6 @@ export interface AppState {
   nutritionLogs: NutritionLog[];
   coachNotes: CoachNote[];
   subscription: SubscriptionState;
+  hrvEntries: HRVEntry[];
+  fitbitConfig?: FitbitConfig;
 }
