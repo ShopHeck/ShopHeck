@@ -16,12 +16,14 @@ import AIInsights from './components/AIInsights';
 import AppleHealthSync from './components/AppleHealthSync';
 import FightReadiness from './components/FightReadiness';
 import FitnessTrackerHub from './components/FitnessTrackerHub';
+import WorkoutLibrary from './components/WorkoutLibrary';
+import MealLibrary from './components/MealLibrary';
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
 import type { SessionType } from './types';
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -44,6 +46,8 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   health: { title: 'Apple Health', subtitle: 'Sync & Export' },
   readiness: { title: 'Fight Readiness', subtitle: 'Camp Analysis' },
   trackers: { title: 'Fitness Trackers', subtitle: 'HR · HRV · Recovery' },
+  'workout-library': { title: 'Workout Library', subtitle: 'Exercises & Drills' },
+  'meal-library': { title: 'Meal Library', subtitle: 'Plans & Generator' },
 };
 
 function FlashOverlay() {
@@ -124,6 +128,8 @@ function AppShell() {
         {view === 'health' && <AppleHealthSync />}
         {view === 'readiness' && <FightReadiness />}
         {view === 'trackers' && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
+        {view === 'workout-library' && <WorkoutLibrary />}
+        {view === 'meal-library' && <MealLibrary />}
         {view === 'fighters' && <CoachDashboard />}
         {view === 'settings' && (
           <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />

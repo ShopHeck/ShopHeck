@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
@@ -391,6 +391,30 @@ export default function Dashboard({ onNavigate }: Props) {
             <div>
               <p className="text-sm font-semibold text-white">Trackers</p>
               <p className="text-xs text-gray-500">HR · HRV · Recovery</p>
+            </div>
+          </button>
+          <button
+            onClick={() => onNavigate('workout-library')}
+            className="card flex items-center gap-3 hover:border-yellow-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
+              <Dumbbell size={18} className="text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Exercise Library</p>
+              <p className="text-xs text-gray-500">Drills & workouts</p>
+            </div>
+          </button>
+          <button
+            onClick={() => onNavigate('meal-library')}
+            className="card flex items-center gap-3 hover:border-green-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-green-900/30 flex items-center justify-center flex-shrink-0">
+              <UtensilsCrossed size={18} className="text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Meal Library</p>
+              <p className="text-xs text-gray-500">Plans & generator</p>
             </div>
           </button>
         </div>
