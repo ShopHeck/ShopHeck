@@ -117,7 +117,7 @@ export default function RoundTimer() {
   const mepTarget = state.currentUser?.mepTarget ?? 65;
 
   // Coaching voice (Goggins mode or standard)
-  const { speakCoach, unlock: unlockCoach } = useCoachingVoice(coachVoice);
+  const { speakCoach, unlock: unlockCoach, fishAudioActive } = useCoachingVoice(coachVoice, isRunning);
 
   // Fire a coaching cue 1.5 s into each rest period
   const prevPhaseForCoach = React.useRef(phase);
@@ -695,7 +695,14 @@ export default function RoundTimer() {
               <Volume2 size={16} className={coachVoice !== 'off' ? 'text-brand-400' : 'text-gray-500'} />
               <div>
                 <span className="text-sm font-medium text-white">Coaching Voice</span>
-                <p className="text-xs text-gray-500">Spoken cue at start of each rest</p>
+                <p className="text-xs text-gray-500">
+                  {coachVoice === 'goggins'
+                    ? fishAudioActive
+                      ? <span className="text-green-400">● Fish Audio</span>
+                      : <span className="text-orange-400">● Web Speech fallback</span>
+                    : 'Spoken cue at start of each rest'
+                  }
+                </p>
               </div>
             </div>
             <div className="flex gap-1">

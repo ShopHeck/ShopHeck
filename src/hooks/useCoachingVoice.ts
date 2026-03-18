@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFishAudioKey } from '../utils/fishAudioKey';
 
 export type CoachVoiceStyle = 'off' | 'standard' | 'goggins';
@@ -9,9 +9,6 @@ const FISH_AUDIO_API   = 'https://api.fish.audio/v1/tts';
 
 // ─── Web Speech fallback helpers ─────────────────────────────────────────────
 
-/**
- * Selects the deepest available male voice for the standard coaching fallback.
- */
 function pickDeepVoice(): SpeechSynthesisVoice | null {
   if (!('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -55,6 +52,7 @@ async function fetchFishAudio(text: string, apiKey: string): Promise<ArrayBuffer
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type':  'application/json',
+      'model':         'speech-1.5',
     },
     body: JSON.stringify({
       text,
@@ -72,30 +70,74 @@ async function fetchFishAudio(text: string, apiKey: string): Promise<ArrayBuffer
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useCoachingVoice(style: CoachVoiceStyle) {
-  const unlockedRef  = useRef(false);
-  const audioCtxRef  = useRef<AudioContext | null>(null);
+export function useCoachingVoice(style: CoachVoiceStyle, isRunning = false) {
+  const audioCtxRef   = useRef<AudioContext | null>(null);
+  const keepAliveRef  = useRef<OscillatorNode | null>(null);
   // Track in-flight requests so we don't stack them
-  const pendingRef   = useRef(false);
+  const pendingRef    = useRef(false);
+  // Whether Fish Audio is the active path (has a valid key and hasn't permanently failed)
+  const [fishAudioActive, setFishAudioActive] = useState(false);
 
-  /** Call from a user-gesture handler to unlock Web Speech on iOS. */
-  const unlock = useCallback(() => {
-    if (unlockedRef.current || !('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance('');
-    u.volume = 0;
-    window.speechSynthesis.speak(u);
-    unlockedRef.current = true;
-  }, []);
-
+  // Eagerly create the AudioContext inside a user-gesture context
   const getAudioCtx = useCallback((): AudioContext => {
     if (!audioCtxRef.current) {
-      audioCtxRef.current = new AudioContext();
+      audioCtxRef.current = new (window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
     if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
+      void audioCtxRef.current.resume();
     }
     return audioCtxRef.current;
   }, []);
+
+  /**
+   * Call from a user-gesture handler to unlock both Web Speech and AudioContext on iOS.
+   * Must be called synchronously inside a click/touch handler.
+   */
+  const unlock = useCallback(() => {
+    // Unlock Web Speech
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+    }
+    // Create and resume AudioContext inside the user gesture
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+    // Update Fish Audio active state based on key presence
+    setFishAudioActive(!!getFishAudioKey());
+  }, [getAudioCtx]);
+
+  // Keepalive oscillator — prevents iOS from suspending the AudioContext between rounds
+  useEffect(() => {
+    if (!isRunning || style === 'off') {
+      if (keepAliveRef.current) {
+        try { keepAliveRef.current.stop(); keepAliveRef.current.disconnect(); } catch { /* noop */ }
+        keepAliveRef.current = null;
+      }
+      return;
+    }
+    // Only start keepalive if AudioContext exists (was unlocked on Start tap)
+    if (!audioCtxRef.current) return;
+
+    const ctx  = audioCtxRef.current;
+    if (ctx.state === 'suspended') void ctx.resume();
+
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0; // completely silent
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    keepAliveRef.current = osc;
+
+    return () => {
+      try { osc.stop(); osc.disconnect(); gain.disconnect(); } catch { /* noop */ }
+      if (keepAliveRef.current === osc) keepAliveRef.current = null;
+    };
+  }, [isRunning, style]);
 
   const speakCoach = useCallback(async (text: string) => {
     if (style === 'off') return;
@@ -108,16 +150,20 @@ export function useCoachingVoice(style: CoachVoiceStyle) {
         if (pendingRef.current) return; // one cue at a time
         pendingRef.current = true;
         try {
-          const buffer = await fetchFishAudio(text, apiKey);
-          const ctx    = getAudioCtx();
+          const buffer  = await fetchFishAudio(text, apiKey);
+          const ctx     = getAudioCtx();
+          // Ensure context is running before decode (safety net for iOS)
+          if (ctx.state === 'suspended') await ctx.resume();
           const decoded = await ctx.decodeAudioData(buffer);
           const src     = ctx.createBufferSource();
           src.buffer    = decoded;
           src.connect(ctx.destination);
           src.start(0);
+          setFishAudioActive(true);
         } catch (err) {
           // Fallback to Web Speech if API call fails (network error, bad key, etc.)
           console.warn('[CoachingVoice] Fish Audio failed, using Web Speech fallback:', err);
+          setFishAudioActive(false);
           speakWebSpeech(text, 'goggins');
         } finally {
           pendingRef.current = false;
@@ -126,6 +172,7 @@ export function useCoachingVoice(style: CoachVoiceStyle) {
       }
 
       // No key set → Web Speech with low-pitch approximation
+      setFishAudioActive(false);
       speakWebSpeech(text, 'goggins');
       return;
     }
@@ -134,5 +181,5 @@ export function useCoachingVoice(style: CoachVoiceStyle) {
     speakWebSpeech(text, 'standard');
   }, [style, getAudioCtx]);
 
-  return { speakCoach, unlock };
+  return { speakCoach, unlock, fishAudioActive };
 }
