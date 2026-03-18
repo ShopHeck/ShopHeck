@@ -5,7 +5,8 @@ import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
-import { getFishAudioKey, setFishAudioKey, clearFishAudioKey } from '../utils/fishAudioKey';
+import { getFishAudioKey, setFishAudioKey, clearFishAudioKey, getFishModelId, setFishModelId, clearFishModelId } from '../utils/fishAudioKey';
+import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -105,6 +106,57 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     setFishAudioKey(fishKeyDraft.trim());
     setFishKeySaved(true);
     setTimeout(() => { setFishKeySaved(false); setEditingFishKey(false); setFishKeyDraft(''); }, 1200);
+  }
+
+  // Voice clone (Fish Audio model upload)
+  const [cloneFile, setCloneFile] = useState<File | null>(null);
+  const [cloneStatus, setCloneStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [cloneError, setCloneError] = useState('');
+  const [hasClonedModel, setHasClonedModel] = useState(!!getFishModelId());
+
+  async function handleCloneVoice() {
+    if (!cloneFile) return;
+    const apiKey = getFishAudioKey();
+    if (!apiKey) { setCloneError('Add your Fish Audio API key first.'); setCloneStatus('error'); return; }
+    setCloneStatus('uploading');
+    setCloneError('');
+    try {
+      const form = new FormData();
+      form.append('title', 'My Coach Voice');
+      form.append('type', 'tts');
+      form.append('train_mode', 'fast');
+      form.append('visibility', 'private');
+      form.append('voices', cloneFile, cloneFile.name);
+      const res = await fetch('https://api.fish.audio/v1/model', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
+      const data = await res.json() as { _id: string };
+      setFishModelId(data._id);
+      setHasClonedModel(true);
+      setCloneStatus('done');
+      setCloneFile(null);
+    } catch (e) {
+      setCloneError(e instanceof Error ? e.message : 'Upload failed');
+      setCloneStatus('error');
+    }
+  }
+
+  // Custom bell
+  const [bellFile, setBellFile] = useState<File | null>(null);
+  const [bellSaved, setBellSaved] = useState(false);
+  const [hasBell, setHasBell] = useState(hasCustomBell());
+
+  async function handleSaveBell() {
+    if (!bellFile) return;
+    const dataUrl = await fileToDataUrl(bellFile);
+    setCustomBell(dataUrl);
+    setHasBell(true);
+    setBellSaved(true);
+    setBellFile(null);
+    setTimeout(() => setBellSaved(false), 1500);
   }
 
   // Profile editing
@@ -664,6 +716,103 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 {hasFishKey ? 'Update key' : 'Add API key →'}
               </button>
             )}
+          </div>
+
+          {/* Voice Clone */}
+          <div className="px-4 py-3.5 border-t border-dark-600">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎙️</span>
+                <p className="text-sm font-medium text-white">Clone Coaching Voice</p>
+              </div>
+              {hasClonedModel && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-400 font-semibold">✓ Active</span>
+                  <button
+                    onClick={() => { clearFishModelId(); setHasClonedModel(false); setCloneStatus('idle'); }}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Upload a short audio sample (10–60 s) to clone a custom voice for the 💀 Goggins coach. Requires your Fish Audio API key.
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={e => { setCloneFile(e.target.files?.[0] ?? null); setCloneStatus('idle'); setCloneError(''); }}
+                />
+                <span className="btn-secondary px-3 py-1.5 text-xs rounded-xl">
+                  {cloneFile ? `✓ ${cloneFile.name}` : 'Choose audio file…'}
+                </span>
+              </label>
+              {cloneFile && (
+                <button
+                  onClick={handleCloneVoice}
+                  disabled={cloneStatus === 'uploading'}
+                  className="btn-primary px-4 py-1.5 text-xs rounded-xl disabled:opacity-50"
+                >
+                  {cloneStatus === 'uploading' ? 'Uploading…' : cloneStatus === 'done' ? '✓ Done' : 'Upload & Clone'}
+                </button>
+              )}
+              {cloneStatus === 'error' && (
+                <p className="text-xs text-red-400">{cloneError}</p>
+              )}
+              {cloneStatus === 'done' && (
+                <p className="text-xs text-green-400">Voice cloned — it will be used next time you start the timer with Goggins mode.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Custom Round Bell */}
+          <div className="px-4 py-3.5 border-t border-dark-600">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🔔</span>
+                <p className="text-sm font-medium text-white">Custom Round Bell</p>
+              </div>
+              {hasBell && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-400 font-semibold">✓ Set</span>
+                  <button
+                    onClick={() => { clearCustomBell(); setHasBell(false); }}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Plays at the start of every round instead of the built-in bell.
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={e => { setBellFile(e.target.files?.[0] ?? null); setBellSaved(false); }}
+                />
+                <span className="btn-secondary px-3 py-1.5 text-xs rounded-xl">
+                  {bellFile ? `✓ ${bellFile.name}` : 'Choose audio file…'}
+                </span>
+              </label>
+              {bellFile && (
+                <button
+                  onClick={handleSaveBell}
+                  className={`px-4 py-1.5 text-xs rounded-xl font-semibold transition-all ${bellSaved ? 'bg-green-700 text-white' : 'btn-primary'}`}
+                >
+                  {bellSaved ? '✓ Saved' : 'Save Bell'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Apple Health */}

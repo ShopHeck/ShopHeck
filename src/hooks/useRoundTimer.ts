@@ -4,6 +4,7 @@ import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import type { CoachVoiceStyle } from './useCoachingVoice';
+import { getCustomBellDataUrl, dataUrlToArrayBuffer } from '../utils/customBell';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -295,9 +296,10 @@ export function useRoundTimer() {
   const timeLeftRef   = useRef(PRESETS[0].workSec);
   const deadlineRef   = useRef(0);
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const audioCtxRef   = useRef<AudioContext | null>(null);
-  const keepAliveRef  = useRef<OscillatorNode | null>(null);
-  const warningFiredRef = useRef(false); // prevent double-fire per phase
+  const audioCtxRef      = useRef<AudioContext | null>(null);
+  const keepAliveRef     = useRef<OscillatorNode | null>(null);
+  const customBellBufRef = useRef<AudioBuffer | null>(null);
+  const warningFiredRef  = useRef(false); // prevent double-fire per phase
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
   const hapticRef     = useRef(true);
@@ -358,6 +360,32 @@ export function useRoundTimer() {
       if (keepAliveRef.current === osc) keepAliveRef.current = null;
     };
   }, [isRunning, getAudioCtx]);
+
+  // Decode and cache custom bell audio each time the timer starts
+  useEffect(() => {
+    if (!isRunning) return;
+    const dataUrl = getCustomBellDataUrl();
+    if (!dataUrl) { customBellBufRef.current = null; return; }
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const buf = dataUrlToArrayBuffer(dataUrl);
+    ctx.decodeAudioData(buf.slice(0))
+      .then(decoded => { customBellBufRef.current = decoded; })
+      .catch(e => { console.warn('[RoundTimer] custom bell decode failed:', e); customBellBufRef.current = null; });
+  }, [isRunning]);
+
+  // Play custom bell if set, otherwise synthesize
+  const playRoundStartBell = useCallback((ctx: AudioContext) => {
+    const buf = customBellBufRef.current;
+    if (buf) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    } else {
+      ringBell(ctx, 1.0);
+    }
+  }, []);
 
   // Flash helper — sets flashColor in context for 600ms
   const flash = useCallback((color: string) => {
@@ -489,7 +517,7 @@ export function useRoundTimer() {
 
         if (ph === 'prep') {
           // Prep done → start round 1
-          ringBell(ctx, 1.0);
+          playRoundStartBell(ctx);
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');
@@ -526,7 +554,7 @@ export function useRoundTimer() {
           // End of rest → new round
           const newRound    = round + 1;
           const isLast      = newRound >= roundsRef.current;
-          ringBell(ctx, 1.0);
+          playRoundStartBell(ctx);
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak(isLast ? 'Last round' : `Round ${newRound}`);
@@ -611,7 +639,7 @@ export function useRoundTimer() {
           if (voiceRef.current) speak(`Round 1 begins in ${prepSecRef.current}`);
         } else {
           // Straight to work
-          ringBell(ctx, 1.0);
+          playRoundStartBell(ctx);
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');

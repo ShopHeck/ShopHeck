@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getFishAudioKey } from '../utils/fishAudioKey';
+import { getFishAudioKey, getFishModelId } from '../utils/fishAudioKey';
 
 export type CoachVoiceStyle = 'off' | 'standard' | 'goggins';
 
-// Fish Audio model ID for the Goggins voice
-const GOGGINS_MODEL_ID = 'ff5468d06c2443dba9b8d2f9c6aa26b0';
+// Built-in Goggins model — used when the user hasn't cloned a custom voice
+const DEFAULT_MODEL_ID = 'ff5468d06c2443dba9b8d2f9c6aa26b0';
 const FISH_AUDIO_API   = 'https://api.fish.audio/v1/tts';
+
+/** Returns the active model ID: user-cloned voice if set, otherwise built-in Goggins */
+function getActiveModelId(): string {
+  return getFishModelId() || DEFAULT_MODEL_ID;
+}
 
 // ─── Web Speech fallback helpers ─────────────────────────────────────────────
 
@@ -56,7 +61,7 @@ async function fetchFishAudio(text: string, apiKey: string): Promise<ArrayBuffer
     },
     body: JSON.stringify({
       text,
-      reference_id: GOGGINS_MODEL_ID,
+      reference_id: getActiveModelId(),
       format:        'mp3',
       latency:       'normal',
     }),
