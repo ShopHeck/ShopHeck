@@ -5,6 +5,7 @@ import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
+import { getFishAudioKey, setFishAudioKey, clearFishAudioKey } from '../utils/fishAudioKey';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -92,6 +93,18 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     saveApiKeyUtil(apiKeyDraft.trim());
     setKeySaved(true);
     setTimeout(() => { setKeySaved(false); setEditingKey(false); setApiKeyDraft(''); }, 1200);
+  }
+
+  // Fish Audio key
+  const [fishKeyDraft, setFishKeyDraft] = useState('');
+  const [editingFishKey, setEditingFishKey] = useState(false);
+  const [fishKeySaved, setFishKeySaved] = useState(false);
+  const hasFishKey = !!getFishAudioKey();
+
+  function handleSaveFishKey() {
+    setFishAudioKey(fishKeyDraft.trim());
+    setFishKeySaved(true);
+    setTimeout(() => { setFishKeySaved(false); setEditingFishKey(false); setFishKeyDraft(''); }, 1200);
   }
 
   // Profile editing
@@ -593,6 +606,62 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 className="text-xs text-brand-500 hover:text-brand-400 transition-colors"
               >
                 {hasApiKey ? 'Update key' : 'Add API key →'}
+              </button>
+            )}
+          </div>
+
+          {/* Fish Audio (Goggins Voice) */}
+          <div className="px-4 py-3.5">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Key size={14} className="text-red-400" />
+                <p className="text-sm font-medium text-white">Fish Audio API Key</p>
+              </div>
+              {hasFishKey ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-400 font-semibold">✓ Set</span>
+                  <button
+                    onClick={() => { clearFishAudioKey(); setEditingFishKey(false); }}
+                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-600">Not set</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-2">
+              Powers the 💀 Goggins coaching voice in the Timer.{' '}
+              <span className="text-gray-600">Get a key at fish.audio</span>
+            </p>
+            {editingFishKey ? (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  className="input font-mono text-sm"
+                  placeholder="Paste Fish Audio API key…"
+                  value={fishKeyDraft}
+                  onChange={e => setFishKeyDraft(e.target.value)}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveFishKey}
+                    disabled={!fishKeyDraft.trim()}
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${fishKeySaved ? 'bg-green-700 text-white' : 'btn-primary'}`}
+                  >
+                    {fishKeySaved ? '✓ Saved' : 'Save Key'}
+                  </button>
+                  <button onClick={() => setEditingFishKey(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingFishKey(true)}
+                className="text-xs text-brand-500 hover:text-brand-400 transition-colors"
+              >
+                {hasFishKey ? 'Update key' : 'Add API key →'}
               </button>
             )}
           </div>

@@ -1,43 +1,84 @@
 import { useCallback, useRef } from 'react';
+import { getFishAudioKey } from '../utils/fishAudioKey';
 
 export type CoachVoiceStyle = 'off' | 'standard' | 'goggins';
 
+// Fish Audio model ID for the Goggins voice
+const GOGGINS_MODEL_ID = 'ff5468d06c2443dba9b8d2f9c6aa26b0';
+const FISH_AUDIO_API   = 'https://api.fish.audio/v1/tts';
+
+// ─── Web Speech fallback helpers ─────────────────────────────────────────────
+
 /**
- * Selects the best available deep male voice for Goggins mode.
- * Falls back gracefully if none found.
- *
- * Preferred voices (roughly ordered by how "Goggins-appropriate" they sound):
- *   - macOS/iOS: "Alex", "Daniel", "Tom"
- *   - Android/Chrome: "Google US English" (male variant), "Google UK English Male"
- *   - Generic: any en-US voice that doesn't flag itself as female
+ * Selects the deepest available male voice for the standard coaching fallback.
  */
 function pickDeepVoice(): SpeechSynthesisVoice | null {
   if (!('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-
   const PREFERRED = ['alex', 'daniel', 'tom', 'google us english', 'google uk english male', 'fred'];
   for (const name of PREFERRED) {
     const v = voices.find(v => v.name.toLowerCase().includes(name));
     if (v) return v;
   }
-  // Fall back: any English voice that doesn't self-identify as female
-  const enVoice = voices.find(v =>
+  return voices.find(v =>
     v.lang.startsWith('en') &&
-    !v.name.toLowerCase().includes('female') &&
-    !v.name.toLowerCase().includes('samantha') &&
-    !v.name.toLowerCase().includes('karen') &&
-    !v.name.toLowerCase().includes('victoria') &&
-    !v.name.toLowerCase().includes('moira') &&
-    !v.name.toLowerCase().includes('tessa'),
-  );
-  return enVoice ?? null;
+    !['samantha', 'karen', 'victoria', 'moira', 'tessa', 'female'].some(n =>
+      v.name.toLowerCase().includes(n),
+    ),
+  ) ?? null;
 }
 
-export function useCoachingVoice(style: CoachVoiceStyle) {
-  const unlockedRef = useRef(false);
+function speakWebSpeech(text: string, style: 'standard' | 'goggins') {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  if (style === 'goggins') {
+    u.pitch  = 0.65;
+    u.rate   = 0.88;
+    u.volume = 1.0;
+    const voice = pickDeepVoice();
+    if (voice) u.voice = voice;
+  } else {
+    u.pitch  = 1.0;
+    u.rate   = 1.0;
+    u.volume = 1.0;
+  }
+  window.speechSynthesis.speak(u);
+}
 
-  /** Must be called inside a user-gesture handler (e.g. the Start tap). */
+// ─── Fish Audio API ───────────────────────────────────────────────────────────
+
+async function fetchFishAudio(text: string, apiKey: string): Promise<ArrayBuffer> {
+  const res = await fetch(FISH_AUDIO_API, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      text,
+      reference_id: GOGGINS_MODEL_ID,
+      format:        'mp3',
+      latency:       'normal',
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fish Audio API error ${res.status}: ${await res.text()}`);
+  }
+  return res.arrayBuffer();
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useCoachingVoice(style: CoachVoiceStyle) {
+  const unlockedRef  = useRef(false);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  // Track in-flight requests so we don't stack them
+  const pendingRef   = useRef(false);
+
+  /** Call from a user-gesture handler to unlock Web Speech on iOS. */
   const unlock = useCallback(() => {
     if (unlockedRef.current || !('speechSynthesis' in window)) return;
     const u = new SpeechSynthesisUtterance('');
@@ -46,30 +87,52 @@ export function useCoachingVoice(style: CoachVoiceStyle) {
     unlockedRef.current = true;
   }, []);
 
-  const speakCoach = useCallback((text: string) => {
-    if (style === 'off' || !('speechSynthesis' in window)) return;
+  const getAudioCtx = useCallback((): AudioContext => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new AudioContext();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  }, []);
 
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
+  const speakCoach = useCallback(async (text: string) => {
+    if (style === 'off') return;
 
     if (style === 'goggins') {
-      // Deep, deliberate, intense — as close to the Goggins timbre as Web TTS allows
-      u.pitch  = 0.65;  // very deep
-      u.rate   = 0.88;  // slower, punchy delivery
-      u.volume = 1.0;
+      const apiKey = getFishAudioKey();
 
-      // Voices load async; call getVoices() fresh every time so late-loading voices work
-      const voice = pickDeepVoice();
-      if (voice) u.voice = voice;
-    } else {
-      // Standard coaching voice — neutral, clear
-      u.pitch  = 1.0;
-      u.rate   = 1.0;
-      u.volume = 1.0;
+      if (apiKey) {
+        // ── Fish Audio path ──────────────────────────────────────────────────
+        if (pendingRef.current) return; // one cue at a time
+        pendingRef.current = true;
+        try {
+          const buffer = await fetchFishAudio(text, apiKey);
+          const ctx    = getAudioCtx();
+          const decoded = await ctx.decodeAudioData(buffer);
+          const src     = ctx.createBufferSource();
+          src.buffer    = decoded;
+          src.connect(ctx.destination);
+          src.start(0);
+        } catch (err) {
+          // Fallback to Web Speech if API call fails (network error, bad key, etc.)
+          console.warn('[CoachingVoice] Fish Audio failed, using Web Speech fallback:', err);
+          speakWebSpeech(text, 'goggins');
+        } finally {
+          pendingRef.current = false;
+        }
+        return;
+      }
+
+      // No key set → Web Speech with low-pitch approximation
+      speakWebSpeech(text, 'goggins');
+      return;
     }
 
-    window.speechSynthesis.speak(u);
-  }, [style]);
+    // Standard voice
+    speakWebSpeech(text, 'standard');
+  }, [style, getAudioCtx]);
 
   return { speakCoach, unlock };
 }
