@@ -746,7 +746,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <input
                 ref={cloneInputRef}
                 type="file"
-                accept="audio/*"
+                accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,audio/*"
                 className="hidden"
                 onChange={e => { setCloneFile(e.target.files?.[0] ?? null); setCloneStatus('idle'); setCloneError(''); }}
               />
@@ -800,7 +800,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <input
                 ref={bellInputRef}
                 type="file"
-                accept="audio/*"
+                accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,audio/*"
                 className="hidden"
                 onChange={e => { setBellFile(e.target.files?.[0] ?? null); setBellSaved(false); }}
               />
