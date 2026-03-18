@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -109,6 +109,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   }
 
   // Voice clone (Fish Audio model upload)
+  const cloneInputRef = useRef<HTMLInputElement>(null);
   const [cloneFile, setCloneFile] = useState<File | null>(null);
   const [cloneStatus, setCloneStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
   const [cloneError, setCloneError] = useState('');
@@ -145,6 +146,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   }
 
   // Custom bell
+  const bellInputRef = useRef<HTMLInputElement>(null);
   const [bellFile, setBellFile] = useState<File | null>(null);
   const [bellSaved, setBellSaved] = useState(false);
   const [hasBell, setHasBell] = useState(hasCustomBell());
@@ -741,17 +743,19 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               Upload a short audio sample (10–60 s) to clone a custom voice for the 💀 Goggins coach. Requires your Fish Audio API key.
             </p>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={e => { setCloneFile(e.target.files?.[0] ?? null); setCloneStatus('idle'); setCloneError(''); }}
-                />
-                <span className="btn-secondary px-3 py-1.5 text-xs rounded-xl">
-                  {cloneFile ? `✓ ${cloneFile.name}` : 'Choose audio file…'}
-                </span>
-              </label>
+              <input
+                ref={cloneInputRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={e => { setCloneFile(e.target.files?.[0] ?? null); setCloneStatus('idle'); setCloneError(''); }}
+              />
+              <button
+                onClick={() => cloneInputRef.current?.click()}
+                className="btn-secondary px-3 py-1.5 text-xs rounded-xl"
+              >
+                {cloneFile ? `✓ ${cloneFile.name}` : 'Choose audio file…'}
+              </button>
               {cloneFile && (
                 <button
                   onClick={handleCloneVoice}
@@ -793,17 +797,19 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               Plays at the start of every round instead of the built-in bell.
             </p>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={e => { setBellFile(e.target.files?.[0] ?? null); setBellSaved(false); }}
-                />
-                <span className="btn-secondary px-3 py-1.5 text-xs rounded-xl">
-                  {bellFile ? `✓ ${bellFile.name}` : 'Choose audio file…'}
-                </span>
-              </label>
+              <input
+                ref={bellInputRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={e => { setBellFile(e.target.files?.[0] ?? null); setBellSaved(false); }}
+              />
+              <button
+                onClick={() => bellInputRef.current?.click()}
+                className="btn-secondary px-3 py-1.5 text-xs rounded-xl"
+              >
+                {bellFile ? `✓ ${bellFile.name}` : 'Choose audio file…'}
+              </button>
               {bellFile && (
                 <button
                   onClick={handleSaveBell}
