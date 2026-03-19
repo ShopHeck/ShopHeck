@@ -57,7 +57,6 @@ async function fetchFishAudio(text: string, apiKey: string): Promise<ArrayBuffer
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type':  'application/json',
-      'model':         'speech-1.5',
     },
     body: JSON.stringify({
       text,

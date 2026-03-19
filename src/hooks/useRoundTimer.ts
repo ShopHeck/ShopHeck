@@ -4,7 +4,7 @@ import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import type { CoachVoiceStyle } from './useCoachingVoice';
-import { getCustomBellDataUrl, dataUrlToArrayBuffer } from '../utils/customBell';
+import { getCustomBellDataUrl } from '../utils/customBell';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -298,7 +298,6 @@ export function useRoundTimer() {
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef      = useRef<AudioContext | null>(null);
   const keepAliveRef     = useRef<OscillatorNode | null>(null);
-  const customBellBufRef = useRef<AudioBuffer | null>(null);
   const warningFiredRef  = useRef(false); // prevent double-fire per phase
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
@@ -361,26 +360,13 @@ export function useRoundTimer() {
     };
   }, [isRunning, getAudioCtx]);
 
-  // Decode and cache custom bell audio each time the timer starts
-  useEffect(() => {
-    if (!isRunning) return;
-    const dataUrl = getCustomBellDataUrl();
-    if (!dataUrl) { customBellBufRef.current = null; return; }
-    const ctx = getAudioCtx();
-    const buf = dataUrlToArrayBuffer(dataUrl);
-    ctx.decodeAudioData(buf.slice(0))
-      .then(decoded => { customBellBufRef.current = decoded; })
-      .catch(e => { console.warn('[RoundTimer] custom bell decode failed:', e); customBellBufRef.current = null; });
-  }, [isRunning, getAudioCtx]);
-
-  // Play custom bell if set, otherwise synthesize
+  // Play custom bell if set (via HTMLAudioElement — no pre-decode needed),
+  // otherwise fall back to the synthesized ringBell.
   const playRoundStartBell = useCallback((ctx: AudioContext) => {
-    const buf = customBellBufRef.current;
-    if (buf) {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
+    const dataUrl = getCustomBellDataUrl();
+    if (dataUrl) {
+      const audio = new Audio(dataUrl);
+      audio.play().catch(e => console.warn('[RoundTimer] custom bell play failed:', e));
     } else {
       ringBell(ctx, 1.0);
     }

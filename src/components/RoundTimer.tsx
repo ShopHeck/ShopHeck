@@ -15,6 +15,7 @@ import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothH
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 import { useCoachingVoice } from '../hooks/useCoachingVoice';
 import { getCoachingCue } from '../utils/reactionPrompts';
+import { getFishAudioKey } from '../utils/fishAudioKey';
 
 // ─── Custom Preset Modal ───────────────────────────────────────────────────
 
@@ -698,9 +699,13 @@ export default function RoundTimer() {
                 <p className="text-xs text-gray-500">
                   {coachVoice === 'goggins'
                     ? fishAudioActive
-                      ? <span className="text-green-400">● Fish Audio</span>
-                      : <span className="text-orange-400">● Web Speech fallback</span>
-                    : 'Spoken cue at start of each rest'
+                      ? <span className="text-green-400">● Fish Audio · cue fires at rest start</span>
+                      : !getFishAudioKey()
+                        ? <span className="text-red-400">● Add Fish Audio API key in Settings</span>
+                        : <span className="text-orange-400">● Connecting… cue fires at rest start</span>
+                    : coachVoice !== 'off'
+                      ? 'Spoken cue at start of each rest'
+                      : ''
                   }
                 </p>
               </div>
