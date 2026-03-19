@@ -298,6 +298,7 @@ export function useRoundTimer() {
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef      = useRef<AudioContext | null>(null);
   const keepAliveRef     = useRef<OscillatorNode | null>(null);
+  const customBellBufRef = useRef<AudioBuffer | null>(null);
   const warningFiredRef  = useRef(false); // prevent double-fire per phase
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
@@ -347,6 +348,21 @@ export function useRoundTimer() {
       return;
     }
     const ctx = getAudioCtx();
+
+    // Pre-decode custom bell into AudioContext so it can be played from timer callbacks
+    const dataUrl = getCustomBellDataUrl();
+    if (dataUrl) {
+      const b64    = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      const binary = atob(b64);
+      const bytes  = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      ctx.decodeAudioData(bytes.buffer.slice(0))
+        .then(buf => { customBellBufRef.current = buf; })
+        .catch(e  => { console.warn('[RoundTimer] custom bell decode failed:', e); });
+    } else {
+      customBellBufRef.current = null;
+    }
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     gain.gain.value = 0; // completely silent
@@ -360,13 +376,14 @@ export function useRoundTimer() {
     };
   }, [isRunning, getAudioCtx]);
 
-  // Play custom bell if set (via HTMLAudioElement — no pre-decode needed),
-  // otherwise fall back to the synthesized ringBell.
+  // Play custom bell using the pre-decoded AudioBuffer (set on Start), or fall back
+  // to the synthesized ringBell.
   const playRoundStartBell = useCallback((ctx: AudioContext) => {
-    const dataUrl = getCustomBellDataUrl();
-    if (dataUrl) {
-      const audio = new Audio(dataUrl);
-      audio.play().catch(e => console.warn('[RoundTimer] custom bell play failed:', e));
+    if (customBellBufRef.current) {
+      const src = ctx.createBufferSource();
+      src.buffer = customBellBufRef.current;
+      src.connect(ctx.destination);
+      src.start(ctx.currentTime);
     } else {
       ringBell(ctx, 1.0);
     }
