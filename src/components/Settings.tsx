@@ -114,6 +114,18 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const [cloneStatus, setCloneStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
   const [cloneError, setCloneError] = useState('');
   const [hasClonedModel, setHasClonedModel] = useState(!!getFishModelId());
+  const [modelIdDraft, setModelIdDraft] = useState('');
+  const [modelIdSaved, setModelIdSaved] = useState(false);
+
+  function handleSaveModelId() {
+    const id = modelIdDraft.trim();
+    if (!id) return;
+    setFishModelId(id);
+    setHasClonedModel(true);
+    setModelIdSaved(true);
+    setModelIdDraft('');
+    setTimeout(() => setModelIdSaved(false), 1500);
+  }
 
   async function handleCloneVoice() {
     if (!cloneFile) return;
@@ -771,6 +783,39 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               {cloneStatus === 'done' && (
                 <p className="text-xs text-green-400">Voice cloned — it will be used next time you start the timer with Goggins mode.</p>
               )}
+            </div>
+            <div className="mt-3 pt-3 border-t border-dark-500">
+              <p className="text-xs text-gray-500 mb-2">Already have a model on fish.audio? Paste your model ID directly:</p>
+              <div className="flex items-center gap-2">
+                {hasClonedModel && !modelIdDraft ? (
+                  <>
+                    <span className="text-xs text-green-400 font-semibold">✓ Model ID set</span>
+                    <button
+                      onClick={() => { clearFishModelId(); setHasClonedModel(false); }}
+                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      className="input font-mono text-xs flex-1"
+                      placeholder="Paste Fish Audio model ID…"
+                      value={modelIdDraft}
+                      onChange={e => setModelIdDraft(e.target.value)}
+                    />
+                    <button
+                      onClick={handleSaveModelId}
+                      disabled={!modelIdDraft.trim()}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${modelIdSaved ? 'bg-green-700 text-white' : 'btn-primary'}`}
+                    >
+                      {modelIdSaved ? '✓' : 'Save'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

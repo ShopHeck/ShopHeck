@@ -366,13 +366,12 @@ export function useRoundTimer() {
     if (!isRunning) return;
     const dataUrl = getCustomBellDataUrl();
     if (!dataUrl) { customBellBufRef.current = null; return; }
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
+    const ctx = getAudioCtx();
     const buf = dataUrlToArrayBuffer(dataUrl);
     ctx.decodeAudioData(buf.slice(0))
       .then(decoded => { customBellBufRef.current = decoded; })
       .catch(e => { console.warn('[RoundTimer] custom bell decode failed:', e); customBellBufRef.current = null; });
-  }, [isRunning]);
+  }, [isRunning, getAudioCtx]);
 
   // Play custom bell if set, otherwise synthesize
   const playRoundStartBell = useCallback((ctx: AudioContext) => {
