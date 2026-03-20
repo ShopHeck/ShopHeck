@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 
 export type HRZone = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -50,6 +52,11 @@ export function getZone(hr: number, maxHR: number): HRZone {
   if (pct >= 0.50) return 1;
   return 0;
 }
+
+// ─── BLE UUIDs (full 128-bit form required by @capacitor-community/bluetooth-le) ──
+
+const HR_SERVICE        = '0000180d-0000-1000-8000-00805f9b34fb';
+const HR_CHARACTERISTIC = '00002a37-0000-1000-8000-00805f9b34fb';
 
 /**
  * Parses the Bluetooth Heart Rate Measurement characteristic (0x2A37).
@@ -105,6 +112,10 @@ function computeRMSSD(rrBuffer: number[]): number | null {
 
 const RR_BUFFER_SIZE = 64; // ~1 min at 60 bpm
 
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+const isNative = Capacitor.isNativePlatform();
+
 export function useBluetoothHR(maxHR: number): HRState & {
   connect: () => Promise<void>;
   disconnect: () => void;
@@ -115,23 +126,26 @@ export function useBluetoothHR(maxHR: number): HRState & {
     hrv: null,
     connected: false,
     connecting: false,
-    supported: typeof navigator !== 'undefined' && 'bluetooth' in navigator,
+    // On native: always supported. On web: check for Web Bluetooth API.
+    supported: isNative || (typeof navigator !== 'undefined' && 'bluetooth' in navigator),
     deviceName: null,
     connectError: null,
   });
 
-  const deviceRef         = useRef<BluetoothDevice | null>(null);
-  const characteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
-  const rrBufferRef       = useRef<number[]>([]);
+  const rrBufferRef = useRef<number[]>([]);
 
-  const handleNotification = useCallback((event: Event) => {
-    const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
-    if (!characteristic.value) return;
+  // Native refs
+  const nativeDeviceIdRef = useRef<string | null>(null);
 
-    const { hr, rrMs } = parseHRMeasurement(characteristic.value);
+  // Web Bluetooth refs
+  const webDeviceRef         = useRef<BluetoothDevice | null>(null);
+  const webCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+
+  // ── Shared HR notification handler ──────────────────────────────────────
+  const handleHRData = useCallback((value: DataView) => {
+    const { hr, rrMs } = parseHRMeasurement(value);
     const zone = getZone(hr, maxHR);
 
-    // Maintain a capped sliding buffer of RR intervals
     if (rrMs.length > 0) {
       rrBufferRef.current = [...rrBufferRef.current, ...rrMs].slice(-RR_BUFFER_SIZE);
     }
@@ -140,75 +154,153 @@ export function useBluetoothHR(maxHR: number): HRState & {
     setState(s => ({ ...s, hr, zone, hrv }));
   }, [maxHR]);
 
-  const disconnect = useCallback(() => {
-    if (characteristicRef.current) {
-      characteristicRef.current.removeEventListener('characteristicvaluechanged', handleNotification);
-      characteristicRef.current.stopNotifications().catch(() => {});
-      characteristicRef.current = null;
-    }
-    if (deviceRef.current?.gatt?.connected) {
-      deviceRef.current.gatt.disconnect();
-    }
-    deviceRef.current = null;
-    rrBufferRef.current = [];
-    setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false, deviceName: null, connectError: null }));
-  }, [handleNotification]);
+  // ── Web Bluetooth notification shim ─────────────────────────────────────
+  const handleWebNotification = useCallback((event: Event) => {
+    const char = event.target as BluetoothRemoteGATTCharacteristic;
+    if (char.value) handleHRData(char.value);
+  }, [handleHRData]);
 
+  // ── Native connect (CoreBluetooth via Capacitor plugin) ─────────────────
+  const connectNative = useCallback(async () => {
+    await BleClient.initialize();
+
+    // requestDevice opens the native iOS Bluetooth device picker.
+    // We scan for the heart_rate service; CoreBluetooth on iOS is more
+    // permissive than Web Bluetooth and will show MyZone devices even
+    // when they don't include the service UUID in their advertisement
+    // packets (provided the device has been paired with this iPhone before).
+    const device = await BleClient.requestDevice({
+      services: [HR_SERVICE],
+      optionalServices: [],
+    });
+
+    nativeDeviceIdRef.current = device.deviceId;
+
+    await BleClient.connect(device.deviceId, () => {
+      // onDisconnect callback
+      rrBufferRef.current = [];
+      nativeDeviceIdRef.current = null;
+      setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false }));
+    });
+
+    await BleClient.startNotifications(
+      device.deviceId,
+      HR_SERVICE,
+      HR_CHARACTERISTIC,
+      (value: DataView) => handleHRData(value),
+    );
+
+    setState(s => ({
+      ...s,
+      connected: true,
+      connecting: false,
+      deviceName: device.name ?? 'HR Device',
+    }));
+  }, [handleHRData]);
+
+  // ── Web Bluetooth connect ────────────────────────────────────────────────
+  const connectWeb = useCallback(async () => {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: ['heart_rate'] },
+        { namePrefix: 'MYZ' },
+        { namePrefix: 'MYZONE' },
+      ],
+      optionalServices: ['heart_rate'],
+    });
+
+    webDeviceRef.current = device;
+
+    device.addEventListener('gattserverdisconnected', () => {
+      rrBufferRef.current = [];
+      setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false }));
+    });
+
+    const server = await device.gatt!.connect();
+    const service = await server.getPrimaryService('heart_rate');
+    const char = await service.getCharacteristic('heart_rate_measurement');
+    webCharacteristicRef.current = char;
+
+    char.addEventListener('characteristicvaluechanged', handleWebNotification);
+    await char.startNotifications();
+
+    setState(s => ({
+      ...s,
+      connected: true,
+      connecting: false,
+      deviceName: device.name ?? 'HR Device',
+    }));
+  }, [handleWebNotification]);
+
+  // ── Public connect ───────────────────────────────────────────────────────
   const connect = useCallback(async () => {
     if (!state.supported) return;
     setState(s => ({ ...s, connecting: true, connectError: null }));
     try {
-      const device = await navigator.bluetooth.requestDevice({
-        // Multiple filters — device must match at least one.
-        // MyZone MZ-3 / MZ-Switch advertise by name ("MYZ-…") not by service UUID,
-        // so they won't appear without an explicit namePrefix filter.
-        filters: [
-          { services: ['heart_rate'] },   // Polar, Garmin, and any standard HR belt
-          { namePrefix: 'MYZ' },          // MyZone MZ-3, MZ-Switch, BKFC edition
-          { namePrefix: 'MYZONE' },       // MyZone-branded variants
-        ],
-        // Required so we can access heart_rate on name-filtered MyZone devices
-        optionalServices: ['heart_rate'],
-      });
-      deviceRef.current = device;
-
-      device.addEventListener('gattserverdisconnected', () => {
-        rrBufferRef.current = [];
-        setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false }));
-      });
-
-      const server     = await device.gatt!.connect();
-      const service    = await server.getPrimaryService('heart_rate');
-      const char       = await service.getCharacteristic('heart_rate_measurement');
-      characteristicRef.current = char;
-
-      char.addEventListener('characteristicvaluechanged', handleNotification);
-      await char.startNotifications();
-
-      setState(s => ({ ...s, connected: true, connecting: false, deviceName: device.name ?? 'HR Device' }));
+      if (isNative) {
+        await connectNative();
+      } else {
+        await connectWeb();
+      }
     } catch (err) {
       const e = err as DOMException;
-      // AbortError / NotFoundError = user cancelled the picker — no error message needed
-      const cancelled = e.name === 'AbortError' || e.name === 'NotFoundError';
+      const cancelled = e.name === 'AbortError' || e.name === 'NotFoundError' || e.name === 'UserCancelledError';
       setState(s => ({
         ...s,
         connecting: false,
         connectError: cancelled ? null : (e.message || 'Connection failed'),
       }));
     }
-  }, [state.supported, handleNotification]);
+  }, [state.supported, connectNative, connectWeb]);
 
+  // ── Disconnect ───────────────────────────────────────────────────────────
+  const disconnect = useCallback(() => {
+    if (isNative) {
+      if (nativeDeviceIdRef.current) {
+        BleClient.stopNotifications(nativeDeviceIdRef.current, HR_SERVICE, HR_CHARACTERISTIC).catch(() => {});
+        BleClient.disconnect(nativeDeviceIdRef.current).catch(() => {});
+        nativeDeviceIdRef.current = null;
+      }
+    } else {
+      if (webCharacteristicRef.current) {
+        webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', handleWebNotification);
+        webCharacteristicRef.current.stopNotifications().catch(() => {});
+        webCharacteristicRef.current = null;
+      }
+      if (webDeviceRef.current?.gatt?.connected) {
+        webDeviceRef.current.gatt.disconnect();
+      }
+      webDeviceRef.current = null;
+    }
+
+    rrBufferRef.current = [];
+    setState(s => ({
+      ...s,
+      hr: null, zone: 0, hrv: null,
+      connected: false, connecting: false,
+      deviceName: null, connectError: null,
+    }));
+  }, [handleWebNotification]);
+
+  // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (characteristicRef.current) {
-        characteristicRef.current.removeEventListener('characteristicvaluechanged', handleNotification);
-        characteristicRef.current.stopNotifications().catch(() => {});
-      }
-      if (deviceRef.current?.gatt?.connected) {
-        deviceRef.current.gatt.disconnect();
+      if (isNative) {
+        if (nativeDeviceIdRef.current) {
+          BleClient.stopNotifications(nativeDeviceIdRef.current, HR_SERVICE, HR_CHARACTERISTIC).catch(() => {});
+          BleClient.disconnect(nativeDeviceIdRef.current).catch(() => {});
+        }
+      } else {
+        if (webCharacteristicRef.current) {
+          webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', handleWebNotification);
+          webCharacteristicRef.current.stopNotifications().catch(() => {});
+        }
+        if (webDeviceRef.current?.gatt?.connected) {
+          webDeviceRef.current.gatt.disconnect();
+        }
       }
     };
-  }, [handleNotification]);
+  }, [handleWebNotification]);
 
   return { ...state, connect, disconnect };
 }

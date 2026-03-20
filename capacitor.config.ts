@@ -1,31 +1,53 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Capacitor config for packaging the PWA as a native app.
+ * Capacitor config — wraps the React/Vite PWA as a native iOS (and eventually Android) app.
  *
- * Setup steps (run once):
- *   npm install @capacitor/core @capacitor/cli @capacitor/app @capacitor/status-bar @capacitor/splash-screen
- *   npx cap add ios      (requires Mac + Xcode 15+)
- *   npx cap add android  (requires Android Studio)
+ * One-time setup (Mac required for iOS):
+ *   npx cap add ios          — creates the Xcode project
+ *   npx cap add android      — future: creates the Android Studio project
  *
- * Build workflow:
- *   npm run build && npx cap sync
- *   npx cap open ios      → Archive → upload to App Store Connect
- *   npx cap open android  → Generate Signed Bundle → upload to Google Play Console
+ * Daily build workflow:
+ *   npm run cap:sync         — builds web + syncs plugins to native project
+ *   npm run cap:ios          — build + sync + open Xcode
+ *
+ * App Store submission:
+ *   In Xcode: Product → Archive → Distribute App → App Store Connect
  */
 const config: CapacitorConfig = {
   appId: 'app.fightcamptraining',
   appName: 'Fight Camp Training',
   webDir: 'dist',
+
   server: {
     androidScheme: 'https',
   },
+
   ios: {
     backgroundColor: '#0a0a0a',
-    contentInset: 'always',
+    contentInset: 'always',    // Respect safe-area (notch / home indicator)
+    allowsLinkPreview: false,
+    scrollEnabled: false,      // Prevent root-level rubber-band scrolling
   },
+
   android: {
     backgroundColor: '#0a0a0a',
+  },
+
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1200,
+      launchAutoHide: true,
+      backgroundColor: '#0a0a0a',
+      iosSpinnerStyle: 'large',
+      spinnerColor: '#f97316',   // brand orange
+      showSpinner: true,
+    },
+    StatusBar: {
+      style: 'DARK',             // White text / icons on dark background
+      backgroundColor: '#0a0a0a',
+      overlaysWebView: false,
+    },
   },
 };
 

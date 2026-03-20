@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
 import { TimerProvider, useTimerContext } from './context/TimerContext';
 import Onboarding from './components/Onboarding';
@@ -65,6 +68,14 @@ function AppShell() {
   const [view, setView] = useState<View>('dashboard');
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
+
+  // Native iOS setup — runs once on mount inside the Capacitor WebView
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+    StatusBar.setBackgroundColor({ color: '#0a0a0a' }).catch(() => {});
+    SplashScreen.hide().catch(() => {});
+  }, []);
 
   if (!state.currentUser) {
     return <Onboarding />;
