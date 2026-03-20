@@ -545,6 +545,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 {hr.connecting ? '…' : hr.connected ? 'Disconnect' : 'Connect'}
               </button>
             </div>
+            {hr.connectError && (
+              <div className="px-4 py-2.5 bg-red-950/30 border-t border-red-900/40">
+                <p className="text-xs text-red-400">{hr.connectError}</p>
+              </div>
+            )}
 
             {/* Max HR */}
             <div className="px-4 py-3.5">

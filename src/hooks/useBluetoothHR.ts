@@ -10,6 +10,7 @@ export interface HRState {
   connecting: boolean;
   supported: boolean;
   deviceName: string | null;
+  connectError: string | null;
 }
 
 export const ZONE_COLORS: Record<HRZone, string> = {
@@ -116,6 +117,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
     connecting: false,
     supported: typeof navigator !== 'undefined' && 'bluetooth' in navigator,
     deviceName: null,
+    connectError: null,
   });
 
   const deviceRef         = useRef<BluetoothDevice | null>(null);
@@ -149,15 +151,23 @@ export function useBluetoothHR(maxHR: number): HRState & {
     }
     deviceRef.current = null;
     rrBufferRef.current = [];
-    setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false, deviceName: null }));
+    setState(s => ({ ...s, hr: null, zone: 0, hrv: null, connected: false, connecting: false, deviceName: null, connectError: null }));
   }, [handleNotification]);
 
   const connect = useCallback(async () => {
     if (!state.supported) return;
-    setState(s => ({ ...s, connecting: true }));
+    setState(s => ({ ...s, connecting: true, connectError: null }));
     try {
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: ['heart_rate'] }],
+        // Multiple filters — device must match at least one.
+        // MyZone MZ-3 / MZ-Switch advertise by name ("MYZ-…") not by service UUID,
+        // so they won't appear without an explicit namePrefix filter.
+        filters: [
+          { services: ['heart_rate'] },   // Polar, Garmin, and any standard HR belt
+          { namePrefix: 'MYZ' },          // MyZone MZ-3, MZ-Switch, BKFC edition
+          { namePrefix: 'MYZONE' },       // MyZone-branded variants
+        ],
+        // Required so we can access heart_rate on name-filtered MyZone devices
         optionalServices: ['heart_rate'],
       });
       deviceRef.current = device;
@@ -176,8 +186,15 @@ export function useBluetoothHR(maxHR: number): HRState & {
       await char.startNotifications();
 
       setState(s => ({ ...s, connected: true, connecting: false, deviceName: device.name ?? 'HR Device' }));
-    } catch {
-      setState(s => ({ ...s, connecting: false }));
+    } catch (err) {
+      const e = err as DOMException;
+      // AbortError / NotFoundError = user cancelled the picker — no error message needed
+      const cancelled = e.name === 'AbortError' || e.name === 'NotFoundError';
+      setState(s => ({
+        ...s,
+        connecting: false,
+        connectError: cancelled ? null : (e.message || 'Connection failed'),
+      }));
     }
   }, [state.supported, handleNotification]);
 
