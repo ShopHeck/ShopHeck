@@ -1,8 +1,13 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Mic } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Sport, WeightClass, ExperienceLevel, UserRole } from '../types';
 import { addDays, format } from 'date-fns';
+import { getApiKey, setApiKey } from '../utils/apiKey';
+import { getFishAudioKey, setFishAudioKey } from '../utils/fishAudioKey';
+
+// TODO: replace with the real App Store listing ID once published
+const APP_STORE_URL = 'https://apps.apple.com/app/id000000000';
 
 const WEIGHT_CLASSES: WeightClass[] = [
   'Strawweight', 'Flyweight', 'Bantamweight', 'Featherweight',
@@ -41,17 +46,33 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
   const [targetWeight, setTargetWeight] = useState('');
   const [campWeeks, setCampWeeks] = useState('8');
 
+  // Integrations
+  const [anthropicKey, setAnthropicKey] = useState(getApiKey());
+  const [fishKey, setFishKey] = useState(getFishAudioKey());
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [showFishKey, setShowFishKey] = useState(false);
+
   const minDate = format(addDays(new Date(), 42), 'yyyy-MM-dd');
   const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
 
   function handleProfileNext() {
     if (!name.trim() || !age) return;
-    setStep(1);
+    if (role === 'coach') {
+      setStep(3);
+    } else {
+      setStep(1);
+    }
   }
 
   function handleCampNext() {
     if (!fightDate || !currentWeight || !targetWeight) return;
     setStep(2);
+  }
+
+  function handleIntegrationsNext() {
+    if (anthropicKey.trim()) setApiKey(anthropicKey.trim());
+    if (fishKey.trim()) setFishAudioKey(fishKey.trim());
+    setStep(4);
   }
 
   function handleFinish() {
@@ -97,6 +118,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
     onClose?.();
   }
 
+  // ─── campOnly modal (unchanged) ─────────────────────────────────────────────
   if (campOnly) {
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -111,7 +133,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
             </button>
           </div>
           <div className="overflow-y-auto flex-1 px-4 py-4">
-            {/* Step 1: Camp setup */}
             {step === 1 && (
               <div className="flex flex-col gap-5">
                 <div>
@@ -122,7 +143,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
                   <label className="label">Opponent (Optional)</label>
                   <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
                 </div>
-                {/* BKFC Format Preset */}
                 <button
                   type="button"
                   onClick={() => { setRounds('5'); setRoundDuration('2'); }}
@@ -139,7 +159,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
                     <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
                   )}
                 </button>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">Rounds</label>
@@ -186,7 +205,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
                 </button>
               </div>
             )}
-            {/* Step 2: Confirm */}
             {step === 2 && (
               <div className="flex flex-col gap-5 text-center">
                 <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
@@ -212,9 +230,19 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
     );
   }
 
+  // ─── Full first-run onboarding ───────────────────────────────────────────────
+
+  // Step indicator dots — only shown during the "form" steps
+  // Fighters: 0 (profile), 1 (camp), 3 (integrations)
+  // Coaches:  0 (profile), 3 (integrations)
+  const fighterDotSteps = [0, 1, 3];
+  const coachDotSteps   = [0, 3];
+  const dotSteps        = role === 'coach' ? coachDotSteps : fighterDotSteps;
+  const showDots        = dotSteps.includes(step);
+
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
-      {/* Hero Banner */}
+      {/* Hero banner — only on step 0 */}
       {step === 0 && (
         <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23f97316%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-30" />
@@ -232,16 +260,21 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
       )}
 
       <div className="flex-1 flex flex-col max-w-lg mx-auto w-full px-4 pb-8">
-        {/* Step Indicators */}
-        {step < 2 && (
+        {/* Step dots */}
+        {showDots && (
           <div className="flex gap-2 justify-center py-4">
-            {[0, 1].map(i => (
-              <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? 'w-8 bg-brand-500' : i < step ? 'w-4 bg-brand-700' : 'w-4 bg-dark-500'}`} />
+            {dotSteps.map(s => (
+              <div
+                key={s}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  s === step ? 'w-8 bg-brand-500' : s < step ? 'w-4 bg-brand-700' : 'w-4 bg-dark-500'
+                }`}
+              />
             ))}
           </div>
         )}
 
-        {/* Step 0: Role + Profile */}
+        {/* ── Step 0: Role + Profile ── */}
         {step === 0 && (
           <div className="flex flex-col gap-5 mt-2">
             <div>
@@ -266,26 +299,13 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
 
             <div>
               <label className="label">Full Name *</label>
-              <input
-                className="input"
-                placeholder="Enter your name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-              />
+              <input className="input" placeholder="Enter your name" value={name} onChange={e => setName(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Age *</label>
-                <input
-                  className="input"
-                  type="number"
-                  placeholder="Age"
-                  min={16}
-                  max={60}
-                  value={age}
-                  onChange={e => setAge(e.target.value)}
-                />
+                <input className="input" type="number" placeholder="Age" min={16} max={60} value={age} onChange={e => setAge(e.target.value)} />
               </div>
               <div>
                 <label className="label">Sport *</label>
@@ -323,26 +343,21 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
 
             <div>
               <label className="label">Gym / Team (Optional)</label>
-              <input
-                className="input"
-                placeholder="Your gym or team name"
-                value={gym}
-                onChange={e => setGym(e.target.value)}
-              />
+              <input className="input" placeholder="Your gym or team name" value={gym} onChange={e => setGym(e.target.value)} />
             </div>
 
             <button
-              onClick={role === 'coach' ? handleFinish : handleProfileNext}
+              onClick={handleProfileNext}
               disabled={!name.trim() || !age}
               className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
-              {role === 'coach' ? 'Create Coach Profile' : 'Next: Set Up Fight Camp'}
+              {role === 'coach' ? 'Next: Quick Setup' : 'Next: Set Up Fight Camp'}
               <ChevronRight size={18} />
             </button>
           </div>
         )}
 
-        {/* Step 1: Fight Camp Setup */}
+        {/* ── Step 1: Fight Camp Setup ── */}
         {step === 1 && (
           <div className="flex flex-col gap-5 mt-2">
             <div>
@@ -352,27 +367,14 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
 
             <div>
               <label className="label">Fight Date *</label>
-              <input
-                className="input"
-                type="date"
-                min={minDate}
-                max={maxDate}
-                value={fightDate}
-                onChange={e => setFightDate(e.target.value)}
-              />
+              <input className="input" type="date" min={minDate} max={maxDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
             </div>
 
             <div>
               <label className="label">Opponent (Optional)</label>
-              <input
-                className="input"
-                placeholder="Opponent's name"
-                value={opponent}
-                onChange={e => setOpponent(e.target.value)}
-              />
+              <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
             </div>
 
-            {/* BKFC Format Preset */}
             <button
               type="button"
               onClick={() => { setRounds('5'); setRoundDuration('2'); }}
@@ -412,23 +414,11 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Current Weight (lbs) *</label>
-                <input
-                  className="input"
-                  type="number"
-                  placeholder="e.g. 160"
-                  value={currentWeight}
-                  onChange={e => setCurrentWeight(e.target.value)}
-                />
+                <input className="input" type="number" placeholder="e.g. 160" value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
               </div>
               <div>
                 <label className="label">Target Weight (lbs) *</label>
-                <input
-                  className="input"
-                  type="number"
-                  placeholder="e.g. 155"
-                  value={targetWeight}
-                  onChange={e => setTargetWeight(e.target.value)}
-                />
+                <input className="input" type="number" placeholder="e.g. 155" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
               </div>
             </div>
 
@@ -462,7 +452,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
           </div>
         )}
 
-        {/* Step 2: Confirm */}
+        {/* ── Step 2: Camp Preview ── */}
         {step === 2 && (
           <div className="flex flex-col gap-6 mt-4 text-center">
             <div className="flex justify-center">
@@ -501,10 +491,178 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
               </div>
             </div>
 
-            <button onClick={handleFinish} className="btn-primary flex items-center justify-center gap-2 text-lg py-4">
-              Enter the Camp
+            <button onClick={() => setStep(3)} className="btn-primary flex items-center justify-center gap-2 text-lg py-4">
+              Continue
               <ChevronRight size={20} />
             </button>
+          </div>
+        )}
+
+        {/* ── Step 3: Integrations ── */}
+        {step === 3 && (
+          <div className="flex flex-col gap-6 mt-4">
+            <div>
+              <h2 className="text-2xl font-black text-white">Supercharge Your Training</h2>
+              <p className="text-gray-500 text-sm mt-1">
+                Optional — you can always add these later in Settings.
+              </p>
+            </div>
+
+            {/* AI Coach card */}
+            <div className="bg-dark-700 rounded-2xl border border-dark-500 p-4 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-brand-900/60 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Brain size={20} className="text-brand-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">AI Coach Insights</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Personalised training analysis powered by Claude AI</p>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  className="input pr-10 text-sm"
+                  type={showAnthropicKey ? 'text' : 'password'}
+                  placeholder="Paste Anthropic API key…"
+                  value={anthropicKey}
+                  onChange={e => setAnthropicKey(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAnthropicKey(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  tabIndex={-1}
+                >
+                  {showAnthropicKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-600">
+                Get your key at{' '}
+                <span className="text-brand-500">console.anthropic.com</span>
+              </p>
+            </div>
+
+            {/* Goggins Voice card */}
+            <div className="bg-dark-700 rounded-2xl border border-dark-500 p-4 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Mic size={20} className="text-red-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">Goggins Coaching Voice</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Add a motivational coaching voice to your round timer</p>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  className="input pr-10 text-sm"
+                  type={showFishKey ? 'text' : 'password'}
+                  placeholder="Paste Fish Audio API key…"
+                  value={fishKey}
+                  onChange={e => setFishKey(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowFishKey(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  tabIndex={-1}
+                >
+                  {showFishKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-600">
+                Get your key at{' '}
+                <span className="text-brand-500">fish.audio</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleIntegrationsNext}
+                className="btn-primary flex items-center justify-center gap-2"
+              >
+                Continue
+                <ChevronRight size={18} />
+              </button>
+              <button
+                onClick={() => setStep(4)}
+                className="text-sm text-gray-500 hover:text-gray-300 py-2 transition-colors"
+              >
+                Skip for now →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: All Set + Review ── */}
+        {step === 4 && (
+          <div className="flex flex-col gap-6 mt-6 text-center">
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-brand-600 rounded-2xl flex items-center justify-center shadow-xl shadow-brand-900/50">
+                <Flame size={40} className="text-white" />
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-black text-white">
+                {name ? `You're locked in, ${name.split(' ')[0]}.` : "You're all set."}
+              </h2>
+              <p className="text-gray-400 mt-2 text-sm">
+                {role === 'fighter'
+                  ? 'Your camp is built. Now it\'s time to put in the work.'
+                  : 'Your coach profile is ready. Time to build champions.'}
+              </p>
+            </div>
+
+            {/* Camp summary — fighters only */}
+            {role === 'fighter' && fightDate && (
+              <div className="bg-dark-700 rounded-xl border border-dark-500 p-4 text-left space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Fight Date</span>
+                  <span className="text-white font-semibold text-sm">
+                    {new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Camp Length</span>
+                  <span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span>
+                </div>
+                {currentWeight && targetWeight && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Weight Cut</span>
+                    <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Primary CTA */}
+            <button onClick={handleFinish} className="btn-primary flex items-center justify-center gap-2 text-lg py-4">
+              {role === 'fighter' ? 'Enter the Camp' : 'Enter the App'}
+              <ChevronRight size={20} />
+            </button>
+
+            {/* Subtle review ask */}
+            <div className="pt-2 border-t border-dark-600">
+              <div className="flex justify-center gap-1 mb-2">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <Star key={i} size={16} className="text-brand-500 fill-brand-500" />
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Loving Fight Camp? A quick App Store review helps other fighters find us.
+              </p>
+              <button
+                onClick={() => window.open(APP_STORE_URL, '_blank')}
+                className="w-full py-2.5 rounded-xl border border-dark-400 text-sm font-semibold text-gray-300 hover:border-brand-600 hover:text-brand-400 transition-all"
+              >
+                ⭐ Leave a Review
+              </button>
+            </div>
           </div>
         )}
       </div>
