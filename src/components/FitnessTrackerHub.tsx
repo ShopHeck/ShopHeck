@@ -79,6 +79,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
 
   const maxHR = currentUser?.maxHR ?? (currentUser ? 220 - currentUser.age : 185);
   const hr    = useBluetoothHR(maxHR);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // ── Manual / BLE HRV log form ──────────────────────────────────────────
   const [showLogForm, setShowLogForm]     = useState(false);
@@ -274,7 +275,9 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                 <p className="text-sm font-semibold text-white">
                   {hr.connected ? hr.deviceName : 'Not connected'}
                 </p>
-                <p className="text-xs text-gray-500">Polar H10 · MyZone · Garmin · any BLE HRM</p>
+                <p className="text-xs text-gray-500">
+                  {isIOS ? 'Not available on iOS — see note below' : 'Polar H10 · MyZone · Garmin · any BLE HRM'}
+                </p>
               </div>
             </div>
             {!hr.connected && hr.supported && (
@@ -291,7 +294,23 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           </div>
 
           {!hr.supported && (
-            <p className="text-xs text-yellow-500">Web Bluetooth not supported in this browser. Use Chrome or Edge on Android/desktop.</p>
+            isIOS ? (
+              <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl p-3 space-y-1.5">
+                <p className="text-xs text-amber-400 font-semibold">Live Bluetooth HR isn't available on iPhone</p>
+                <p className="text-xs text-amber-500/80">
+                  iOS blocks Web Bluetooth in all browsers. Use{' '}
+                  <button
+                    onClick={() => onNavigate('health')}
+                    className="underline font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    Apple Health Import
+                  </button>
+                  {' '}below — MyZone syncs to Apple Health automatically via the MyZone app.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-500">Web Bluetooth requires Chrome or Edge on desktop or Android.</p>
+            )
           )}
 
           {hr.connected && (
