@@ -297,7 +297,7 @@ export function useRoundTimer() {
   const deadlineRef   = useRef(0);
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef      = useRef<AudioContext | null>(null);
-  const keepAliveRef     = useRef<OscillatorNode | null>(null);
+  const suspendTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const customBellBufRef = useRef<AudioBuffer | null>(null);
   const warningFiredRef  = useRef(false); // prevent double-fire per phase
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
@@ -338,18 +338,23 @@ export function useRoundTimer() {
     return audioCtxRef.current;
   }, []);
 
-  // Keep AudioContext alive while running — prevents mobile browser auto-suspension
+  // Decode the custom bell file whenever the timer starts so it's ready for
+  // synchronous playback inside the setInterval callback.
+  // No keepalive oscillator — the audio context is deliberately suspended between
+  // sounds so that iOS's .duckOthers session restores background music volume after
+  // each bell/clapper finishes rather than keeping it ducked the whole session.
   useEffect(() => {
     if (!isRunning) {
-      if (keepAliveRef.current) {
-        try { keepAliveRef.current.stop(); keepAliveRef.current.disconnect(); } catch { /* noop */ }
-        keepAliveRef.current = null;
-      }
+      // Suspend promptly so the audio session releases and background music resumes.
+      if (suspendTimerRef.current) clearTimeout(suspendTimerRef.current);
+      suspendTimerRef.current = setTimeout(() => {
+        audioCtxRef.current?.suspend().catch(() => {});
+        suspendTimerRef.current = null;
+      }, 800);
       return;
     }
-    const ctx = getAudioCtx();
 
-    // Pre-decode custom bell into AudioContext so it can be played from timer callbacks
+    const ctx = getAudioCtx();
     const dataUrl = getCustomBellDataUrl();
     if (dataUrl) {
       const b64    = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -362,19 +367,22 @@ export function useRoundTimer() {
     } else {
       customBellBufRef.current = null;
     }
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    gain.gain.value = 0; // completely silent
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    keepAliveRef.current = osc;
-    return () => {
-      try { osc.stop(); osc.disconnect(); gain.disconnect(); } catch { /* noop */ }
-      if (keepAliveRef.current === osc) keepAliveRef.current = null;
-    };
   }, [isRunning, getAudioCtx]);
+
+  // Debounced audio-session release — called after every bell/clapper so the
+  // AudioContext is suspended (= session inactive) once all audio has decayed.
+  // iOS then un-ducks background music with its standard 0.5 s fade.
+  //
+  // Delay: 7 s covers the longest sound (triple end-of-round bell ≈ 5.5 s decay).
+  // Each subsequent sound resets the timer, so music stays ducked through the full
+  // warning → countdown → bell sequence without interruption.
+  const scheduleCtxSuspend = useCallback(() => {
+    if (suspendTimerRef.current) clearTimeout(suspendTimerRef.current);
+    suspendTimerRef.current = setTimeout(() => {
+      audioCtxRef.current?.suspend().catch(() => {});
+      suspendTimerRef.current = null;
+    }, 7000);
+  }, []);
 
   // Play custom bell using the pre-decoded AudioBuffer (set on Start), or fall back
   // to the synthesized ringBell.
@@ -528,7 +536,7 @@ export function useRoundTimer() {
 
         if (ph === 'prep') {
           // Prep done → start round 1
-          playRoundStartBell(ctx);
+          playRoundStartBell(ctx); scheduleCtxSuspend();
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');
@@ -542,7 +550,7 @@ export function useRoundTimer() {
         } else if (ph === 'work') {
           if (round >= roundsRef.current) {
             // Session complete
-            ringSessionComplete(ctx);
+            ringSessionComplete(ctx); scheduleCtxSuspend();
             flash('bg-green-500');
             vibrate(HAPTIC.sessionComplete);
             if (voiceRef.current) speak('Session complete. Great work.');
@@ -551,7 +559,7 @@ export function useRoundTimer() {
             setTimeLeft(0);
           } else {
             // End of round → rest
-            ringEndOfRound(ctx);
+            ringEndOfRound(ctx); scheduleCtxSuspend();
             flash('bg-blue-500');
             vibrate(HAPTIC.roundEnd);
             if (voiceRef.current) speak('Rest');
@@ -565,7 +573,7 @@ export function useRoundTimer() {
           // End of rest → new round
           const newRound    = round + 1;
           const isLast      = newRound >= roundsRef.current;
-          playRoundStartBell(ctx);
+          playRoundStartBell(ctx); scheduleCtxSuspend();
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak(isLast ? 'Last round' : `Round ${newRound}`);
@@ -591,7 +599,7 @@ export function useRoundTimer() {
         !warningFiredRef.current
       ) {
         warningFiredRef.current = true;
-        playClapper(ctx);
+        playClapper(ctx); scheduleCtxSuspend();
         vibrate(HAPTIC.warning);
         if (voiceRef.current) speak(`${warningSecRef.current} seconds`);
       }
@@ -606,7 +614,7 @@ export function useRoundTimer() {
     }, 250);
 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, getAudioCtx, flash, vibrate, speak]);
+  }, [isRunning, getAudioCtx, flash, vibrate, speak, scheduleCtxSuspend]);
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const reset = useCallback(() => {

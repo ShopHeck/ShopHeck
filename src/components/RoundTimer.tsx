@@ -120,23 +120,16 @@ export default function RoundTimer() {
   // Coaching voice (Goggins mode or standard)
   const { speakCoach, unlock: unlockCoach, fishAudioActive, fishAudioError } = useCoachingVoice(coachVoice);
 
-  // Fire coaching cues on phase transitions:
-  //   • 2 s into each WORK phase  — motivational ("GET MOVING")
-  //   • 1.5 s into each REST phase — recovery coaching ("CATCH YOUR BREATH")
+  // Fire a coaching cue 1.5 s into each rest period
   const prevPhaseForCoach = React.useRef(phase);
   React.useEffect(() => {
     const prev = prevPhaseForCoach.current;
     prevPhaseForCoach.current = phase;
+    if (phase !== 'rest' || prev === 'rest') return;
     if (coachVoice === 'off') return;
-
-    const isWorkStart = phase === 'work' && prev !== 'work';
-    const isRestStart = phase === 'rest' && prev !== 'rest';
-    if (!isWorkStart && !isRestStart) return;
-
-    const delay = isWorkStart ? 2000 : 1500;
     const t = setTimeout(() => {
       speakCoach(getCoachingCue(state.currentUser?.sport, coachVoice));
-    }, delay);
+    }, 1500);
     return () => clearTimeout(t);
   }, [phase, coachVoice, speakCoach, state.currentUser?.sport]);
 
