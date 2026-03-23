@@ -378,12 +378,21 @@ export function useRoundTimer() {
 
   // Play custom bell using the pre-decoded AudioBuffer (set on Start), or fall back
   // to the synthesized ringBell.
+  // The custom bell is routed through the same gain (1.8×) + limiter chain as ringBell
+  // so that it has comparable loudness and triggers iOS audio-focus ducking of background
+  // music at the same level as the synthesized bell.
   const playRoundStartBell = useCallback((ctx: AudioContext) => {
     if (customBellBufRef.current) {
+      const t       = ctx.currentTime;
+      const limiter = makeLimiter(ctx);
+      const gain    = ctx.createGain();
+      gain.gain.setValueAtTime(1.8, t);
+      gain.connect(limiter);
+
       const src = ctx.createBufferSource();
       src.buffer = customBellBufRef.current;
-      src.connect(ctx.destination);
-      src.start(ctx.currentTime);
+      src.connect(gain);
+      src.start(t);
     } else {
       ringBell(ctx, 1.0);
     }

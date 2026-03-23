@@ -118,18 +118,25 @@ export default function RoundTimer() {
   const mepTarget = state.currentUser?.mepTarget ?? 65;
 
   // Coaching voice (Goggins mode or standard)
-  const { speakCoach, unlock: unlockCoach, fishAudioActive } = useCoachingVoice(coachVoice, isRunning);
+  const { speakCoach, unlock: unlockCoach, fishAudioActive, fishAudioError } = useCoachingVoice(coachVoice);
 
-  // Fire a coaching cue 1.5 s into each rest period
+  // Fire coaching cues on phase transitions:
+  //   • 2 s into each WORK phase  — motivational ("GET MOVING")
+  //   • 1.5 s into each REST phase — recovery coaching ("CATCH YOUR BREATH")
   const prevPhaseForCoach = React.useRef(phase);
   React.useEffect(() => {
     const prev = prevPhaseForCoach.current;
     prevPhaseForCoach.current = phase;
-    if (phase !== 'rest' || prev === 'rest') return;
     if (coachVoice === 'off') return;
+
+    const isWorkStart = phase === 'work' && prev !== 'work';
+    const isRestStart = phase === 'rest' && prev !== 'rest';
+    if (!isWorkStart && !isRestStart) return;
+
+    const delay = isWorkStart ? 2000 : 1500;
     const t = setTimeout(() => {
       speakCoach(getCoachingCue(state.currentUser?.sport, coachVoice));
-    }, 1500);
+    }, delay);
     return () => clearTimeout(t);
   }, [phase, coachVoice, speakCoach, state.currentUser?.sport]);
 
@@ -698,13 +705,15 @@ export default function RoundTimer() {
                 <span className="text-sm font-medium text-white">Coaching Voice</span>
                 <p className="text-xs text-gray-500">
                   {coachVoice === 'goggins'
-                    ? fishAudioActive
-                      ? <span className="text-green-400">● Fish Audio · cue fires at rest start</span>
-                      : !getFishAudioKey()
-                        ? <span className="text-red-400">● Add Fish Audio API key in Settings</span>
-                        : <span className="text-orange-400">● Connecting… cue fires at rest start</span>
+                    ? fishAudioError
+                      ? <span className="text-red-400" title={fishAudioError}>● Fish Audio error — using voice fallback</span>
+                      : fishAudioActive
+                        ? <span className="text-green-400">● Fish Audio ready · fires each round &amp; rest</span>
+                        : !getFishAudioKey()
+                          ? <span className="text-red-400">● Add Fish Audio API key in Settings</span>
+                          : <span className="text-yellow-400">● API key set · tap Start to activate</span>
                     : coachVoice !== 'off'
-                      ? 'Spoken cue at start of each rest'
+                      ? 'Spoken cue at start of each round & rest'
                       : ''
                   }
                 </p>
