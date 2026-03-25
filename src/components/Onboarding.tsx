@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Mic } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Sport, WeightClass, ExperienceLevel, UserRole } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
-import { getFishAudioKey, setFishAudioKey } from '../utils/fishAudioKey';
 
 // TODO: replace with the real App Store listing ID once published
 const APP_STORE_URL = 'https://apps.apple.com/app/id000000000';
@@ -48,9 +47,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
 
   // Integrations
   const [anthropicKey, setAnthropicKey] = useState(getApiKey());
-  const [fishKey, setFishKey] = useState(getFishAudioKey());
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
-  const [showFishKey, setShowFishKey] = useState(false);
 
   const minDate = format(addDays(new Date(), 42), 'yyyy-MM-dd');
   const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
@@ -71,7 +68,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
 
   function handleIntegrationsNext() {
     if (anthropicKey.trim()) setApiKey(anthropicKey.trim());
-    if (fishKey.trim()) setFishAudioKey(fishKey.trim());
     setStep(4);
   }
 
@@ -541,42 +537,6 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
               <p className="text-xs text-gray-600">
                 Get your key at{' '}
                 <span className="text-brand-500">console.anthropic.com</span>
-              </p>
-            </div>
-
-            {/* Goggins Voice card */}
-            <div className="bg-dark-700 rounded-2xl border border-dark-500 p-4 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-red-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Mic size={20} className="text-red-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">Goggins Coaching Voice</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Add a motivational coaching voice to your round timer</p>
-                </div>
-              </div>
-              <div className="relative">
-                <input
-                  className="input pr-10 text-sm"
-                  type={showFishKey ? 'text' : 'password'}
-                  placeholder="Paste Fish Audio API key…"
-                  value={fishKey}
-                  onChange={e => setFishKey(e.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowFishKey(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                  tabIndex={-1}
-                >
-                  {showFishKey ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              <p className="text-xs text-gray-600">
-                Get your key at{' '}
-                <span className="text-brand-500">fish.audio</span>
               </p>
             </div>
 

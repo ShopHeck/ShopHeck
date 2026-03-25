@@ -151,39 +151,3 @@ export function getRandomPrompt(sport: Sport | undefined, isPro: boolean): strin
   const prompts = REACTION_PROMPTS[key as keyof typeof REACTION_PROMPTS];
   return prompts[Math.floor(Math.random() * prompts.length)];
 }
-
-// ─── Goggins-Mode Coaching Cues ───────────────────────────────────────────────
-
-export const GOGGINS_CUES: string[] = [
-  "You think this is hard? Good. Hard is what separates you from everyone else who quit.",
-  "Forty percent. That's all you've given. You have sixty percent left. USE IT.",
-  "Your mind is begging you to slow down. That is a lie. Keep going.",
-  "Nobody is coming to save you. You have to save yourself. MOVE.",
-  "Callus your mind. Every second of this discomfort is building something they can't take from you.",
-  "When you think you're done, you're only at forty percent. You have more. Give it.",
-  "Stay hard. This rest is over the moment you decide you're ready.",
-  "You chose this. Own every second of it. No excuses.",
-  "The most dangerous person in the world is someone who refuses to accept their limitations. Be that person.",
-  "Pain is temporary. Weakness — if you let it in — is permanent. Don't let it in.",
-  "Be uncommon amongst uncommon people. Go beyond what they think you're capable of.",
-  "There's no cookie at the end of this. You do it because it makes you unbreakable.",
-  "The only way out is through. Get back out there and take what's yours.",
-  "Suffering is a gift. It reveals what you are made of. Let's find out.",
-  "Your body is telling you to stop. Your body is a liar. Override it.",
-  "Who's gonna carry the boats when it gets hard? YOU ARE. Now GO.",
-  "Every rep, every round, every second is a war against the voice in your head saying quit. WIN THAT WAR.",
-  "You didn't come this far to come this far. FINISH.",
-  "I don't stop when I'm tired. I stop when I'm done. Are you done? I didn't think so.",
-  "This moment right here — this is where champions are made. Not in the easy moments. THIS one.",
-  "Take their soul. When that bell rings, take everything they have.",
-  "You have to be willing to suffer more than your opponent. Are you willing? PROVE IT.",
-  "No days off in your mind. Your mind must be trained harder than your body.",
-  "The standard is the standard. Don't negotiate with yourself. Execute.",
-];
-
-export function getCoachingCue(sport: Sport | undefined, style: 'standard' | 'goggins'): string {
-  if (style === 'goggins') {
-    return GOGGINS_CUES[Math.floor(Math.random() * GOGGINS_CUES.length)];
-  }
-  return getRandomPrompt(sport, true);
-}

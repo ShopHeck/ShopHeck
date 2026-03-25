@@ -13,9 +13,6 @@ import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
-import { useCoachingVoice } from '../hooks/useCoachingVoice';
-import { getCoachingCue } from '../utils/reactionPrompts';
-import { getFishAudioKey } from '../utils/fishAudioKey';
 
 // ─── Custom Preset Modal ───────────────────────────────────────────────────
 
@@ -102,12 +99,12 @@ export default function RoundTimer() {
   const timer = useRoundTimer();
   const {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-    voiceEnabled, hapticEnabled, reactionMode, coachVoice,
+    voiceEnabled, hapticEnabled, reactionMode,
     workColor, restColor,
     phase, currentRound, timeLeft, isRunning,
     handleStartPause, reset, selectPreset,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
-    setVoiceEnabled, setHapticEnabled, setReactionMode, setCoachVoice,
+    setVoiceEnabled, setHapticEnabled, setReactionMode,
     setWorkColor, setRestColor,
   } = timer;
 
@@ -117,27 +114,10 @@ export default function RoundTimer() {
   const { mep, resetMEP } = useMyZoneMEP(hr.zone, isRunning);
   const mepTarget = state.currentUser?.mepTarget ?? 65;
 
-  // Coaching voice (Goggins mode or standard)
-  const { speakCoach, unlock: unlockCoach, fishAudioActive, fishAudioError } = useCoachingVoice(coachVoice);
-
-  // Fire a coaching cue 1.5 s into each rest period
-  const prevPhaseForCoach = React.useRef(phase);
-  React.useEffect(() => {
-    const prev = prevPhaseForCoach.current;
-    prevPhaseForCoach.current = phase;
-    if (phase !== 'rest' || prev === 'rest') return;
-    if (coachVoice === 'off') return;
-    const t = setTimeout(() => {
-      speakCoach(getCoachingCue(state.currentUser?.sport, coachVoice));
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [phase, coachVoice, speakCoach, state.currentUser?.sport]);
-
-  // Wrap handleStartPause to also unlock the coaching voice on first tap
+  // Wrap handleStartPause
   const onStartPause = React.useCallback(() => {
-    unlockCoach();
     handleStartPause();
-  }, [unlockCoach, handleStartPause]);
+  }, [handleStartPause]);
 
   // Simple absolute-value adjuster for settings rows
   const adj = (setter: (v: number) => void, current: number, delta: number, min: number, max: number) => {
@@ -690,46 +670,6 @@ export default function RoundTimer() {
             </button>
           </div>
 
-          {/* Coaching Voice */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
-              <Volume2 size={16} className={coachVoice !== 'off' ? 'text-brand-400' : 'text-gray-500'} />
-              <div>
-                <span className="text-sm font-medium text-white">Coaching Voice</span>
-                <p className="text-xs text-gray-500">
-                  {coachVoice === 'goggins'
-                    ? fishAudioError
-                      ? <span className="text-red-400" title={fishAudioError}>● Fish Audio error — using voice fallback</span>
-                      : fishAudioActive
-                        ? <span className="text-green-400">● Fish Audio ready · fires each round &amp; rest</span>
-                        : !getFishAudioKey()
-                          ? <span className="text-red-400">● Add Fish Audio API key in Settings</span>
-                          : <span className="text-yellow-400">● API key set · tap Start to activate</span>
-                    : coachVoice !== 'off'
-                      ? 'Spoken cue at start of each round & rest'
-                      : ''
-                  }
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-1">
-              {(['off', 'standard', 'goggins'] as const).map(v => (
-                <button
-                  key={v}
-                  onClick={() => setCoachVoice(v)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border transition-all ${
-                    coachVoice === v
-                      ? v === 'goggins'
-                        ? 'bg-red-700 border-red-500 text-white'
-                        : 'bg-brand-600 border-brand-500 text-white'
-                      : 'bg-dark-600 border-dark-400 text-gray-400 hover:border-dark-300'
-                  }`}
-                >
-                  {v === 'goggins' ? '💀 Goggins' : v === 'standard' ? 'Standard' : 'Off'}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

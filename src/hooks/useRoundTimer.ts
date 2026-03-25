@@ -3,7 +3,6 @@ import { useTimerContext } from '../context/TimerContext';
 import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
-import type { CoachVoiceStyle } from './useCoachingVoice';
 import { getCustomBellDataUrl } from '../utils/customBell';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -45,7 +44,6 @@ interface TimerSave {
   voiceEnabled: boolean;
   hapticEnabled: boolean;
   reactionMode: boolean;
-  coachVoice: CoachVoiceStyle;
   workColor: string;
   restColor: string;
   phase: Phase;
@@ -61,7 +59,6 @@ const DEFAULTS: Partial<TimerSave> = {
   voiceEnabled: false,
   hapticEnabled: true,
   reactionMode: false,
-  coachVoice: 'off',
   workColor: '#22c55e',
   restColor: '#ef4444',
 };
@@ -274,7 +271,6 @@ export function useRoundTimer() {
   const [voiceEnabled,  setVoiceEnabled]  = useState(false);
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [reactionMode,  setReactionMode]  = useState(false);
-  const [coachVoice,    setCoachVoice]    = useState<CoachVoiceStyle>('off');
   const [workColor, setWorkColor] = useState('#22c55e');
   const [restColor, setRestColor] = useState('#ef4444');
 
@@ -303,7 +299,6 @@ export function useRoundTimer() {
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
   const hapticRef     = useRef(true);
-  const coachVoiceRef = useRef<CoachVoiceStyle>('off');
 
   // Sync refs with state
   useEffect(() => { phaseRef.current     = phase;        }, [phase]);
@@ -317,7 +312,6 @@ export function useRoundTimer() {
   useEffect(() => { timeLeftRef.current  = timeLeft;     }, [timeLeft]);
   useEffect(() => { voiceRef.current     = voiceEnabled; }, [voiceEnabled]);
   useEffect(() => { hapticRef.current    = hapticEnabled;}, [hapticEnabled]);
-  useEffect(() => { coachVoiceRef.current = coachVoice;  }, [coachVoice]);
 
   // Push updates to TimerContext signal bus
   useEffect(() => {
@@ -417,14 +411,14 @@ export function useRoundTimer() {
     if (phase === 'idle') return;
     saveTimer({
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-      voiceEnabled, hapticEnabled, reactionMode, coachVoice, workColor, restColor,
+      voiceEnabled, hapticEnabled, reactionMode, workColor, restColor,
       phase, currentRound, isRunning,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
     });
   }, [phase, currentRound, isRunning, timeLeft,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-      voiceEnabled, hapticEnabled, reactionMode, coachVoice, workColor, restColor]);
+      voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
   // ── Restore on mount ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -440,7 +434,6 @@ export function useRoundTimer() {
     setVoiceEnabled(saved.voiceEnabled);
     setHapticEnabled(saved.hapticEnabled);
     setReactionMode(saved.reactionMode);
-    if (saved.coachVoice) { setCoachVoice(saved.coachVoice); coachVoiceRef.current = saved.coachVoice; }
     if (saved.workColor) setWorkColor(saved.workColor);
     if (saved.restColor) setRestColor(saved.restColor);
 
@@ -682,7 +675,7 @@ export function useRoundTimer() {
   return {
     // Settings
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-    voiceEnabled, hapticEnabled, reactionMode, coachVoice,
+    voiceEnabled, hapticEnabled, reactionMode,
     workColor, restColor,
     // Timer state
     phase, currentRound, timeLeft, isRunning,
@@ -697,7 +690,6 @@ export function useRoundTimer() {
     setVoiceEnabled,
     setHapticEnabled,
     setReactionMode,
-    setCoachVoice: (v: CoachVoiceStyle) => { setCoachVoice(v); coachVoiceRef.current = v; },
     setWorkColor,
     setRestColor,
   };
