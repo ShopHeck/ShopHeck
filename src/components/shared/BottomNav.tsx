@@ -1,5 +1,6 @@
 import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users, Settings, Timer } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { triggerHaptic, HAPTIC } from '../../hooks/useHaptics';
 
 interface Props {
   active: string;
@@ -32,7 +33,7 @@ export default function BottomNav({ active, onChange }: Props) {
         {items.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
-            onClick={() => onChange(id)}
+            onClick={() => { triggerHaptic(HAPTIC.tick); onChange(id); }}
             className={`nav-item ${active === id ? 'active' : ''}`}
           >
             <Icon size={20} strokeWidth={active === id ? 2.5 : 1.8} />

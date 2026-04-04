@@ -48,6 +48,11 @@ const config: CapacitorConfig = {
       backgroundColor: '#0a0a0a',
       overlaysWebView: false,
     },
+    Keyboard: {
+      resize: 'body',            // Resize body (not the viewport) when keyboard opens
+      resizeOnFullScreen: true,  // Also resize in landscape / full-screen modes
+      style: 'dark',
+    },
   },
 };
 

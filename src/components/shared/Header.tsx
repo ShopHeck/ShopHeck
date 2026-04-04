@@ -22,7 +22,7 @@ export default function Header({ title, showBack, onBack, onSettings, subtitle, 
   const showTimerPill = signal.isRunning && currentView !== 'timer' && onNavigate;
 
   return (
-    <header className="sticky top-0 z-40 bg-dark-800/90 backdrop-blur border-b border-dark-500">
+    <header className="sticky top-0 z-40 bg-dark-800/90 backdrop-blur border-b border-dark-500 safe-area-top">
       <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
         {showBack ? (
           <button onClick={onBack} className="text-gray-400 hover:text-white transition-colors p-1 -ml-1">

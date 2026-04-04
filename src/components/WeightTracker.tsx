@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import {
   LineChart,
@@ -85,6 +86,7 @@ export default function WeightTracker() {
 
   function logWeight() {
     if (!weight) return;
+    triggerHaptic(HAPTIC.sessionComplete);
     dispatch({
       type: 'LOG_WEIGHT',
       payload: {

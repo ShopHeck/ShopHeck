@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star, C
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { format, parseISO, addDays } from 'date-fns';
+import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import type { SessionType } from '../types';
 import type { LogPrefill } from '../App';
 
@@ -53,7 +54,10 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
   }
 
   function toggleDone(dayOfWeek: number, sessionIdx: number) {
-    dispatch({ type: 'TOGGLE_SESSION', payload: sessionKey(dayOfWeek, sessionIdx) });
+    const key = sessionKey(dayOfWeek, sessionIdx);
+    const completing = !completedSessions[key];
+    triggerHaptic(completing ? HAPTIC.sessionComplete : HAPTIC.tick);
+    dispatch({ type: 'TOGGLE_SESSION', payload: key });
   }
 
   function dayOverrideKey(dayOfWeek: number) {
@@ -174,7 +178,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             return (
               <button
                 key={idx}
-                onClick={() => setSelectedDay(isSelected ? null : idx)}
+                onClick={() => { triggerHaptic(HAPTIC.tick); setSelectedDay(isSelected ? null : idx); }}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 transition-all ${
                   isSelected
                     ? 'border-brand-500 bg-brand-900/30'

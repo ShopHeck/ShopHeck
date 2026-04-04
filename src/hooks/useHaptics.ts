@@ -38,3 +38,17 @@ export function useHaptics(enabled: boolean) {
     }
   }, [enabled]);
 }
+
+/**
+ * Fire a haptic directly — no enabled gate. Use for UI interactions
+ * (tab taps, selection changes) that should always feel native on iOS.
+ */
+export function triggerHaptic(pattern: number | readonly number[]) {
+  if (isNative) {
+    const key = (Object.keys(HAPTIC) as HapticKey[]).find(k => HAPTIC[k] === pattern);
+    const nativeFn = key ? NATIVE_MAP[key] : () => Haptics.impact({ style: ImpactStyle.Medium });
+    nativeFn().catch(() => {});
+  } else if ('vibrate' in navigator) {
+    navigator.vibrate(pattern as number | number[]);
+  }
+}
