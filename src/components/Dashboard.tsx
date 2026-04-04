@@ -24,7 +24,7 @@ interface Props {
 
 export default function Dashboard({ onNavigate }: Props) {
   const { state } = useApp();
-  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser } = state;
+  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions } = state;
 
   if (!activeCamp) return null;
 
@@ -50,6 +50,17 @@ export default function Dashboard({ onNavigate }: Props) {
   const todayDayOfWeek = today.getDay();
   const todaySessions = currentWeek?.days.find(d => d.dayOfWeek === todayDayOfWeek);
   const recentLogs = workoutLogs.filter(l => l.campId === activeCamp.id).slice(0, 3);
+
+  // Weekly summary stats
+  const weekLogs = workoutLogs.filter(l => l.campId === activeCamp.id && l.weekNumber === currentWeekNum);
+  const weekMinutes = weekLogs.reduce((sum, l) => sum + l.duration, 0);
+  const weekAvgRpe = weekLogs.length > 0
+    ? Math.round(weekLogs.reduce((sum, l) => sum + l.rpe, 0) / weekLogs.length * 10) / 10
+    : null;
+  const weekPlanned = currentWeek?.days.reduce((sum, d) => sum + (!d.isRestDay ? d.sessions.length : 0), 0) ?? 0;
+  const weekDone = Object.keys(completedSessions).filter(
+    k => k.startsWith(`${activeCamp.id}-${currentWeekNum}-`) && completedSessions[k]
+  ).length;
 
   const readiness = computeReadiness(state);
   const latestCoachNote = coachNotes
@@ -228,6 +239,47 @@ export default function Dashboard({ onNavigate }: Props) {
           <div className="text-xs text-gray-500">sparring rounds</div>
         </button>
       </div>
+
+      {/* This Week Summary */}
+      {(weekPlanned > 0 || weekLogs.length > 0) && (
+        <div className="mx-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">This Week</p>
+            <span className="text-xs text-gray-600">Week {currentWeekNum}</span>
+          </div>
+          <div className="card">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <div className="text-lg font-black text-white">
+                  {weekDone}<span className="text-gray-600 font-medium text-sm">/{weekPlanned}</span>
+                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5">sessions</div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-white">{weekMinutes || '—'}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">minutes</div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-white">{weekAvgRpe ?? '—'}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">avg RPE</div>
+              </div>
+            </div>
+            {weekPlanned > 0 && (
+              <div className="mt-3">
+                <div className="h-1.5 bg-dark-500 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      weekDone >= weekPlanned ? 'bg-green-500' :
+                      weekDone / weekPlanned >= 0.7 ? 'bg-brand-500' : 'bg-dark-300'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((weekDone / weekPlanned) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Today's Schedule */}
       {todaySessions && (

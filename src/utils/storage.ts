@@ -15,6 +15,7 @@ export const defaultState: AppState = {
   fighters: [],
   coaches: [],
   completedSessions: {},
+  dayOverrides: {},
   gamePlans: {},
   nutritionLogs: [],
   coachNotes: [],

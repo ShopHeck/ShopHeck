@@ -240,6 +240,8 @@ export interface AppState {
   coaches: FighterProfile[];
   /** Key: `${campId}-${weekNum}-${dayOfWeek}-${sessionIndex}` */
   completedSessions: Record<string, boolean>;
+  /** Key: `${campId}-${weekNum}-${dayOfWeek}` — true = user marked day as rest */
+  dayOverrides: Record<string, boolean>;
   /** Key: campId */
   gamePlans: Record<string, GamePlan>;
   nutritionLogs: NutritionLog[];

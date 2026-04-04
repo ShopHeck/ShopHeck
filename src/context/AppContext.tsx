@@ -45,6 +45,7 @@ type Action =
   | { type: 'DELETE_SPARRING'; payload: string }
   | { type: 'DELETE_WEIGHT'; payload: string }
   | { type: 'TOGGLE_SESSION'; payload: string }
+  | { type: 'TOGGLE_DAY_OVERRIDE'; payload: string }
   | { type: 'SAVE_GAME_PLAN'; payload: GamePlan }
   | { type: 'LOG_NUTRITION'; payload: Omit<NutritionLog, 'id' | 'createdAt'> }
   | { type: 'DELETE_NUTRITION'; payload: string }
@@ -122,6 +123,15 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'TOGGLE_SESSION':
       return toggleSessionComplete(state, action.payload);
+
+    case 'TOGGLE_DAY_OVERRIDE':
+      return {
+        ...state,
+        dayOverrides: {
+          ...state.dayOverrides,
+          [action.payload]: !state.dayOverrides[action.payload],
+        },
+      };
 
     case 'SAVE_GAME_PLAN':
       return saveGamePlan(state, action.payload);

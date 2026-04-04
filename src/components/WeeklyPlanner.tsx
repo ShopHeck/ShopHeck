@@ -32,7 +32,7 @@ interface Props {
 
 export default function WeeklyPlanner({ onLogSession }: Props) {
   const { state, dispatch } = useApp();
-  const { activeCamp, trainingSchedule, completedSessions } = state;
+  const { activeCamp, trainingSchedule, completedSessions, dayOverrides, workoutLogs } = state;
 
   const currentWeekNum = activeCamp ? getCurrentWeekNumber(activeCamp) : 1;
   const [selectedWeek, setSelectedWeek] = useState(currentWeekNum);
@@ -54,6 +54,14 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
 
   function toggleDone(dayOfWeek: number, sessionIdx: number) {
     dispatch({ type: 'TOGGLE_SESSION', payload: sessionKey(dayOfWeek, sessionIdx) });
+  }
+
+  function dayOverrideKey(dayOfWeek: number) {
+    return `${activeCamp!.id}-${selectedWeek}-${dayOfWeek}`;
+  }
+
+  function toggleDayRest(dayOfWeek: number) {
+    dispatch({ type: 'TOGGLE_DAY_OVERRIDE', payload: dayOverrideKey(dayOfWeek) });
   }
 
   // Adherence for the selected week: completed non-rest sessions / total non-rest sessions
@@ -194,17 +202,30 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
       </div>
 
       {/* Day Detail */}
-      {selectedDay !== null && selectedDayData && (
+      {selectedDay !== null && selectedDayData && (() => {
+        const isRestOverride = !!dayOverrides[dayOverrideKey(selectedDay)];
+        const isRest = selectedDayData.isRestDay || isRestOverride;
+        return (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-base font-bold text-white">{FULL_DAY_LABELS[selectedDay]}</h3>
-            {selectedDayData.isRestDay && <span className="badge bg-green-900/40 text-green-400">Rest Day</span>}
+            <div className="flex items-center gap-2">
+              {isRest && <span className="badge bg-green-900/40 text-green-400">Rest Day</span>}
+              {!selectedDayData.isRestDay && (
+                <button
+                  onClick={() => toggleDayRest(selectedDay)}
+                  className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  {isRestOverride ? 'Restore training' : 'Mark as rest'}
+                </button>
+              )}
+            </div>
           </div>
 
-          {selectedDayData.isRestDay ? (
+          {isRest ? (
             <div className="card text-center py-8">
               <div className="text-4xl mb-3">🛌</div>
-              <p className="font-semibold text-white">Full Rest Day</p>
+              <p className="font-semibold text-white">{isRestOverride ? 'Rest Day (Override)' : 'Full Rest Day'}</p>
               <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
                 Recovery is part of training. Sleep 8+ hours, hydrate, and eat well.
               </p>
@@ -215,6 +236,12 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                 const config = SESSION_CONFIG[session.type];
                 const key = sessionKey(selectedDay, i);
                 const isDone = !!completedSessions[key];
+                const matchingLog = isDone ? workoutLogs.find(l =>
+                  l.campId === activeCamp.id &&
+                  l.weekNumber === selectedWeek &&
+                  l.dayLabel === FULL_DAY_LABELS[selectedDay] &&
+                  l.sessionType === session.type
+                ) : undefined;
 
                 return (
                   <div
@@ -241,9 +268,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                           </span>
                           <span className="badge bg-black/20 text-xs">{config.label}</span>
                           {isDone && <span className="badge bg-green-900/50 text-green-400 text-xs">Done ✓</span>}
+                          {matchingLog && <span className="badge bg-dark-500 text-gray-400 text-xs">RPE {matchingLog.rpe}</span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-gray-400">{session.duration} min</span>
+                          {matchingLog && <span className="text-xs text-gray-500">{matchingLog.duration} min logged</span>}
                         </div>
                         {!isDone && (
                           <>
@@ -269,7 +298,8 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Week at a Glance */}
       <div className="mx-4">
