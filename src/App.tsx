@@ -1,30 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
 import { TimerProvider, useTimerContext } from './context/TimerContext';
+import ViewSkeleton from './components/shared/ViewSkeleton';
+import type { SessionType } from './types';
+
+// ── Static imports — rendered immediately on first paint ──────────────────
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
-import WeeklyPlanner from './components/WeeklyPlanner';
-import WorkoutLogger from './components/WorkoutLogger';
-import WeightTracker from './components/WeightTracker';
-import ProgressCharts from './components/ProgressCharts';
-import CoachDashboard from './components/CoachDashboard';
-import Settings from './components/Settings';
-import RoundTimer from './components/RoundTimer';
-import GamePlanBuilder from './components/GamePlanBuilder';
-import NutritionTracker from './components/NutritionTracker';
-import AIInsights from './components/AIInsights';
-import AppleHealthSync from './components/AppleHealthSync';
-import FightReadiness from './components/FightReadiness';
-import FitnessTrackerHub from './components/FitnessTrackerHub';
-import WorkoutLibrary from './components/WorkoutLibrary';
-import MealLibrary from './components/MealLibrary';
+import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
-import type { SessionType } from './types';
+
+// ── Lazy imports — loaded on first navigation to that view ────────────────
+const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
+const WorkoutLogger    = lazy(() => import('./components/WorkoutLogger'));
+const WeightTracker    = lazy(() => import('./components/WeightTracker'));
+const ProgressCharts   = lazy(() => import('./components/ProgressCharts'));
+const CoachDashboard   = lazy(() => import('./components/CoachDashboard'));
+const Settings         = lazy(() => import('./components/Settings'));
+const GamePlanBuilder  = lazy(() => import('./components/GamePlanBuilder'));
+const NutritionTracker = lazy(() => import('./components/NutritionTracker'));
+const AIInsights       = lazy(() => import('./components/AIInsights'));
+const AppleHealthSync  = lazy(() => import('./components/AppleHealthSync'));
+const FightReadiness   = lazy(() => import('./components/FightReadiness'));
+const FitnessTrackerHub = lazy(() => import('./components/FitnessTrackerHub'));
+const WorkoutLibrary   = lazy(() => import('./components/WorkoutLibrary'));
+const MealLibrary      = lazy(() => import('./components/MealLibrary'));
 
 type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library';
 
@@ -35,31 +40,29 @@ export interface LogPrefill {
 }
 
 const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
-  dashboard: { title: 'Fight Camp' },
-  planner: { title: 'Weekly Planner', subtitle: 'Training Schedule' },
-  log: { title: 'Training Log', subtitle: 'Workouts & Sparring' },
-  timer: { title: 'Round Timer', subtitle: 'Training Intervals' },
-  weight: { title: 'Weight Tracker', subtitle: 'Cut Monitoring' },
-  progress: { title: 'Progress', subtitle: 'Charts & Benchmarks' },
-  fighters: { title: 'Fighters', subtitle: 'Coach View' },
-  settings: { title: 'Settings' },
-  gameplan: { title: 'Game Plan', subtitle: 'Fight Strategy' },
-  nutrition: { title: 'Nutrition', subtitle: 'Hydration & Meals' },
-  aiinsights: { title: 'AI Insights', subtitle: 'Coach Analysis' },
-  health: { title: 'Apple Health', subtitle: 'Sync & Export' },
-  readiness: { title: 'Fight Readiness', subtitle: 'Camp Analysis' },
-  trackers: { title: 'Fitness Trackers', subtitle: 'HR · HRV · Recovery' },
-  'workout-library': { title: 'Workout Library', subtitle: 'Exercises & Drills' },
-  'meal-library': { title: 'Meal Library', subtitle: 'Plans & Generator' },
+  dashboard:        { title: 'Fight Camp' },
+  planner:          { title: 'Weekly Planner',     subtitle: 'Training Schedule' },
+  log:              { title: 'Training Log',        subtitle: 'Workouts & Sparring' },
+  timer:            { title: 'Round Timer',         subtitle: 'Training Intervals' },
+  weight:           { title: 'Weight Tracker',      subtitle: 'Cut Monitoring' },
+  progress:         { title: 'Progress',            subtitle: 'Charts & Benchmarks' },
+  fighters:         { title: 'Fighters',            subtitle: 'Coach View' },
+  settings:         { title: 'Settings' },
+  gameplan:         { title: 'Game Plan',           subtitle: 'Fight Strategy' },
+  nutrition:        { title: 'Nutrition',           subtitle: 'Hydration & Meals' },
+  aiinsights:       { title: 'AI Insights',         subtitle: 'Coach Analysis' },
+  health:           { title: 'Apple Health',        subtitle: 'Sync & Export' },
+  readiness:        { title: 'Fight Readiness',     subtitle: 'Camp Analysis' },
+  trackers:         { title: 'Fitness Trackers',    subtitle: 'HR · HRV · Recovery' },
+  'workout-library': { title: 'Workout Library',   subtitle: 'Exercises & Drills' },
+  'meal-library':   { title: 'Meal Library',        subtitle: 'Plans & Generator' },
 };
 
 function FlashOverlay() {
   const { signal } = useTimerContext();
   if (!signal.flashColor) return null;
   return (
-    <div
-      className={`fixed inset-0 ${signal.flashColor} pointer-events-none z-50 phase-flash`}
-    />
+    <div className={`fixed inset-0 ${signal.flashColor} pointer-events-none z-50 phase-flash`} />
   );
 }
 
@@ -108,51 +111,62 @@ function AppShell() {
         className="flex-1 max-w-lg mx-auto w-full overflow-y-auto"
         style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        {view === 'dashboard' && !isCoach && camp && (
-          <Dashboard onNavigate={(v, prefill?) => {
-            if (v === 'log' && prefill) navigateToLog(prefill);
-            else setView(v as View);
-          }} />
-        )}
-        {view === 'dashboard' && !isCoach && !camp && (
-          <div className="flex flex-col items-center justify-center py-20 px-8 text-center gap-4">
-            <p className="text-gray-400">No active fight camp.</p>
-            <button onClick={() => setView('settings')} className="btn-primary">Set Up a Camp</button>
+        {/* key={view} forces a remount on every navigation, triggering the
+            CSS fade-in animation. Suspense shows ViewSkeleton while a lazy
+            chunk is loading on first visit to that view. */}
+        <Suspense fallback={<ViewSkeleton />}>
+          <div key={view} className="view-enter">
+
+            {view === 'dashboard' && !isCoach && camp && (
+              <Dashboard onNavigate={(v, prefill?) => {
+                if (v === 'log' && prefill) navigateToLog(prefill);
+                else setView(v as View);
+              }} />
+            )}
+            {view === 'dashboard' && !isCoach && !camp && (
+              <div className="flex flex-col items-center justify-center py-20 px-8 text-center gap-4">
+                <p className="text-gray-400">No active fight camp.</p>
+                <button onClick={() => setView('settings')} className="btn-primary">Set Up a Camp</button>
+              </div>
+            )}
+            {view === 'dashboard' && isCoach && <CoachDashboard />}
+            {view === 'planner' && (
+              <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} />
+            )}
+            {view === 'log' && (
+              <WorkoutLogger
+                prefill={logPrefill}
+                onPrefillConsumed={() => setLogPrefill(null)}
+              />
+            )}
+            {view === 'timer'           && <RoundTimer />}
+            {view === 'weight'          && <WeightTracker />}
+            {view === 'nutrition'       && <NutritionTracker />}
+            {view === 'progress'        && <ProgressCharts />}
+            {view === 'gameplan'        && <GamePlanBuilder />}
+            {view === 'aiinsights'      && <AIInsights />}
+            {view === 'health'          && <AppleHealthSync />}
+            {view === 'readiness'       && <FightReadiness />}
+            {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
+            {view === 'workout-library' && <WorkoutLibrary />}
+            {view === 'meal-library'    && <MealLibrary />}
+            {view === 'fighters'        && <CoachDashboard />}
+            {view === 'settings'        && (
+              <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
+            )}
+
           </div>
-        )}
-        {view === 'dashboard' && isCoach && <CoachDashboard />}
-        {view === 'planner' && (
-          <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} />
-        )}
-        {view === 'log' && (
-          <WorkoutLogger
-            prefill={logPrefill}
-            onPrefillConsumed={() => setLogPrefill(null)}
-          />
-        )}
-        {view === 'timer' && <RoundTimer />}
-        {view === 'weight' && <WeightTracker />}
-        {view === 'nutrition' && <NutritionTracker />}
-        {view === 'progress' && <ProgressCharts />}
-        {view === 'gameplan' && <GamePlanBuilder />}
-        {view === 'aiinsights' && <AIInsights />}
-        {view === 'health' && <AppleHealthSync />}
-        {view === 'readiness' && <FightReadiness />}
-        {view === 'trackers' && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
-        {view === 'workout-library' && <WorkoutLibrary />}
-        {view === 'meal-library' && <MealLibrary />}
-        {view === 'fighters' && <CoachDashboard />}
-        {view === 'settings' && (
-          <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
-        )}
+        </Suspense>
       </main>
 
       <AdBanner />
       <BottomNav active={view} onChange={(v) => setView(v as View)} />
 
-      {/* New Camp — reuse Onboarding camp step */}
+      {/* New Camp modal — reuses Onboarding camp step */}
       {showNewCamp && (
-        <Onboarding campOnly onClose={() => setShowNewCamp(false)} />
+        <Suspense fallback={null}>
+          <Onboarding campOnly onClose={() => setShowNewCamp(false)} />
+        </Suspense>
       )}
     </div>
   );
