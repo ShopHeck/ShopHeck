@@ -171,7 +171,15 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const [state, dispatch] = useReducer(reducer, undefined, () => {
+    // Always regenerate trainingSchedule from activeCamp so cached stale week
+    // dates (from before generator fixes) are never used.
+    const loaded = loadState();
+    if (loaded.activeCamp) {
+      return setSchedule(loaded, generateTrainingCamp(loaded.activeCamp));
+    }
+    return loaded;
+  });
 
   // Process Stripe Payment Link return on mount
   useEffect(() => {

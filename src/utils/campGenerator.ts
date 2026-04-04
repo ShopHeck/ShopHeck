@@ -1,4 +1,4 @@
-import { addDays, format, startOfWeek } from 'date-fns';
+import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession } from '../types';
 
 type Phase = 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper';
@@ -248,7 +248,7 @@ export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
 
   for (let i = 0; i < campWeeks; i++) {
     const phaseConfig = phaseConfigs[i] || phaseConfigs[phaseConfigs.length - 1];
-    const weekStart = startOfWeek(addDays(new Date(startDate), i * 7), { weekStartsOn: 1 });
+    const weekStart = startOfWeek(addDays(parseISO(startDate), i * 7), { weekStartsOn: 1 });
     const weekEnd = addDays(weekStart, 6);
 
     const isBKFC = sport === 'Bare Knuckle';
@@ -303,21 +303,21 @@ export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
 
 export function getDaysUntilFight(fightDate: string): number {
   const today = new Date();
-  const fight = new Date(fightDate);
+  const fight = parseISO(fightDate);
   const diff = Math.ceil((fight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   return Math.max(0, diff);
 }
 
 export function getCurrentWeekNumber(camp: FightCamp): number {
   const today = new Date();
-  const start = new Date(camp.startDate);
+  const start = parseISO(camp.startDate);
   const diff = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 7));
   return Math.max(1, Math.min(diff + 1, camp.campWeeks));
 }
 
 export function getCampProgress(camp: FightCamp): number {
   const total = camp.campWeeks * 7;
-  const start = new Date(camp.startDate);
+  const start = parseISO(camp.startDate);
   const today = new Date();
   const elapsed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
