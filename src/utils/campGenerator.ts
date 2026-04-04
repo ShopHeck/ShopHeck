@@ -1,4 +1,4 @@
-import { addDays, format } from 'date-fns';
+import { addDays, format, startOfWeek } from 'date-fns';
 import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession } from '../types';
 
 type Phase = 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper';
@@ -248,7 +248,7 @@ export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
 
   for (let i = 0; i < campWeeks; i++) {
     const phaseConfig = phaseConfigs[i] || phaseConfigs[phaseConfigs.length - 1];
-    const weekStart = addDays(new Date(startDate), i * 7);
+    const weekStart = startOfWeek(addDays(new Date(startDate), i * 7), { weekStartsOn: 1 });
     const weekEnd = addDays(weekStart, 6);
 
     const isBKFC = sport === 'Bare Knuckle';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star, CheckCircle2, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import type { SessionType } from '../types';
 import type { LogPrefill } from '../App';
 
@@ -150,6 +150,10 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
       <div className="mx-4">
         <div className="grid grid-cols-7 gap-1">
           {DAY_LABELS.map((label, idx) => {
+            // weekStart is always Monday (idx=1). Compute this day's calendar date:
+            // Mon→+0, Tue→+1, ..., Sat→+5, Sun→+6
+            const weekStartDate = parseISO(week.startDate);
+            const dayDate = addDays(weekStartDate, idx === 0 ? 6 : idx - 1);
             const dayData = week.days.find(d => d.dayOfWeek === idx);
             const isToday = idx === todayDayOfWeek && selectedWeek === currentWeekNum;
             const isSelected = selectedDay === idx;
@@ -173,6 +177,9 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
               >
                 <span className={`text-xs font-medium ${isSelected ? 'text-brand-400' : isToday ? 'text-brand-300' : 'text-gray-500'}`}>
                   {label}
+                </span>
+                <span className={`text-[10px] leading-none ${isSelected ? 'text-brand-500' : isToday ? 'text-brand-600' : 'text-gray-600'}`}>
+                  {format(dayDate, 'd')}
                 </span>
                 <div className={`w-2 h-2 rounded-full ${
                   allDone ? 'bg-green-500' :
