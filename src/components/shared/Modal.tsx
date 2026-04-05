@@ -1,6 +1,5 @@
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 
 interface Props {
   title: string;
@@ -11,38 +10,41 @@ interface Props {
 }
 
 export default function Modal({ title, onClose, children, footer }: Props) {
-  // On native (resize:'native'), the WKWebView itself shrinks when the keyboard
-  // opens, so fixed elements already sit above it — no JS workaround needed.
-  // On web, use visualViewport to nudge the sheet up by the keyboard height.
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  // Use JS-computed pixel height instead of dvh/vh CSS units.
+  // visualViewport shrinks when keyboard opens (works with resize:'native' in Capacitor).
+  // This avoids: dvh browser support gaps, fixed-in-scrollable-container WKWebView bugs,
+  // and stacking context issues from opacity animations on ancestor elements.
+  const [maxH, setMaxH] = useState(() => {
+    const h = window.visualViewport?.height ?? window.innerHeight;
+    return `${Math.floor(h * 0.92)}px`;
+  });
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
 
-    if (!Capacitor.isNativePlatform()) {
-      const vv = window.visualViewport;
-      if (vv) {
-        const update = () => setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
-        vv.addEventListener('resize', update);
-        return () => {
-          document.body.style.overflow = '';
-          vv.removeEventListener('resize', update);
-        };
-      }
-    }
+    const update = () => {
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      setMaxH(`${Math.floor(h * 0.92)}px`);
+    };
 
-    return () => { document.body.style.overflow = ''; };
+    window.visualViewport?.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+
+    return () => {
+      document.body.style.overflow = '';
+      window.visualViewport?.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+    };
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    // z-[200] ensures this is above bottom nav (z-50) regardless of any ancestor stacking context
+    <div className="fixed inset-0 z-[200]">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      {/* absolute bottom-0 avoids flex centering issues; sm:relative for desktop centering */}
       <div
-        className="relative bg-dark-700 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-dark-400 max-h-[90dvh] flex flex-col"
-        style={{
-          marginBottom: keyboardOffset,
-          transition: keyboardOffset ? 'none' : 'margin-bottom 120ms ease-out',
-        }}
+        className="absolute bottom-0 left-0 right-0 sm:relative sm:mx-auto sm:bottom-auto sm:max-w-lg bg-dark-700 rounded-t-2xl sm:rounded-2xl border border-dark-400 flex flex-col sm:my-auto"
+        style={{ maxHeight: maxH }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-dark-500 flex-shrink-0">
