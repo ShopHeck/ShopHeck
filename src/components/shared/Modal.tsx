@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 interface Props {
   title: string;
@@ -10,23 +11,24 @@ interface Props {
 }
 
 export default function Modal({ title, onClose, children, footer }: Props) {
-  // When the software keyboard opens, visualViewport.height shrinks while
-  // window.innerHeight stays fixed. Shift the sheet up by the difference so
-  // the footer (submit button) stays visible above the keyboard.
+  // On native (resize:'native'), the WKWebView itself shrinks when the keyboard
+  // opens, so fixed elements already sit above it — no JS workaround needed.
+  // On web, use visualViewport to nudge the sheet up by the keyboard height.
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
 
-    const vv = window.visualViewport;
-    if (vv) {
-      const update = () => setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
-      vv.addEventListener('resize', update);
-      update(); // initialise in case keyboard is already up
-      return () => {
-        document.body.style.overflow = '';
-        vv.removeEventListener('resize', update);
-      };
+    if (!Capacitor.isNativePlatform()) {
+      const vv = window.visualViewport;
+      if (vv) {
+        const update = () => setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
+        vv.addEventListener('resize', update);
+        return () => {
+          document.body.style.overflow = '';
+          vv.removeEventListener('resize', update);
+        };
+      }
     }
 
     return () => { document.body.style.overflow = ''; };
@@ -39,7 +41,7 @@ export default function Modal({ title, onClose, children, footer }: Props) {
         className="relative bg-dark-700 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-dark-400 max-h-[90dvh] flex flex-col"
         style={{
           marginBottom: keyboardOffset,
-          transition: 'margin-bottom 120ms ease-out',
+          transition: keyboardOffset ? 'none' : 'margin-bottom 120ms ease-out',
         }}
       >
         {/* Header */}

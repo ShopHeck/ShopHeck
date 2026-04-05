@@ -49,8 +49,8 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: 'body',            // Resize body (not the viewport) when keyboard opens
-      resizeOnFullScreen: true,  // Also resize in landscape / full-screen modes
+      resize: 'native',          // Resize the WKWebView itself — fixed elements naturally clear the keyboard
+      resizeOnFullScreen: true,
       style: 'dark',
     },
   },
