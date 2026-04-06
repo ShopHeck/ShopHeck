@@ -1,3 +1,5 @@
+export type OffSeasonGoal = 'base-building' | 'strength' | 'maintain' | 'recovery';
+
 export type WeightClass =
   | 'Strawweight'
   | 'Flyweight'
@@ -16,7 +18,8 @@ export type UserRole = 'fighter' | 'coach';
 
 export interface FightCamp {
   id: string;
-  fightDate: string;
+  /** Undefined for off-season plans */
+  fightDate?: string;
   opponent?: string;
   weightClass: WeightClass;
   currentWeight: number;
@@ -28,13 +31,17 @@ export interface FightCamp {
   campWeeks: number;
   startDate: string;
   createdAt: string;
+  /** True when this is an off-season training plan with no fight date */
+  isOffSeason?: boolean;
+  offSeasonGoal?: OffSeasonGoal;
 }
 
 export interface TrainingWeek {
   weekNumber: number;
   startDate: string;
   endDate: string;
-  phase: 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper';
+  phase: 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper'
+       | 'Foundation' | 'Development' | 'Performance' | 'Active Recovery';
   focus: string;
   intensity: 'Low' | 'Medium' | 'High' | 'Very High';
   days: TrainingDay[];

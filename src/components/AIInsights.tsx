@@ -61,7 +61,7 @@ function buildPrompt(state: ReturnType<typeof useApp>['state']): string {
 - Level: ${currentUser.experienceLevel}${currentUser.gym ? ` | Gym: ${currentUser.gym}` : ''}${currentUser.record ? ` | Record: ${currentUser.record}` : ''}
 
 ## Fight Camp
-- Fight: ${format(parseISO(activeCamp.fightDate), 'MMM d, yyyy')} (${daysOut} days out)${activeCamp.opponent ? ` vs ${activeCamp.opponent}` : ''}
+- Fight: ${format(parseISO(activeCamp.fightDate ?? ''), 'MMM d, yyyy')} (${daysOut} days out)${activeCamp.opponent ? ` vs ${activeCamp.opponent}` : ''}
 - Format: ${activeCamp.rounds}R × ${activeCamp.roundDuration}min
 - Weight: ${currentWeight} lbs → ${activeCamp.targetWeight} lbs target (${weightToGo} lbs to cut)
 - Progress: Week ${currentWeekNum}/${activeCamp.campWeeks} · ${progress}%${currentWeek ? ` · ${currentWeek.phase} (${currentWeek.intensity})` : ''}

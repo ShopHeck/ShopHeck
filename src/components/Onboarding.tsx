@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import type { Sport, WeightClass, ExperienceLevel, UserRole } from '../types';
+import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
+
+const OFF_SEASON_GOALS: { value: OffSeasonGoal; label: string; desc: string }[] = [
+  { value: 'base-building', label: 'Base Building', desc: 'Aerobic engine, technical drilling, volume work' },
+  { value: 'strength',      label: 'Build Strength', desc: 'Power, hypertrophy, functional strength' },
+  { value: 'maintain',      label: 'Maintain & Sharpen', desc: 'Balanced training to stay competition-ready' },
+  { value: 'recovery',      label: 'Active Recovery', desc: 'Light training, deload, coming back from injury' },
+];
 
 // TODO: replace with the real App Store listing ID once published
 const APP_STORE_URL = 'https://apps.apple.com/app/id000000000';
@@ -20,10 +27,12 @@ const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Beginner', 'Amateur', 'Semi-Pro',
 
 interface Props {
   campOnly?: boolean;
+  /** Pre-selects off-season mode and hides the fight camp toggle */
+  offSeasonOnly?: boolean;
   onClose?: () => void;
 }
 
-export default function Onboarding({ campOnly = false, onClose }: Props) {
+export default function Onboarding({ campOnly = false, offSeasonOnly = false, onClose }: Props) {
   const { state, dispatch } = useApp();
   const [step, setStep] = useState(campOnly ? 1 : 0);
   const [role, setRole] = useState<UserRole>('fighter');
@@ -35,6 +44,10 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
   const [weightClass, setWeightClass] = useState<WeightClass>('Lightweight');
   const [experience, setExperience] = useState<ExperienceLevel>('Amateur');
   const [gym, setGym] = useState('');
+
+  // Camp mode
+  const [isOffSeason, setIsOffSeason] = useState(offSeasonOnly);
+  const [offSeasonGoal, setOffSeasonGoal] = useState<OffSeasonGoal>('maintain');
 
   // Camp
   const [fightDate, setFightDate] = useState('');
@@ -62,7 +75,7 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
   }
 
   function handleCampNext() {
-    if (!fightDate || !currentWeight || !targetWeight) return;
+    if (!isOffSeason && !fightDate) return;
     setStep(2);
   }
 
@@ -72,9 +85,10 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
   }
 
   function handleFinish() {
-    const fightDateObj = new Date(fightDate);
-    const campWeeksNum = parseInt(campWeeks);
-    const startDate = format(addDays(fightDateObj, -(campWeeksNum * 7)), 'yyyy-MM-dd');
+    const campWeeksNum = isOffSeason ? 12 : parseInt(campWeeks);
+    const startDate = isOffSeason
+      ? format(new Date(), 'yyyy-MM-dd')
+      : format(addDays(new Date(fightDate), -(campWeeksNum * 7)), 'yyyy-MM-dd');
 
     if (!campOnly) {
       dispatch({
@@ -96,17 +110,19 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
       dispatch({
         type: 'CREATE_CAMP',
         payload: {
-          fightDate,
-          opponent: opponent.trim() || undefined,
+          fightDate: isOffSeason ? undefined : fightDate,
+          opponent: (!isOffSeason && opponent.trim()) ? opponent.trim() : undefined,
           weightClass: campOnly ? (user?.weightClass ?? weightClass) : weightClass,
-          currentWeight: parseFloat(currentWeight),
-          targetWeight: parseFloat(targetWeight),
+          currentWeight: parseFloat(currentWeight) || 0,
+          targetWeight: parseFloat(targetWeight) || parseFloat(currentWeight) || 0,
           rounds: parseInt(rounds),
           roundDuration: parseInt(roundDuration),
           sport: campOnly ? (user?.sport ?? sport) : sport,
           experienceLevel: campOnly ? (user?.experienceLevel ?? experience) : experience,
           campWeeks: campWeeksNum,
           startDate,
+          isOffSeason: isOffSeason || undefined,
+          offSeasonGoal: isOffSeason ? offSeasonGoal : undefined,
         },
       });
     }
@@ -122,7 +138,9 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
         <div className="relative bg-dark-800 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-dark-400 max-h-[90vh] flex flex-col">
           <div className="flex items-center justify-between px-4 py-4 border-b border-dark-500 flex-shrink-0">
             <h2 className="text-base font-bold text-white">
-              {step === 1 ? 'New Fight Camp' : 'Camp Generated!'}
+              {step === 1
+                ? (isOffSeason ? 'Off Season Plan' : 'New Fight Camp')
+                : (isOffSeason ? 'Plan Ready!' : 'Camp Generated!')}
             </h2>
             <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
               <X size={20} />
@@ -131,92 +149,156 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
           <div className="overflow-y-auto flex-1 px-4 py-4">
             {step === 1 && (
               <div className="flex flex-col gap-5">
-                <div>
-                  <label className="label">Fight Date *</label>
-                  <input className="input" type="date" min={minDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Opponent (Optional)</label>
-                  <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setRounds('5'); setRoundDuration('2'); }}
-                  className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
-                >
-                  <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Flame size={16} className="text-red-400" />
+                {/* Mode toggle — hidden when offSeasonOnly is forced from outside */}
+                {!offSeasonOnly && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setIsOffSeason(false)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${!isOffSeason ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'}`}
+                    >
+                      <Flame size={20} />
+                      <span className="text-xs font-semibold">Fight Camp</span>
+                    </button>
+                    <button
+                      onClick={() => setIsOffSeason(true)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${isOffSeason ? 'border-teal-500 bg-teal-900/20 text-teal-400' : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'}`}
+                    >
+                      <Dumbbell size={20} />
+                      <span className="text-xs font-semibold">Off Season</span>
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white">BKFC Format</p>
-                    <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+                )}
+
+                {/* Off Season Goal Selector */}
+                {isOffSeason ? (
+                  <div>
+                    <label className="label">Training Goal</label>
+                    <div className="flex flex-col gap-2">
+                      {OFF_SEASON_GOALS.map(g => (
+                        <button
+                          key={g.value}
+                          onClick={() => setOffSeasonGoal(g.value)}
+                          className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${offSeasonGoal === g.value ? 'border-teal-500 bg-teal-900/20' : 'border-dark-400 bg-dark-700 hover:border-dark-300'}`}
+                        >
+                          <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
+                          <div>
+                            <p className={`text-sm font-bold ${offSeasonGoal === g.value ? 'text-teal-300' : 'text-white'}`}>{g.label}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{g.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  {rounds === '5' && roundDuration === '2' && (
-                    <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
-                  )}
-                </button>
+                ) : (
+                  <>
+                    <div>
+                      <label className="label">Fight Date *</label>
+                      <input className="input" type="date" min={minDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="label">Opponent (Optional)</label>
+                      <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setRounds('5'); setRoundDuration('2'); }}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
+                    >
+                      <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Flame size={16} className="text-red-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white">BKFC Format</p>
+                        <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+                      </div>
+                      {rounds === '5' && roundDuration === '2' && (
+                        <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
+                      )}
+                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Rounds</label>
+                        <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
+                          {[3,4,5,6,8,10,12,15].map(n => <option key={n} value={n}>{n} rounds</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">Round Duration</label>
+                        <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                          <option value="2">2 minutes</option>
+                          <option value="3">3 minutes</option>
+                          <option value="5">5 minutes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Weight fields — always shown, optional in off-season */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Rounds</label>
-                    <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
-                      {[3,4,5,6,8,10,12,15].map(n => <option key={n} value={n}>{n} rounds</option>)}
-                    </select>
+                    <label className="label">Current Weight (lbs){!isOffSeason && ' *'}</label>
+                    <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
                   </div>
                   <div>
-                    <label className="label">Round Duration</label>
-                    <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
-                      <option value="2">2 minutes</option>
-                      <option value="3">3 minutes</option>
-                      <option value="5">5 minutes</option>
-                    </select>
+                    <label className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</label>
+                    <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                {/* Camp Length — fight camp only (off-season is always 12 weeks) */}
+                {!isOffSeason && (
                   <div>
-                    <label className="label">Current Weight (lbs) *</label>
-                    <input className="input" type="number" placeholder="e.g. 160" value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                    <label className="label">Camp Length</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['6','8','10'].map(w => (
+                        <button key={w} onClick={() => setCampWeeks(w)}
+                          className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${campWeeks === w ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
+                          {w} Weeks
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div>
-                    <label className="label">Target Weight (lbs) *</label>
-                    <input className="input" type="number" placeholder="e.g. 155" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Camp Length</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['6','8','10'].map(w => (
-                      <button key={w} onClick={() => setCampWeeks(w)}
-                        className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${campWeeks === w ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
-                        {w} Weeks
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                )}
+
                 <button
                   onClick={handleCampNext}
-                  disabled={!fightDate || !currentWeight || !targetWeight}
-                  className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={!isOffSeason && !fightDate}
+                  className={`flex items-center justify-center gap-2 disabled:opacity-50 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300 hover:!bg-teal-900/50' : 'btn-primary'}`}
                 >
-                  Generate Camp <Flame size={16} />
+                  {isOffSeason ? <><Dumbbell size={16} /> Generate Off Season Plan</> : <><Flame size={16} /> Generate Camp</>}
                 </button>
               </div>
             )}
             {step === 2 && (
               <div className="flex flex-col gap-5 text-center">
-                <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
-                  <Flame size={32} className="text-white" />
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-lg ${isOffSeason ? 'bg-teal-700' : 'bg-brand-600'}`}>
+                  {isOffSeason ? <Dumbbell size={32} className="text-white" /> : <Flame size={32} className="text-white" />}
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-white">Camp Generated!</h3>
-                  <p className="text-gray-400 text-sm mt-1">Your {campWeeks}-week program is ready.</p>
+                  <h3 className="text-xl font-black text-white">{isOffSeason ? 'Off Season Plan Ready!' : 'Camp Generated!'}</h3>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {isOffSeason ? '12-week off season program is ready.' : `Your ${campWeeks}-week program is ready.`}
+                  </p>
                 </div>
                 <div className="bg-dark-600 rounded-xl border border-dark-400 p-4 text-left space-y-2">
-                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span></div>
+                  {isOffSeason ? (
+                    <>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Mode</span><span className="text-teal-400 font-bold text-sm">Off Season</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Goal</span><span className="text-white font-semibold text-sm capitalize">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Duration</span><span className="text-teal-400 font-bold text-sm">12 Weeks (3 cycles)</span></div>
+                      {currentWeight && <div className="flex justify-between"><span className="text-gray-500 text-sm">Starting Weight</span><span className="text-white font-semibold text-sm">{currentWeight} lbs</span></div>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span></div>
+                    </>
+                  )}
                 </div>
-                <button onClick={handleFinish} className="btn-primary flex items-center justify-center gap-2">
-                  Start Camp <ChevronRight size={18} />
+                <button onClick={handleFinish} className={`flex items-center justify-center gap-2 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
+                  {isOffSeason ? 'Start Off Season' : 'Start Camp'} <ChevronRight size={18} />
                 </button>
               </div>
             )}
@@ -353,141 +435,208 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
           </div>
         )}
 
-        {/* ── Step 1: Fight Camp Setup ── */}
+        {/* ── Step 1: Training Setup ── */}
         {step === 1 && (
           <div className="flex flex-col gap-5 mt-2">
             <div>
-              <h2 className="text-xl font-black text-white">Fight Camp Setup</h2>
-              <p className="text-gray-500 text-sm mt-1">Tell us about your upcoming fight</p>
+              <h2 className="text-xl font-black text-white">
+                {isOffSeason ? 'Off Season Setup' : 'Fight Camp Setup'}
+              </h2>
+              <p className="text-gray-500 text-sm mt-1">
+                {isOffSeason ? 'Set your goal and start training' : 'Tell us about your upcoming fight'}
+              </p>
             </div>
 
-            <div>
-              <label className="label">Fight Date *</label>
-              <input className="input" type="date" min={minDate} max={maxDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+            {/* Mode toggle */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setIsOffSeason(false)}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all text-sm font-semibold ${!isOffSeason ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'}`}
+              >
+                <Flame size={16} /> Fight Camp
+              </button>
+              <button
+                onClick={() => setIsOffSeason(true)}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all text-sm font-semibold ${isOffSeason ? 'border-teal-500 bg-teal-900/20 text-teal-400' : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'}`}
+              >
+                <Dumbbell size={16} /> Off Season
+              </button>
             </div>
 
-            <div>
-              <label className="label">Opponent (Optional)</label>
-              <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => { setRounds('5'); setRoundDuration('2'); }}
-              className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
-            >
-              <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Flame size={16} className="text-red-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-white">BKFC Format</p>
-                <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
-              </div>
-              {rounds === '5' && roundDuration === '2' && (
-                <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
-              )}
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
+            {/* Off Season Goal Selector */}
+            {isOffSeason ? (
               <div>
-                <label className="label">Rounds</label>
-                <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
-                  {[3, 4, 5, 6, 8, 10, 12, 15].map(n => (
-                    <option key={n} value={n}>{n} rounds</option>
+                <label className="label">Training Goal</label>
+                <div className="flex flex-col gap-2">
+                  {OFF_SEASON_GOALS.map(g => (
+                    <button
+                      key={g.value}
+                      onClick={() => setOffSeasonGoal(g.value)}
+                      className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${offSeasonGoal === g.value ? 'border-teal-500 bg-teal-900/20' : 'border-dark-400 bg-dark-700 hover:border-dark-300'}`}
+                    >
+                      <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
+                      <div>
+                        <p className={`text-sm font-bold ${offSeasonGoal === g.value ? 'text-teal-300' : 'text-white'}`}>{g.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{g.desc}</p>
+                      </div>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <label className="label">Round Duration</label>
-                <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
-                  <option value="2">2 minutes</option>
-                  <option value="3">3 minutes</option>
-                  <option value="5">5 minutes</option>
-                </select>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <label className="label">Fight Date *</label>
+                  <input className="input" type="date" min={minDate} max={maxDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Opponent (Optional)</label>
+                  <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setRounds('5'); setRoundDuration('2'); }}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left w-full ${rounds === '5' && roundDuration === '2' ? 'border-red-600 bg-red-950/30' : 'border-dark-400 bg-dark-700 hover:border-red-800/60'}`}
+                >
+                  <div className="w-9 h-9 bg-red-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Flame size={16} className="text-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">BKFC Format</p>
+                    <p className="text-xs text-red-400">5 rounds · 2 min · 1 min rest — bare knuckle rules</p>
+                  </div>
+                  {rounds === '5' && roundDuration === '2' && (
+                    <CheckCircle size={16} className="text-red-400 flex-shrink-0" />
+                  )}
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Rounds</label>
+                    <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
+                      {[3, 4, 5, 6, 8, 10, 12, 15].map(n => (
+                        <option key={n} value={n}>{n} rounds</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Round Duration</label>
+                    <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                      <option value="2">2 minutes</option>
+                      <option value="3">3 minutes</option>
+                      <option value="5">5 minutes</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
+            {/* Weight fields */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Current Weight (lbs) *</label>
-                <input className="input" type="number" placeholder="e.g. 160" value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                <label className="label">Current Weight (lbs){!isOffSeason && ' *'}</label>
+                <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
               </div>
               <div>
-                <label className="label">Target Weight (lbs) *</label>
-                <input className="input" type="number" placeholder="e.g. 155" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                <label className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</label>
+                <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
               </div>
             </div>
 
-            <div>
-              <label className="label">Camp Length</label>
-              <div className="grid grid-cols-3 gap-2">
-                {['6', '8', '10'].map(w => (
-                  <button
-                    key={w}
-                    onClick={() => setCampWeeks(w)}
-                    className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
-                      campWeeks === w
-                        ? 'border-brand-500 bg-brand-900/30 text-brand-400'
-                        : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'
-                    }`}
-                  >
-                    {w} Weeks
-                  </button>
-                ))}
+            {/* Camp Length — fight camp only */}
+            {!isOffSeason && (
+              <div>
+                <label className="label">Camp Length</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['6', '8', '10'].map(w => (
+                    <button
+                      key={w}
+                      onClick={() => setCampWeeks(w)}
+                      className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        campWeeks === w
+                          ? 'border-brand-500 bg-brand-900/30 text-brand-400'
+                          : 'border-dark-400 bg-dark-700 text-gray-400 hover:border-dark-300'
+                      }`}
+                    >
+                      {w} Weeks
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               onClick={handleCampNext}
-              disabled={!fightDate || !currentWeight || !targetWeight}
-              className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isOffSeason && !fightDate}
+              className={`flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300 hover:!bg-teal-900/50' : 'btn-primary'}`}
             >
-              Generate Training Camp
-              <Flame size={18} />
+              {isOffSeason ? <><Dumbbell size={18} /> Generate Off Season Plan</> : <>Generate Training Camp <Flame size={18} /></>}
             </button>
           </div>
         )}
 
-        {/* ── Step 2: Camp Preview ── */}
+        {/* ── Step 2: Preview ── */}
         {step === 2 && (
           <div className="flex flex-col gap-6 mt-4 text-center">
             <div className="flex justify-center">
-              <div className="w-20 h-20 bg-brand-600 rounded-2xl flex items-center justify-center shadow-xl shadow-brand-900/50">
-                <Flame size={40} className="text-white" />
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl ${isOffSeason ? 'bg-teal-700 shadow-teal-900/50' : 'bg-brand-600 shadow-brand-900/50'}`}>
+                {isOffSeason ? <Dumbbell size={40} className="text-white" /> : <Flame size={40} className="text-white" />}
               </div>
             </div>
 
             <div>
-              <h2 className="text-2xl font-black text-white">Camp Generated!</h2>
+              <h2 className="text-2xl font-black text-white">
+                {isOffSeason ? 'Off Season Plan Ready!' : 'Camp Generated!'}
+              </h2>
               <p className="text-gray-400 mt-2 text-sm">
-                Your {campWeeks}-week training program is ready. Stay disciplined, trust the process.
+                {isOffSeason
+                  ? 'Your 12-week program is set. Stay consistent, build your base.'
+                  : `Your ${campWeeks}-week training program is ready. Stay disciplined, trust the process.`}
               </p>
             </div>
 
             <div className="bg-dark-700 rounded-xl border border-dark-500 p-4 text-left space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Fighter</span>
+                <span className="text-gray-500 text-sm">{isOffSeason ? 'Athlete' : 'Fighter'}</span>
                 <span className="text-white font-semibold">{name}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Fight Date</span>
-                <span className="text-white font-semibold">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Weight Class</span>
-                <span className="text-white font-semibold">{weightClass}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Camp Duration</span>
-                <span className="text-brand-400 font-bold">{campWeeks} Weeks</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">Weight Cut</span>
-                <span className="text-white font-semibold">{currentWeight} → {targetWeight} lbs</span>
-              </div>
+              {isOffSeason ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Mode</span>
+                    <span className="text-teal-400 font-bold">Off Season</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Goal</span>
+                    <span className="text-white font-semibold">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Duration</span>
+                    <span className="text-teal-400 font-bold">12 Weeks · 3 Cycles</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Fight Date</span>
+                    <span className="text-white font-semibold">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Weight Class</span>
+                    <span className="text-white font-semibold">{weightClass}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Camp Duration</span>
+                    <span className="text-brand-400 font-bold">{campWeeks} Weeks</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Weight Cut</span>
+                    <span className="text-white font-semibold">{currentWeight} → {targetWeight} lbs</span>
+                  </div>
+                </>
+              )}
             </div>
 
-            <button onClick={() => setStep(3)} className="btn-primary flex items-center justify-center gap-2 text-lg py-4">
+            <button onClick={() => setStep(3)} className={`flex items-center justify-center gap-2 text-lg py-4 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
               Continue
               <ChevronRight size={20} />
             </button>
@@ -578,31 +727,52 @@ export default function Onboarding({ campOnly = false, onClose }: Props) {
               </p>
             </div>
 
-            {/* Camp summary — fighters only */}
-            {role === 'fighter' && fightDate && (
+            {/* Summary — fighters only */}
+            {role === 'fighter' && (fightDate || isOffSeason) && (
               <div className="bg-dark-700 rounded-xl border border-dark-500 p-4 text-left space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Fight Date</span>
-                  <span className="text-white font-semibold text-sm">
-                    {new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Camp Length</span>
-                  <span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span>
-                </div>
-                {currentWeight && targetWeight && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Weight Cut</span>
-                    <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span>
-                  </div>
+                {isOffSeason ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-sm">Mode</span>
+                      <span className="text-teal-400 font-bold text-sm">Off Season</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-sm">Goal</span>
+                      <span className="text-white font-semibold text-sm">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-sm">Duration</span>
+                      <span className="text-teal-400 font-bold text-sm">12 Weeks</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-sm">Fight Date</span>
+                      <span className="text-white font-semibold text-sm">
+                        {new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-sm">Camp Length</span>
+                      <span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span>
+                    </div>
+                    {currentWeight && targetWeight && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500 text-sm">Weight Cut</span>
+                        <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
 
             {/* Primary CTA */}
             <button onClick={handleFinish} className="btn-primary flex items-center justify-center gap-2 text-lg py-4">
-              {role === 'fighter' ? 'Enter the Camp' : 'Enter the App'}
+              {role === 'fighter'
+                ? (isOffSeason ? 'Start Off Season' : 'Enter the Camp')
+                : 'Enter the App'}
               <ChevronRight size={20} />
             </button>
 

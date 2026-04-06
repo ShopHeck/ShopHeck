@@ -84,7 +84,7 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   const logDate = parseISO(log.date);
   const dayNum = Math.max(1, differenceInDays(logDate, campStart) + 1);
   const totalDays = camp.campWeeks * 7;
-  const daysToFight = Math.max(0, differenceInDays(parseISO(camp.fightDate), new Date()));
+  const daysToFight = Math.max(0, differenceInDays(parseISO(camp.fightDate ?? ''), new Date()));
 
   // Big day number
   ctx.fillStyle = '#ffffff';
@@ -146,7 +146,7 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   ctx.fillText(format(logDate, 'MMMM d, yyyy').toUpperCase(), cx, cardY + 390);
 
   // Opponent / fight info
-  const fightDate = format(parseISO(camp.fightDate), 'MMM d, yyyy');
+  const fightDate = format(parseISO(camp.fightDate ?? ''), 'MMM d, yyyy');
   const fightLabel = camp.opponent
     ? `vs. ${camp.opponent}  ·  ${fightDate}`
     : `Fight Date: ${fightDate}`;

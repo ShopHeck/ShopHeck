@@ -127,7 +127,7 @@ export default function AppleHealthSync() {
 
         const { id: campId, startDate, campWeeks, fightDate } = activeCamp;
         const campStart = startDate;
-        const campEnd = fightDate;
+        const campEnd = fightDate ?? startDate;
 
         // Filter to camp date range
         const campWeights = weights
@@ -330,7 +330,7 @@ export default function AppleHealthSync() {
               <div className="card space-y-3">
                 <p className="text-sm font-bold text-white">Import Preview</p>
                 <p className="text-xs text-gray-500">
-                  Filtered to your camp: {format(parseISO(activeCamp.startDate), 'MMM d')} – {format(parseISO(activeCamp.fightDate), 'MMM d, yyyy')}
+                  Filtered to your camp: {format(parseISO(activeCamp.startDate), 'MMM d')} – {format(parseISO(activeCamp.fightDate ?? ''), 'MMM d, yyyy')}
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">

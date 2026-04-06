@@ -148,7 +148,7 @@ export default function NutritionTracker() {
 
   function autoSuggestTargets() {
     if (!activeCamp || !currentUser) return;
-    const daysToFight = differenceInDays(parseISO(activeCamp.fightDate), new Date());
+    const daysToFight = differenceInDays(parseISO(activeCamp.fightDate ?? ''), new Date());
     const bodyWeightLbs = activeCamp.currentWeight;
     // Calorie deficit based on proximity to fight
     const deficit = daysToFight < 14 ? 500 : daysToFight < 28 ? 200 : 0;

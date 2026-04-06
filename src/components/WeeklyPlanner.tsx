@@ -22,6 +22,11 @@ const PHASE_COLORS: Record<string, string> = {
   'Fight Specific': 'text-orange-400',
   'Peak': 'text-red-400',
   'Taper': 'text-green-400',
+  // Off-season phases
+  'Foundation':       'text-indigo-400',
+  'Development':      'text-teal-400',
+  'Performance':      'text-purple-400',
+  'Active Recovery':  'text-green-400',
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -41,6 +46,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
 
   const week = trainingSchedule[selectedWeek - 1];
   if (!week || !activeCamp) return null;
+
+  const isOffSeason = !!activeCamp.isOffSeason;
+  // For off-season, compute cycle and phase-within-cycle for the selected week
+  const selectedCycle = isOffSeason ? Math.ceil(selectedWeek / 4) : null;
+  const selectedCyclePhase = isOffSeason ? ((selectedWeek - 1) % 4) + 1 : null;
 
   const today = new Date();
   const todayDayOfWeek = today.getDay();
@@ -89,11 +99,20 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             <ChevronLeft size={20} />
           </button>
           <div className="text-center">
-            <p className="text-white font-bold">Week {selectedWeek}</p>
+            <p className="text-white font-bold">
+              {isOffSeason ? `Off Season — Week ${selectedWeek}` : `Week ${selectedWeek}`}
+            </p>
             <p className="text-xs text-gray-500">
               {format(parseISO(week.startDate), 'MMM d')} – {format(parseISO(week.endDate), 'MMM d')}
-              {selectedWeek === currentWeekNum && <span className="text-brand-400 ml-1">(This Week)</span>}
+              {selectedWeek === currentWeekNum && (
+                <span className={`ml-1 ${isOffSeason ? 'text-teal-400' : 'text-brand-400'}`}>(This Week)</span>
+              )}
             </p>
+            {isOffSeason && selectedCycle !== null && selectedCyclePhase !== null && (
+              <p className="text-[11px] text-gray-600 mt-0.5">
+                Cycle {selectedCycle} · Phase {selectedCyclePhase} of 4
+              </p>
+            )}
           </div>
           <button
             onClick={() => setSelectedWeek(w => Math.min(activeCamp.campWeeks, w + 1))}
@@ -181,16 +200,22 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                 onClick={() => { triggerHaptic(HAPTIC.tick); setSelectedDay(isSelected ? null : idx); }}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 transition-all ${
                   isSelected
-                    ? 'border-brand-500 bg-brand-900/30'
+                    ? (isOffSeason ? 'border-teal-500 bg-teal-900/20' : 'border-brand-500 bg-brand-900/30')
                     : isToday
-                    ? 'border-brand-700/50 bg-dark-600'
+                    ? (isOffSeason ? 'border-teal-700/50 bg-dark-600' : 'border-brand-700/50 bg-dark-600')
                     : 'border-dark-500 bg-dark-700 hover:border-dark-400'
                 }`}
               >
-                <span className={`text-xs font-medium ${isSelected ? 'text-brand-400' : isToday ? 'text-brand-300' : 'text-gray-500'}`}>
+                <span className={`text-xs font-medium ${
+                  isSelected ? (isOffSeason ? 'text-teal-400' : 'text-brand-400') :
+                  isToday ? (isOffSeason ? 'text-teal-300' : 'text-brand-300') : 'text-gray-500'
+                }`}>
                   {label}
                 </span>
-                <span className={`text-[10px] leading-none ${isSelected ? 'text-brand-500' : isToday ? 'text-brand-600' : 'text-gray-600'}`}>
+                <span className={`text-[10px] leading-none ${
+                  isSelected ? (isOffSeason ? 'text-teal-500' : 'text-brand-500') :
+                  isToday ? (isOffSeason ? 'text-teal-600' : 'text-brand-600') : 'text-gray-600'
+                }`}>
                   {format(dayDate, 'd')}
                 </span>
                 <div className={`w-2 h-2 rounded-full ${
@@ -288,7 +313,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                                 title: session.title,
                                 duration: session.duration,
                               })}
-                              className="mt-3 text-xs font-semibold text-brand-400 bg-black/30 hover:bg-black/50 border border-brand-700/50 px-3 py-1.5 rounded-lg transition-all"
+                              className={`mt-3 text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border ${
+                                isOffSeason
+                                  ? 'text-teal-400 border-teal-700/50'
+                                  : 'text-brand-400 border-brand-700/50'
+                              }`}
                             >
                               + Log this session
                             </button>

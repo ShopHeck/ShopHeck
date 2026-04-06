@@ -55,7 +55,7 @@ export default function WeightTracker() {
   const totalCut = startW - targetW;
   const cutProgress = totalCut > 0 ? Math.min(100, Math.max(0, ((startW - currentW) / totalCut) * 100)) : 100;
 
-  const daysUntilFight = differenceInDays(parseISO(activeCamp.fightDate), new Date());
+  const daysUntilFight = differenceInDays(parseISO(activeCamp.fightDate ?? ''), new Date());
 
   // Build chart data: include camp start, all entries, and target
   const chartData = (() => {

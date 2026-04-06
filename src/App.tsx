@@ -10,6 +10,7 @@ import type { SessionType } from './types';
 // ── Static imports — rendered immediately on first paint ──────────────────
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
+import OffSeasonDashboard from './components/OffSeasonDashboard';
 import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
@@ -70,6 +71,7 @@ function AppShell() {
   const { state } = useApp();
   const [view, setView] = useState<View>('dashboard');
   const [showNewCamp, setShowNewCamp] = useState(false);
+  const [showNewOffSeason, setShowNewOffSeason] = useState(false);
   const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
 
   // Native iOS setup — runs once on mount inside the Capacitor WebView
@@ -89,7 +91,9 @@ function AppShell() {
 
   const camp = state.activeCamp;
   const dashSubtitle = camp
-    ? `${state.currentUser.name} · ${camp.weightClass}`
+    ? (camp.isOffSeason
+        ? `Off Season · ${state.currentUser.name}`
+        : `${state.currentUser.name} · ${camp.weightClass}`)
     : state.currentUser.name;
 
   function navigateToLog(prefill?: LogPrefill) {
@@ -117,16 +121,48 @@ function AppShell() {
         <Suspense fallback={<ViewSkeleton />}>
           <div key={view} className="view-enter">
 
-            {view === 'dashboard' && !isCoach && camp && (
+            {view === 'dashboard' && !isCoach && camp && !camp.isOffSeason && (
               <Dashboard onNavigate={(v, prefill?) => {
                 if (v === 'log' && prefill) navigateToLog(prefill);
                 else setView(v as View);
               }} />
             )}
+            {view === 'dashboard' && !isCoach && camp && camp.isOffSeason && (
+              <OffSeasonDashboard onNavigate={(v, prefill?) => {
+                if (v === 'log' && prefill) navigateToLog(prefill);
+                else setView(v as View);
+              }} />
+            )}
             {view === 'dashboard' && !isCoach && !camp && (
-              <div className="flex flex-col items-center justify-center py-20 px-8 text-center gap-4">
-                <p className="text-gray-400">No active fight camp.</p>
-                <button onClick={() => setView('settings')} className="btn-primary">Set Up a Camp</button>
+              <div className="mx-4 mt-8 flex flex-col gap-4">
+                <div className="text-center mb-2">
+                  <h2 className="text-xl font-black text-white">What are you training for?</h2>
+                  <p className="text-gray-500 text-sm mt-1">Choose your mode to get started</p>
+                </div>
+                <button
+                  onClick={() => setShowNewCamp(true)}
+                  className="card flex items-center gap-4 hover:border-brand-600 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-brand-900/50 flex items-center justify-center flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-400"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-white">Fight Camp</p>
+                    <p className="text-xs text-gray-500 mt-0.5">I have a fight scheduled — build a camp around it</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setShowNewOffSeason(true)}
+                  className="card flex items-center gap-4 hover:border-teal-700 transition-colors text-left"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-400"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-white">Off Season Training</p>
+                    <p className="text-xs text-gray-500 mt-0.5">No fight scheduled — just training, tracking progress</p>
+                  </div>
+                </button>
               </div>
             )}
             {view === 'dashboard' && isCoach && <CoachDashboard />}
@@ -166,6 +202,13 @@ function AppShell() {
       {showNewCamp && (
         <Suspense fallback={null}>
           <Onboarding campOnly onClose={() => setShowNewCamp(false)} />
+        </Suspense>
+      )}
+
+      {/* New Off Season modal */}
+      {showNewOffSeason && (
+        <Suspense fallback={null}>
+          <Onboarding campOnly offSeasonOnly onClose={() => setShowNewOffSeason(false)} />
         </Suspense>
       )}
     </div>

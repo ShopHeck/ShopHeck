@@ -1,5 +1,5 @@
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
-import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession } from '../types';
+import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession, OffSeasonGoal } from '../types';
 
 type Phase = 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper';
 
@@ -240,7 +240,226 @@ function buildWeekSchedule(phase: PhaseConfig, isAdvanced: boolean, sport: strin
   return days;
 }
 
+// ─── Off Season Schedule ──────────────────────────────────────────────────
+
+type OffPhase = 'Foundation' | 'Development' | 'Performance' | 'Active Recovery';
+
+const OFF_SEASON_CYCLE: OffPhase[] = ['Foundation', 'Development', 'Performance', 'Active Recovery'];
+
+interface OffPhaseConfig {
+  phase: OffPhase;
+  focus: string;
+  intensity: TrainingWeek['intensity'];
+  hasSparringTue: boolean;
+  hasSparringFri: boolean;
+}
+
+function getOffPhaseConfig(phase: OffPhase, goal: OffSeasonGoal): OffPhaseConfig {
+  const configs: Record<OffPhase, OffPhaseConfig> = {
+    Foundation: {
+      phase: 'Foundation',
+      focus: 'Aerobic base, movement fundamentals, technical drilling — build the engine',
+      intensity: 'Low',
+      hasSparringTue: false,
+      hasSparringFri: false,
+    },
+    Development: {
+      phase: 'Development',
+      focus: 'Increase training load, introduce sparring, build work capacity',
+      intensity: 'Medium',
+      hasSparringTue: goal !== 'recovery',
+      hasSparringFri: false,
+    },
+    Performance: {
+      phase: 'Performance',
+      focus: 'Peak training week — two sparring sessions, high conditioning volume',
+      intensity: 'High',
+      hasSparringTue: goal !== 'recovery' && goal !== 'strength',
+      hasSparringFri: goal !== 'recovery' && goal !== 'strength' && goal !== 'base-building',
+    },
+    'Active Recovery': {
+      phase: 'Active Recovery',
+      focus: 'Planned deload — light technique work, full tissue recovery, reset for next cycle',
+      intensity: 'Low',
+      hasSparringTue: false,
+      hasSparringFri: false,
+    },
+  };
+  return configs[phase];
+}
+
+function buildOffSeasonWeekSchedule(cfg: OffPhaseConfig, sport: string): TrainingDay[] {
+  const { phase, hasSparringTue, hasSparringFri } = cfg;
+  const isRecovery = phase === 'Active Recovery';
+  const sportLabel = sport === 'MMA' ? 'MMA' : sport === 'Boxing' ? 'Boxing' : sport === 'Bare Knuckle' ? 'Bare Knuckle' : sport;
+
+  const condSession = (title: string, duration: number, description: string): TrainingSession => ({
+    type: 'conditioning', title, duration, description,
+  });
+  const skillSession = (title: string, duration: number, description: string): TrainingSession => ({
+    type: 'skill', title, duration, description,
+  });
+  const strengthSession = (title: string, duration: number, description: string): TrainingSession => ({
+    type: 'strength', title, duration, description,
+  });
+  const sparringSession = (title: string, duration: number, description: string): TrainingSession => ({
+    type: 'sparring', title, duration, description,
+  });
+  const recoverySession = (title: string, duration: number, description: string): TrainingSession => ({
+    type: 'recovery', title, duration, description,
+  });
+
+  return [
+    // Monday
+    buildDay(1, 'Monday', isRecovery ? [
+      skillSession(`${sportLabel} — Light Technique`, 60, 'Low-intensity shadow boxing, light pad work, movement drills. No pressure.'),
+    ] : [
+      condSession(
+        phase === 'Performance' ? 'High Intensity Intervals' : 'Aerobic Conditioning',
+        phase === 'Performance' ? 45 : 40,
+        phase === 'Performance'
+          ? '5×4min hard effort rounds (bag or assault bike), 2min rest. Push hard each round.'
+          : '40min moderate steady-state. Zone 2 HR (60–70% max). Build the aerobic engine.',
+      ),
+      skillSession(`${sportLabel} — Technical Drilling`, 75, 'Shadow boxing warm-up, pad work combinations, heavy bag rounds. Focus on technical precision.'),
+    ]),
+
+    // Tuesday
+    buildDay(2, 'Tuesday', isRecovery ? [
+      recoverySession('Active Recovery', 45, 'Light stretching, mobility work, foam rolling. Let the body adapt.'),
+    ] : hasSparringTue ? [
+      sparringSession('Sparring Session', 90, `${phase === 'Performance' ? '6' : '4'} rounds of controlled sparring. Focus on clean technique and problem-solving. No ego.`),
+    ] : [
+      strengthSession('Strength & Power', 60, 'Compound lifts, plyometrics, functional power work. Olympic-style movements for combat athletes.'),
+    ]),
+
+    // Wednesday
+    buildDay(3, 'Wednesday', isRecovery ? [
+      condSession('Light Conditioning', 30, 'Easy 30min jog or bike. Keep heart rate below 65% max HR.'),
+    ] : [
+      skillSession(`${sportLabel} — Combination Work`, 75, 'Combination chains, defensive movement, footwork patterns, counter-striking drills.'),
+      recoverySession('Cool-down & Recovery', 20, 'Static stretching, deep breathing, ice bath if needed.'),
+    ]),
+
+    // Thursday
+    buildDay(4, 'Thursday', isRecovery ? [
+      skillSession(`${sportLabel} — Light Technique`, 60, 'Shadow boxing, slow pad work, movement focus. Keep intensity minimal.'),
+    ] : [
+      condSession(
+        phase === 'Performance' ? 'Fight Rounds Conditioning' : 'Circuit Training',
+        45,
+        phase === 'Performance'
+          ? '8 rounds on bags, staying in motion. No rest between rounds. Push your limits.'
+          : 'Burpees, sprawls, shadow boxing, jump rope circuit. 5 rounds, 5 exercises.',
+      ),
+      skillSession(`${sportLabel} — Pad Work Focus`, 75, 'Combination pad work, timing drills, counter striking, defensive response training.'),
+    ]),
+
+    // Friday
+    buildDay(5, 'Friday', isRecovery ? [
+      { type: 'rest', title: 'Rest Day', duration: 0, description: 'Full rest. Let your body recover completely.' },
+    ] : hasSparringFri ? [
+      sparringSession('Technical Sparring', 90, '4 rounds at 60–70% intensity. Technical focus — execution over winning.'),
+    ] : [
+      strengthSession('Strength & Conditioning', 60, 'Strength training + metabolic conditioning finisher. End with 10min high-intensity circuit.'),
+    ]),
+
+    // Saturday
+    buildDay(6, 'Saturday', isRecovery ? [
+      recoverySession('Recovery Session', 45, 'Yoga, mobility, or easy swim. Focus on the joints and connective tissue.'),
+    ] : [
+      condSession('Long Conditioning', 60, 'Long run (45min) or bike (60min). Maintain conversation pace. Builds the aerobic foundation everything runs on.'),
+    ]),
+
+    // Sunday
+    buildDay(0, 'Sunday', [
+      recoverySession('Rest & Recovery', 30, 'Full rest. Sleep 8+ hours. Prioritise nutrition and mental recovery.'),
+    ], true),
+  ];
+}
+
+function buildOffSeasonWeekGoals(phase: OffPhase, goal: OffSeasonGoal): string[] {
+  const base: Record<OffPhase, string[]> = {
+    Foundation: [
+      'Complete all conditioning sessions',
+      'Focus on technical precision over intensity',
+      'Establish consistent sleep and nutrition habits',
+    ],
+    Development: [
+      'Hit all scheduled sparring rounds',
+      'Increase conditioning volume from last week',
+      'Track body weight and hydration daily',
+    ],
+    Performance: [
+      'Complete both sparring sessions',
+      'Push conditioning at full effort',
+      'Log every session with honest RPE ratings',
+    ],
+    'Active Recovery': [
+      'Keep intensity light — resist the urge to push',
+      'Prioritise sleep: aim for 8+ hours',
+      'Reflect on what worked this cycle',
+    ],
+  };
+
+  const extras: Record<OffSeasonGoal, Partial<Record<OffPhase, string>>> = {
+    'base-building': {
+      Foundation: 'Build aerobic base — no skipping cardio',
+      Development: 'Stay consistent: base > intensity this phase',
+    },
+    strength: {
+      Foundation: 'Hit all strength sessions, track lifts',
+      Performance: 'Set a new PR on at least one lift',
+    },
+    maintain: {},
+    recovery: {
+      Foundation: 'Listen to your body — skip if genuinely fatigued',
+      'Active Recovery': 'Prioritise recovery over training volume',
+    },
+  };
+
+  const goals = [...base[phase]];
+  const extra = extras[goal]?.[phase];
+  if (extra) goals[0] = extra;
+  return goals;
+}
+
+function generateOffSeasonSchedule(camp: FightCamp): TrainingWeek[] {
+  const { campWeeks, startDate, sport } = camp;
+  const goal: OffSeasonGoal = camp.offSeasonGoal ?? 'maintain';
+  const weeks: TrainingWeek[] = [];
+
+  for (let i = 0; i < campWeeks; i++) {
+    const cyclePos = i % 4; // 0=Foundation, 1=Development, 2=Performance, 3=ActiveRecovery
+    const phase = OFF_SEASON_CYCLE[cyclePos];
+    const cfg = getOffPhaseConfig(phase, goal);
+
+    const weekStart = startOfWeek(addDays(parseISO(startDate), i * 7), { weekStartsOn: 1 });
+    const weekEnd = addDays(weekStart, 6);
+
+    weeks.push({
+      weekNumber: i + 1,
+      startDate: format(weekStart, 'yyyy-MM-dd'),
+      endDate: format(weekEnd, 'yyyy-MM-dd'),
+      phase,
+      focus: cfg.focus,
+      intensity: cfg.intensity,
+      weeklyGoals: buildOffSeasonWeekGoals(phase, goal),
+      days: buildOffSeasonWeekSchedule(cfg, sport),
+    });
+  }
+
+  return weeks;
+}
+
+export function getCurrentOffSeasonCycle(camp: FightCamp): number {
+  const weekNum = getCurrentWeekNumber(camp);
+  return Math.ceil(weekNum / 4);
+}
+
 export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
+  if (camp.isOffSeason) return generateOffSeasonSchedule(camp);
+
   const { campWeeks, startDate, experienceLevel, sport } = camp;
   const isAdvanced = experienceLevel === 'Professional' || experienceLevel === 'Semi-Pro';
   const phaseConfigs = getPhaseConfigs(campWeeks, experienceLevel);
@@ -301,7 +520,8 @@ export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
   return weeks;
 }
 
-export function getDaysUntilFight(fightDate: string): number {
+export function getDaysUntilFight(fightDate: string | undefined): number {
+  if (!fightDate) return 0;
   const today = new Date();
   const fight = parseISO(fightDate);
   const diff = Math.ceil((fight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));

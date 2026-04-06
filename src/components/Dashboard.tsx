@@ -81,7 +81,7 @@ export default function Dashboard({ onNavigate }: Props) {
                 <span className="text-gray-400 font-medium">days out</span>
               </div>
               <p className="text-gray-400 text-sm mt-1">
-                {format(parseISO(activeCamp.fightDate), 'MMMM d, yyyy')}
+                {format(parseISO(activeCamp.fightDate ?? ''), 'MMMM d, yyyy')}
                 {activeCamp.opponent && <span className="text-gray-500"> · vs {activeCamp.opponent}</span>}
               </p>
             </div>

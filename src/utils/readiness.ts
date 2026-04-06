@@ -31,7 +31,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   if (!activeCamp) return null;
 
   const now = new Date();
-  const fightDate = parseISO(activeCamp.fightDate);
+  const fightDate = parseISO(activeCamp.fightDate ?? '');
   const campStart = parseISO(activeCamp.startDate);
   const daysUntilFight = Math.max(1, differenceInDays(fightDate, now));
   const daysIntoCamp = Math.max(0, differenceInDays(now, campStart));

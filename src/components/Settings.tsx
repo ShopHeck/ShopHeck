@@ -139,7 +139,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
   function openEditCamp(camp: FightCamp) {
     setEditingCamp(camp);
-    setCFightDate(camp.fightDate);
+    setCFightDate(camp.fightDate ?? '');
     setCOpponent(camp.opponent ?? '');
     setCRounds(String(camp.rounds));
     setCRoundDuration(String(camp.roundDuration));
@@ -269,8 +269,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               {[...camps].reverse().map(camp => {
                 const isActive = activeCamp?.id === camp.id;
                 const stats = campStats(camp);
-                const daysOut = Math.ceil((new Date(camp.fightDate).getTime() - Date.now()) / 86400000);
-                const isPast = daysOut < 0;
+                const daysOut = camp.fightDate
+                  ? Math.ceil((new Date(camp.fightDate).getTime() - Date.now()) / 86400000)
+                  : 0;
+                const isPast = camp.fightDate ? daysOut < 0 : false;
 
                 return (
                   <div
@@ -281,7 +283,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-white text-sm">
-                            {format(parseISO(camp.fightDate), 'MMM d, yyyy')}
+                            {camp.isOffSeason
+                              ? 'Off Season Training'
+                              : (camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d, yyyy') : '—')}
                           </p>
                           {isActive && (
                             <span className="badge bg-brand-900/60 text-brand-400 text-xs">Active</span>
