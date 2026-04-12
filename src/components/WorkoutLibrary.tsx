@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
+import type { FC } from 'react';
 import { Search, ChevronDown, ChevronUp, Dumbbell, Zap, Target, Shield, Waves } from 'lucide-react';
 import { EXERCISES, CATEGORY_LABELS, type Exercise, type ExerciseCategory } from '../data/workoutLibrary';
 
-const CATEGORIES: { value: ExerciseCategory | 'all'; label: string; Icon?: (props: { size: number }) => JSX.Element }[] = [
+const CATEGORIES: { value: ExerciseCategory | 'all'; label: string; Icon?: FC<{ size: number }> }[] = [
   { value: 'all',            label: 'All' },
   { value: 'conditioning',   label: 'Conditioning',   Icon: Zap      },
   { value: 'strength',       label: 'Strength',       Icon: Dumbbell },
