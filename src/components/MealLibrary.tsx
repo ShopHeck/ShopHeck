@@ -13,13 +13,13 @@ function MacroPill({ label, value, unit, color }: { label: string; value: number
   );
 }
 
-function MacroBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function MacroBar({ label, value, max, color, unit = 'g' }: { label: string; value: number; max: number; color: string; unit?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs mb-0.5">
         <span className="text-gray-400">{label}</span>
-        <span className="text-white font-semibold">{Math.round(value)}g</span>
+        <span className="text-white font-semibold">{Math.round(value)}{unit}</span>
       </div>
       <div className="h-1.5 bg-dark-600 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
@@ -242,6 +242,9 @@ function MacroGenerator() {
 
   const [result,  setResult]  = useState<GeneratedMeal | null>(null);
   const [saved,   setSaved]   = useState(false);
+  const [mealTime, setMealTime] = useState('Lunch');
+
+  const MEAL_TIMES = ['Breakfast', 'Pre-Workout', 'Lunch', 'Post-Workout', 'Dinner', 'Snack'];
 
   function handleGenerate() {
     const targets: Macros = {
@@ -264,7 +267,7 @@ function MacroGenerator() {
         date: today,
         waterOz: 0,
         mealRatings: {},
-        notes: '',
+        notes: `Generated for ${mealTime}`,
         macros: {
           calories: Math.round(result.totalMacros.calories),
           protein:  Math.round(result.totalMacros.protein),
@@ -322,6 +325,23 @@ function MacroGenerator() {
             <button onClick={handleGenerate} className="text-xs text-brand-400 font-semibold">Regenerate</button>
           </div>
 
+          {/* Meal timing selector */}
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+            {MEAL_TIMES.map(t => (
+              <button
+                key={t}
+                onClick={() => setMealTime(t)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
+                  mealTime === t
+                    ? 'bg-brand-600 border-brand-500 text-white'
+                    : 'bg-dark-600 border-dark-400 text-gray-400 hover:border-dark-300'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
           <div>
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Ingredients</p>
             <div className="space-y-1.5">
@@ -337,6 +357,7 @@ function MacroGenerator() {
           {t && (
             <div className="space-y-2 pt-1 border-t border-dark-600">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Estimated Macros</p>
+              <MacroBar label="Calories" value={t.calories} max={Number(calories) || 2000} color="bg-orange-500" unit="kcal" />
               <MacroBar label="Protein"  value={t.protein}  max={Number(protein)  || 200} color="bg-green-500" />
               <MacroBar label="Carbs"    value={t.carbs}    max={Number(carbs)    || 300} color="bg-blue-500"  />
               <MacroBar label="Fat"      value={t.fat}      max={Number(fat)      || 100} color="bg-purple-500" />
@@ -396,8 +417,8 @@ export default function MealLibrary() {
               onClick={() => setTab(value)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
                 tab === value
-                  ? 'bg-dark-500 text-white shadow'
-                  : 'text-gray-500 hover:text-gray-300'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-gray-400 hover:text-white'
               }`}
             >
               <Icon size={14} />

@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Dumbbell, Zap, Target, Shield, Waves } from 'lucide-react';
 import { EXERCISES, CATEGORY_LABELS, type Exercise, type ExerciseCategory } from '../data/workoutLibrary';
 
-const CATEGORIES: { value: ExerciseCategory | 'all'; label: string }[] = [
-  { value: 'all',           label: 'All' },
-  { value: 'conditioning',  label: 'Conditioning' },
-  { value: 'strength',      label: 'Strength' },
-  { value: 'skill',         label: 'Skill' },
-  { value: 'sparring-drill',label: 'Sparring Drills' },
-  { value: 'flexibility',   label: 'Flexibility' },
+const CATEGORIES: { value: ExerciseCategory | 'all'; label: string; Icon?: (props: { size: number }) => JSX.Element }[] = [
+  { value: 'all',            label: 'All' },
+  { value: 'conditioning',   label: 'Conditioning',   Icon: Zap      },
+  { value: 'strength',       label: 'Strength',       Icon: Dumbbell },
+  { value: 'skill',          label: 'Skill',          Icon: Target   },
+  { value: 'sparring-drill', label: 'Sparring Drills', Icon: Shield  },
+  { value: 'flexibility',    label: 'Flexibility',    Icon: Waves    },
 ];
 
 const DIFFICULTY_COLORS: Record<Exercise['difficulty'], string> = {
@@ -96,19 +96,22 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
 
 export default function WorkoutLibrary() {
   const [category, setCategory] = useState<ExerciseCategory | 'all'>('all');
+  const [difficulty, setDifficulty] = useState<Exercise['difficulty'] | 'all'>('all');
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return EXERCISES.filter(ex => {
       const matchesCat = category === 'all' || ex.category === category;
+      const matchesDiff = difficulty === 'all' || ex.difficulty === difficulty;
       const matchesSearch = !q
         || ex.name.toLowerCase().includes(q)
         || ex.muscleGroups.some(m => m.toLowerCase().includes(q))
-        || ex.sports.some(s => s.toLowerCase().includes(q));
-      return matchesCat && matchesSearch;
+        || ex.sports.some(s => s.toLowerCase().includes(q))
+        || ex.instructions.toLowerCase().includes(q);
+      return matchesCat && matchesDiff && matchesSearch;
     });
-  }, [category, search]);
+  }, [category, difficulty, search]);
 
   return (
     <div className="pb-4">
@@ -131,13 +134,34 @@ export default function WorkoutLibrary() {
           <button
             key={c.value}
             onClick={() => setCategory(c.value)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               category === c.value
                 ? 'bg-brand-600 border-brand-500 text-white'
                 : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
             }`}
           >
+            {c.Icon && <c.Icon size={11} />}
             {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Difficulty filter chips */}
+      <div className="mx-4 mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+        {(['all', 'Beginner', 'Intermediate', 'Advanced'] as const).map(d => (
+          <button
+            key={d}
+            onClick={() => setDifficulty(d)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              difficulty === d
+                ? d === 'Beginner'     ? 'bg-green-700  border-green-600  text-white'
+                : d === 'Intermediate' ? 'bg-yellow-700 border-yellow-600 text-white'
+                : d === 'Advanced'     ? 'bg-red-700    border-red-600    text-white'
+                :                       'bg-brand-600  border-brand-500  text-white'
+                : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
+            }`}
+          >
+            {d === 'all' ? 'All Levels' : d}
           </button>
         ))}
       </div>
@@ -156,7 +180,7 @@ export default function WorkoutLibrary() {
             </div>
             <p className="text-sm text-gray-400">No exercises match your search.</p>
             <button
-              onClick={() => { setSearch(''); setCategory('all'); }}
+              onClick={() => { setSearch(''); setCategory('all'); setDifficulty('all'); }}
               className="text-xs text-brand-400 font-semibold"
             >
               Clear filters

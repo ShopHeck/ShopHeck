@@ -99,6 +99,10 @@ export function deleteSparringLog(state: AppState, id: string): AppState {
   return { ...state, sparringLogs: state.sparringLogs.filter(l => l.id !== id) };
 }
 
+export function deleteConditioningTest(state: AppState, id: string): AppState {
+  return { ...state, conditioningTests: state.conditioningTests.filter(t => t.id !== id) };
+}
+
 export function deleteWeightEntry(state: AppState, id: string): AppState {
   return { ...state, weightEntries: state.weightEntries.filter(e => e.id !== id) };
 }

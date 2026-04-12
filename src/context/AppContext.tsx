@@ -12,6 +12,7 @@ import {
   addWeightEntry,
   deleteWorkoutLog,
   deleteSparringLog,
+  deleteConditioningTest,
   deleteWeightEntry,
   updateProfile,
   deleteCamp,
@@ -43,6 +44,7 @@ type Action =
   | { type: 'LOG_WEIGHT'; payload: Omit<WeightEntry, 'id' | 'createdAt'> }
   | { type: 'DELETE_WORKOUT'; payload: string }
   | { type: 'DELETE_SPARRING'; payload: string }
+  | { type: 'DELETE_CONDITIONING'; payload: string }
   | { type: 'DELETE_WEIGHT'; payload: string }
   | { type: 'TOGGLE_SESSION'; payload: string }
   | { type: 'TOGGLE_DAY_OVERRIDE'; payload: string }
@@ -117,6 +119,9 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'DELETE_SPARRING':
       return deleteSparringLog(state, action.payload);
+
+    case 'DELETE_CONDITIONING':
+      return deleteConditioningTest(state, action.payload);
 
     case 'DELETE_WEIGHT':
       return deleteWeightEntry(state, action.payload);
