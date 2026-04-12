@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Droplets, Plus, Minus, Trash2, UtensilsCrossed, Flame, Settings2 } from 'lucide-react';
+import { Droplets, Minus, Trash2, UtensilsCrossed, Flame, Settings2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO, subDays, differenceInDays } from 'date-fns';
 import type { NutritionLog, MacroEntry } from '../types';
+import Modal from './shared/Modal';
 
 type MealRating = 'good' | 'ok' | 'poor';
 type Meal = 'breakfast' | 'lunch' | 'dinner';
@@ -238,25 +239,25 @@ export default function NutritionTracker() {
             ))}
           </div>
 
-          {/* +/- custom */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">Adjust oz</span>
-            <div className="flex items-center gap-2">
+          {/* Quick-add presets */}
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-xs text-gray-500 flex-shrink-0">Quick add:</span>
+            {[16, 32].map(oz => (
               <button
-                onClick={() => addWater(-8)}
-                disabled={waterOz < 8}
-                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all"
+                key={oz}
+                onClick={() => addWater(oz)}
+                className="flex-1 py-1.5 rounded-lg bg-dark-600 border border-dark-400 text-xs text-gray-300 hover:border-brand-600 hover:text-white transition-all font-semibold"
               >
-                <Minus size={14} />
+                +{oz}oz
               </button>
-              <span className="text-sm text-gray-400 w-16 text-center">8 oz / glass</span>
-              <button
-                onClick={() => addWater(8)}
-                className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white transition-all"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
+            ))}
+            <button
+              onClick={() => addWater(-8)}
+              disabled={waterOz < 8}
+              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all flex-shrink-0"
+            >
+              <Minus size={14} />
+            </button>
           </div>
         </div>
       </section>
@@ -305,78 +306,21 @@ export default function NutritionTracker() {
           </button>
         </div>
 
-        {showTargetEditor ? (
-          <div className="card space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Daily Targets</p>
-              <button onClick={autoSuggestTargets} className="text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-                Auto-suggest from camp
-              </button>
-            </div>
-            {([
-              { key: 'calories', label: 'Calories (kcal)' },
-              { key: 'protein',  label: 'Protein (g)' },
-              { key: 'carbs',    label: 'Carbs (g)' },
-              { key: 'fat',      label: 'Fat (g)' },
-            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
-              <div key={key}>
-                <label className="label">{label}</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  value={targetInput[key] || ''}
-                  onChange={e => setTargetInput(t => ({ ...t, [key]: Number(e.target.value) }))}
-                />
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <button onClick={saveTargets} className="btn-primary flex-1 py-2 text-sm">Save Targets</button>
-              <button onClick={() => setShowTargetEditor(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            </div>
-          </div>
-        ) : showMacroEntry ? (
-          <div className="card space-y-3">
-            <p className="text-sm font-semibold text-white">Today's Intake</p>
-            {([
-              { key: 'calories', label: 'Calories (kcal)' },
-              { key: 'protein',  label: 'Protein (g)' },
-              { key: 'carbs',    label: 'Carbs (g)' },
-              { key: 'fat',      label: 'Fat (g)' },
-            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
-              <div key={key}>
-                <label className="label">{label}</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  value={macroInput[key] || ''}
-                  onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
-                />
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <button onClick={saveMacros} className="btn-primary flex-1 py-2 text-sm">Save</button>
-              <button onClick={() => setShowMacroEntry(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <div className="card space-y-3">
-            {currentUser?.macroTargets ? (
-              <>
-                <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color="#f97316" />
-                <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color="#22c55e" />
-                <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color="#3b82f6" />
-                <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color="#a855f7" />
-              </>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-2">Set targets to track your macros</p>
-            )}
-            <button onClick={openMacroEntry} className="w-full text-sm text-brand-400 hover:text-brand-300 font-semibold py-1 transition-colors">
-              {todayLog?.macros ? 'Edit today\'s intake' : '+ Log today\'s macros'}
-            </button>
-          </div>
-        )}
+        <div className="card space-y-3">
+          {currentUser?.macroTargets ? (
+            <>
+              <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color="#f97316" />
+              <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color="#22c55e" />
+              <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color="#3b82f6" />
+              <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color="#a855f7" />
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-2">Set targets to track your macros</p>
+          )}
+          <button onClick={openMacroEntry} className="w-full text-sm text-brand-400 hover:text-brand-300 font-semibold py-1 transition-colors">
+            {todayLog?.macros ? 'Edit today\'s intake' : '+ Log today\'s macros'}
+          </button>
+        </div>
       </section>
 
       {/* Notes */}
@@ -433,8 +377,14 @@ export default function NutritionTracker() {
                     {isToday ? 'Today' : format(parseISO(date), 'EEE M/d')}
                   </span>
                   {log ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-blue-400 text-xs font-semibold">{log.waterOz}oz</span>
+                      {log.macros && (
+                        <>
+                          <span className="text-orange-400 text-xs font-semibold">{log.macros.calories}kcal</span>
+                          <span className="text-green-400 text-xs font-semibold">{log.macros.protein}g P</span>
+                        </>
+                      )}
                       {score && (
                         <span className={`badge text-xs ${
                           score === 'good' ? 'bg-green-900/40 text-green-400' :
@@ -462,6 +412,77 @@ export default function NutritionTracker() {
           })}
         </div>
       </section>
+
+      {/* Macro Entry Modal */}
+      {showMacroEntry && (
+        <Modal
+          title="Today's Intake"
+          onClose={() => setShowMacroEntry(false)}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={saveMacros} className="btn-primary flex-1 py-2 text-sm">Save</button>
+              <button onClick={() => setShowMacroEntry(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {([
+              { key: 'calories', label: 'Calories (kcal)' },
+              { key: 'protein',  label: 'Protein (g)' },
+              { key: 'carbs',    label: 'Carbs (g)' },
+              { key: 'fat',      label: 'Fat (g)' },
+            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+              <div key={key}>
+                <label className="label">{label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={macroInput[key] || ''}
+                  onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* Target Editor Modal */}
+      {showTargetEditor && (
+        <Modal
+          title="Daily Macro Targets"
+          onClose={() => setShowTargetEditor(false)}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={saveTargets} className="btn-primary flex-1 py-2 text-sm">Save Targets</button>
+              <button onClick={() => setShowTargetEditor(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <button onClick={autoSuggestTargets} className="w-full text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors text-left">
+              Auto-suggest from camp data →
+            </button>
+            {([
+              { key: 'calories', label: 'Calories (kcal)' },
+              { key: 'protein',  label: 'Protein (g)' },
+              { key: 'carbs',    label: 'Carbs (g)' },
+              { key: 'fat',      label: 'Fat (g)' },
+            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+              <div key={key}>
+                <label className="label">{label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={targetInput[key] || ''}
+                  onChange={e => setTargetInput(t => ({ ...t, [key]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle } from 'lucide-react';
+import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle, Activity } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -17,9 +17,9 @@ const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
 ];
 
 const TAB_CONFIG = [
-  { id: 'workout', label: 'Workouts' },
-  { id: 'sparring', label: 'Sparring' },
-  { id: 'conditioning', label: 'Tests' },
+  { id: 'workout',      label: 'Workouts', Icon: Dumbbell  },
+  { id: 'sparring',     label: 'Sparring', Icon: Zap       },
+  { id: 'conditioning', label: 'Tests',    Icon: Activity  },
 ];
 
 interface Props {
@@ -34,6 +34,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteSparConfirmId, setDeleteSparConfirmId] = useState<string | null>(null);
+  const [deleteCondConfirmId, setDeleteCondConfirmId] = useState<string | null>(null);
   const [showSparModal, setShowSparModal] = useState(false);
   const [showCondModal, setShowCondModal] = useState(false);
   const [shareLog, setShareLog] = useState<WorkoutLog | null>(null);
@@ -92,6 +93,12 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const campWorkouts = workoutLogs.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const campSparring = sparringLogs.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const campCond = conditioningTests.filter(l => l.campId === camp.id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const tabCounts: Record<string, number> = {
+    workout: campWorkouts.length,
+    sparring: campSparring.length,
+    conditioning: campCond.length,
+  };
 
   const currentWeekNum = getCurrentWeekNumber(camp);
 
@@ -172,11 +179,12 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
             <button
               key={t.id}
               onClick={() => setTab(t.id as typeof tab)}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
                 tab === t.id ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
-              {t.label}
+              <t.Icon size={13} />
+              {t.label}{tabCounts[t.id] > 0 ? ` · ${tabCounts[t.id]}` : ''}
             </button>
           ))}
         </div>
@@ -198,8 +206,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
             campWorkouts.map(log => (
               <div key={log.id} className="card">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Dumbbell size={16} className="text-brand-500" />
+                  <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0 text-xl">
+                    {SESSION_TYPES.find(s => s.value === log.sessionType)?.emoji ?? '🏋️'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -277,15 +285,21 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           ) : (
             campCond.map(test => (
               <div key={test.id} className="card">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-sm">{test.testType}</p>
                     <p className="text-xs text-gray-500">{format(parseISO(test.date), 'MMM d')} · Week {test.weekNumber}</p>
                     {test.notes && <p className="text-xs text-gray-600 mt-1 italic">{test.notes}</p>}
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-brand-400">{test.value}</p>
-                    <p className="text-xs text-gray-500">{test.unit}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-brand-400">{test.value}</p>
+                      <p className="text-xs text-gray-500">{test.unit}</p>
+                    </div>
+                    <button onClick={() => setDeleteCondConfirmId(test.id)}
+                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -319,22 +333,14 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Workout Title *</label>
               <input className="input" placeholder="e.g. Morning Pad Work" value={wTitle} onChange={e => setWTitle(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Duration (min)</label>
-                <input className="input" type="number" min="5" max="300" value={wDuration} onChange={e => setWDuration(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">RPE (1–10)</label>
-                <input className="input" type="number" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)} />
-              </div>
+            <div>
+              <label className="label">Duration (min)</label>
+              <input className="input" type="number" min="5" max="300" value={wDuration} onChange={e => setWDuration(e.target.value)} />
             </div>
             <div>
-              <div className="flex justify-between mb-1">
-                <label className="label mb-0">Effort: {wRpe}/10</label>
-              </div>
+              <label className="label mb-0">Effort: {wRpe}/10</label>
               <input type="range" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)}
-                className="w-full accent-brand-500" />
+                className="w-full accent-brand-500 mt-2" />
             </div>
             <div>
               <label className="label">Notes</label>
@@ -476,6 +482,29 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <button onClick={() => setDeleteSparConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
               <button
                 onClick={() => { dispatch({ type: 'DELETE_SPARRING', payload: deleteSparConfirmId }); setDeleteSparConfirmId(null); }}
+                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Conditioning Test Confirm */}
+      {deleteCondConfirmId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteCondConfirmId(null)} />
+          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
+            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={22} className="text-red-400" />
+            </div>
+            <h3 className="text-base font-bold text-white text-center mb-2">Delete Test Result?</h3>
+            <p className="text-sm text-gray-400 text-center mb-6">This conditioning test result will be permanently deleted.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteCondConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+              <button
+                onClick={() => { dispatch({ type: 'DELETE_CONDITIONING', payload: deleteCondConfirmId }); setDeleteCondConfirmId(null); }}
                 className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
               >
                 Delete
