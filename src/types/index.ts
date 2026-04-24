@@ -140,7 +140,89 @@ export interface FighterProfile {
   macroTargets?: MacroEntry;
   maxHR?: number;   // override for 220-age estimate
   mepTarget?: number; // daily MyZone Effort Points target
+  /** Learned weights applied to the NEXT camp's generator + readiness scoring. */
+  factorWeights?: CampFactorWeights;
 }
+
+// ─── Post-Fight Results & Breakdown ──────────────────────────────────────
+
+export type FightOutcome = 'win' | 'loss' | 'draw' | 'no-contest';
+
+export type FightMethod =
+  | 'KO'
+  | 'TKO'
+  | 'Submission'
+  | 'Unanimous Decision'
+  | 'Split Decision'
+  | 'Majority Decision'
+  | 'DQ'
+  | 'Technical Decision';
+
+export type DamageLevel = 'none' | 'light' | 'moderate' | 'heavy';
+
+export interface FightRound {
+  roundNumber: number;
+  /** Self-assessed performance in this round (1 = bad, 5 = dominant) */
+  selfScore: 1 | 2 | 3 | 4 | 5;
+  /** Pressure felt from opponent (1 = none, 5 = overwhelming) */
+  opponentPressure: 1 | 2 | 3 | 4 | 5;
+  /** Cardio felt in the round (1 = gassed, 5 = felt strong) */
+  cardio: 1 | 2 | 3 | 4 | 5;
+  damageDealt: DamageLevel;
+  damageTaken: DamageLevel;
+  workedWell: string;
+  didntWork: string;
+  cornerAdjustment?: string;
+}
+
+export interface FightResult {
+  id: string;
+  campId: string;
+  fighterId: string;
+  fightDate: string;
+  opponent: string;
+  outcome: FightOutcome;
+  method: FightMethod;
+  /** 1-indexed. Undefined means went the distance. */
+  roundStopped?: number;
+  totalRounds: number;
+  rounds: FightRound[];
+  weighInWeight?: number;
+  fightNightWeight?: number;
+  /** 1–5. How closely did the fighter stick to the camp gameplan? */
+  stylePlanFollowed: 1 | 2 | 3 | 4 | 5;
+  overallNotes: string;
+  lessons: string;
+  /** Snapshot of readiness score the day before the fight, so it can't drift. */
+  readinessAtFight?: number;
+  createdAt: string;
+}
+
+/** Per-fighter overrides that feed campGenerator + readiness for the next camp. */
+export interface CampFactorWeights {
+  weightCut: number;       // default 20
+  trainingVolume: number;  // default 25
+  sessionQuality: number;  // default 15
+  sparring: number;        // default 20
+  conditioning: number;    // default 10
+  nutrition: number;       // default 10
+  /** Override to bias peak-phase sparring rounds. */
+  sparringRoundsTarget?: number;
+  conditioningFocus?: 'anaerobic' | 'aerobic' | 'mixed';
+  strengthEmphasis?: 'low' | 'normal' | 'high';
+  updatedAt: string;
+  derivedFromFightId: string;
+}
+
+/** Default weights for the six scored factors. Sum = 100. */
+export const DEFAULT_FACTOR_WEIGHTS = {
+  weightCut: 20,
+  trainingVolume: 25,
+  sessionQuality: 15,
+  sparring: 20,
+  conditioning: 10,
+  nutrition: 10,
+} as const satisfies Record<'weightCut' | 'trainingVolume' | 'sessionQuality' | 'sparring' | 'conditioning' | 'nutrition', number>;
 
 export type CoachNoteCategory = 'technique' | 'conditioning' | 'mental' | 'nutrition' | 'general';
 
@@ -256,4 +338,5 @@ export interface AppState {
   subscription: SubscriptionState;
   hrvEntries: HRVEntry[];
   fitbitConfig?: FitbitConfig;
+  fightResults: FightResult[];
 }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
 import { processStripeReturn, saveSubscription } from '../utils/subscription';
 import {
   loadState,
@@ -27,6 +27,10 @@ import {
   addHRVEntry,
   deleteHRVEntry,
   setFitbitConfig,
+  addFightResult,
+  updateFightResult,
+  deleteFightResult,
+  applyFactorWeights,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 
@@ -58,6 +62,10 @@ type Action =
   | { type: 'LOG_HRV'; payload: Omit<HRVEntry, 'id' | 'createdAt'> }
   | { type: 'DELETE_HRV'; payload: string }
   | { type: 'SET_FITBIT_CONFIG'; payload: FitbitConfig | null }
+  | { type: 'LOG_FIGHT_RESULT'; payload: FightResult }
+  | { type: 'UPDATE_FIGHT_RESULT'; payload: FightResult }
+  | { type: 'DELETE_FIGHT_RESULT'; payload: string }
+  | { type: 'APPLY_FACTOR_WEIGHTS'; payload: { fighterId: string; weights: CampFactorWeights } }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -81,14 +89,14 @@ function reducer(state: AppState, action: Action): AppState {
 
     case 'CREATE_CAMP': {
       const camp = createCamp(action.payload);
-      const schedule = generateTrainingCamp(camp);
+      const schedule = generateTrainingCamp(camp, state.currentUser?.factorWeights);
       return setSchedule({ ...state, camps: [...state.camps, camp], activeCamp: camp }, schedule);
     }
 
     case 'UPDATE_CAMP': {
       const camps = state.camps.map(c => c.id === action.payload.id ? action.payload : c);
       const activeCamp = state.activeCamp?.id === action.payload.id ? action.payload : state.activeCamp;
-      const schedule = activeCamp ? generateTrainingCamp(activeCamp) : state.trainingSchedule;
+      const schedule = activeCamp ? generateTrainingCamp(activeCamp, state.currentUser?.factorWeights) : state.trainingSchedule;
       return setSchedule({ ...state, camps, activeCamp }, schedule);
     }
 
@@ -98,7 +106,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_ACTIVE_CAMP': {
       const camp = state.camps.find(c => c.id === action.payload) || null;
       if (!camp) return state;
-      const schedule = generateTrainingCamp(camp);
+      const schedule = generateTrainingCamp(camp, state.currentUser?.factorWeights);
       return setSchedule({ ...state, activeCamp: camp }, schedule);
     }
 
@@ -170,6 +178,18 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_FITBIT_CONFIG':
       return setFitbitConfig(state, action.payload);
 
+    case 'LOG_FIGHT_RESULT':
+      return addFightResult(state, action.payload);
+
+    case 'UPDATE_FIGHT_RESULT':
+      return updateFightResult(state, action.payload);
+
+    case 'DELETE_FIGHT_RESULT':
+      return deleteFightResult(state, action.payload);
+
+    case 'APPLY_FACTOR_WEIGHTS':
+      return applyFactorWeights(state, action.payload.fighterId, action.payload.weights);
+
     case 'RESET':
       return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [], coaches: [] };
 
@@ -191,7 +211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // dates (from before generator fixes) are never used.
     const loaded = loadState();
     if (loaded.activeCamp) {
-      return setSchedule(loaded, generateTrainingCamp(loaded.activeCamp));
+      return setSchedule(loaded, generateTrainingCamp(loaded.activeCamp, loaded.currentUser?.factorWeights));
     }
     return loaded;
   });

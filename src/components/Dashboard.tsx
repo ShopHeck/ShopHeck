@@ -1,4 +1,4 @@
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
@@ -20,11 +20,12 @@ import type { LogPrefill } from '../App';
 
 interface Props {
   onNavigate: (view: string, prefill?: LogPrefill) => void;
+  onShowFightBreakdown: (fightId: string) => void;
 }
 
-export default function Dashboard({ onNavigate }: Props) {
+export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const { state } = useApp();
-  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions } = state;
+  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults } = state;
 
   if (!activeCamp) return null;
 
@@ -63,6 +64,14 @@ export default function Dashboard({ onNavigate }: Props) {
   ).length;
 
   const readiness = computeReadiness(state);
+
+  // Post-fight CTA: fight date has passed and no FightResult exists for this camp.
+  const campFightResult = fightResults.find(r => r.campId === activeCamp.id);
+  const showPostFightCta = !!activeCamp.fightDate
+    && parseISO(activeCamp.fightDate) < new Date()
+    && !campFightResult;
+  const hasLoggedFight = !!campFightResult;
+
   const latestCoachNote = coachNotes
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
@@ -107,6 +116,46 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Post-fight CTA — shows after fight date until a result is logged. */}
+      {showPostFightCta && (
+        <div className="mx-4">
+          <button
+            onClick={() => onNavigate('fight-log')}
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-purple-900/40 to-dark-700 border border-purple-800 rounded-2xl p-4 text-left hover:border-purple-600 transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-purple-900/50 flex items-center justify-center flex-shrink-0">
+              <Trophy size={22} className="text-purple-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold">Log your fight result</p>
+              <p className="text-xs text-gray-400 mt-0.5">Round-by-round breakdown · tunes your next camp</p>
+            </div>
+            <ChevronRight size={18} className="text-purple-300 flex-shrink-0" />
+          </button>
+        </div>
+      )}
+
+      {/* View-breakdown shortcut once a result has been logged. */}
+      {hasLoggedFight && campFightResult && (
+        <div className="mx-4">
+          <button
+            onClick={() => onShowFightBreakdown(campFightResult.id)}
+            className="w-full flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-2xl p-4 text-left hover:border-brand-700 transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-brand-900/40 flex items-center justify-center flex-shrink-0">
+              <History size={20} className="text-brand-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold">View Fight Breakdown</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {campFightResult.outcome.toUpperCase()} · {campFightResult.method}
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />
+          </button>
+        </div>
+      )}
 
       {/* Readiness Card */}
       {readiness && (

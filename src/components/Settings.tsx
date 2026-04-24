@@ -556,6 +556,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Integrations</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          {/* Camp History */}
+          <button
+            onClick={() => onNavigate?.('camp-history')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-brand-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Trophy size={15} className="text-brand-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Camp History & Fight Breakdowns</p>
+              <p className="text-xs text-gray-600">Compare camps · tune next camp</p>
+            </div>
+            <ChevronRight size={15} className="text-gray-600" />
+          </button>
+
           {/* AI Insights */}
           <button
             onClick={() => onNavigate?.('aiinsights')}

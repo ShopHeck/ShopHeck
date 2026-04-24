@@ -31,8 +31,11 @@ const FightReadiness   = lazy(() => import('./components/FightReadiness'));
 const FitnessTrackerHub = lazy(() => import('./components/FitnessTrackerHub'));
 const WorkoutLibrary   = lazy(() => import('./components/WorkoutLibrary'));
 const MealLibrary      = lazy(() => import('./components/MealLibrary'));
+const FightResultForm  = lazy(() => import('./components/FightResultForm'));
+const FightBreakdown   = lazy(() => import('./components/FightBreakdown'));
+const CampComparison   = lazy(() => import('./components/CampComparison'));
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -57,6 +60,9 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   trackers:         { title: 'Fitness Trackers',    subtitle: 'HR · HRV · Recovery' },
   'workout-library': { title: 'Workout Library',   subtitle: 'Exercises & Drills' },
   'meal-library':   { title: 'Meal Library',        subtitle: 'Plans & Generator' },
+  'fight-log':      { title: 'Log Fight Result',    subtitle: 'Post-Fight Breakdown' },
+  'fight-breakdown': { title: 'Fight Breakdown',    subtitle: 'KPIs & Analysis' },
+  'camp-history':   { title: 'Camp History',        subtitle: 'Compare Past Camps' },
 };
 
 function FlashOverlay() {
@@ -73,6 +79,10 @@ function AppShell() {
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewOffSeason, setShowNewOffSeason] = useState(false);
   const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
+  /** Fight being viewed in the breakdown screen. */
+  const [activeFightId, setActiveFightId] = useState<string | null>(null);
+  /** When editing an existing fight result, pass the id into the form. */
+  const [editingFightId, setEditingFightId] = useState<string | null>(null);
 
   // Native iOS setup — runs once on mount inside the Capacitor WebView
   useEffect(() => {
@@ -122,10 +132,13 @@ function AppShell() {
           <div key={view} className="view-enter">
 
             {view === 'dashboard' && !isCoach && camp && !camp.isOffSeason && (
-              <Dashboard onNavigate={(v, prefill?) => {
-                if (v === 'log' && prefill) navigateToLog(prefill);
-                else setView(v as View);
-              }} />
+              <Dashboard
+                onNavigate={(v, prefill?) => {
+                  if (v === 'log' && prefill) navigateToLog(prefill);
+                  else setView(v as View);
+                }}
+                onShowFightBreakdown={(id) => { setActiveFightId(id); setView('fight-breakdown'); }}
+              />
             )}
             {view === 'dashboard' && !isCoach && camp && camp.isOffSeason && (
               <OffSeasonDashboard onNavigate={(v, prefill?) => {
@@ -186,6 +199,30 @@ function AppShell() {
             {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
             {view === 'workout-library' && <WorkoutLibrary />}
             {view === 'meal-library'    && <MealLibrary />}
+            {view === 'camp-history'    && (
+              <CampComparison
+                onOpenFight={(id) => { setActiveFightId(id); setView('fight-breakdown'); }}
+              />
+            )}
+            {view === 'fight-log' && camp && (
+              <FightResultForm
+                camp={camp}
+                existingId={editingFightId ?? undefined}
+                onDone={(id) => {
+                  setEditingFightId(null);
+                  setActiveFightId(id);
+                  setView('fight-breakdown');
+                }}
+                onCancel={() => { setEditingFightId(null); setView('dashboard'); }}
+              />
+            )}
+            {view === 'fight-breakdown' && activeFightId && (
+              <FightBreakdown
+                fightId={activeFightId}
+                onBack={() => setView('camp-history')}
+                onEdit={(id) => { setEditingFightId(id); setView('fight-log'); }}
+              />
+            )}
             {view === 'fighters'        && <CoachDashboard />}
             {view === 'settings'        && (
               <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
