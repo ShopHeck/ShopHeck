@@ -1,5 +1,6 @@
 import { differenceInDays, parseISO, subDays } from 'date-fns';
-import type { AppState } from '../types';
+import type { AppState, CampFactorWeights } from '../types';
+import { DEFAULT_FACTOR_WEIGHTS } from '../types';
 
 export interface ReadinessBreakdownItem {
   label: string;
@@ -26,9 +27,19 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     weightEntries,
     conditioningTests,
     nutritionLogs,
+    currentUser,
   } = state;
 
   if (!activeCamp) return null;
+
+  const w: Pick<CampFactorWeights, 'weightCut' | 'trainingVolume' | 'sessionQuality' | 'sparring' | 'conditioning' | 'nutrition'> = {
+    weightCut: currentUser?.factorWeights?.weightCut ?? DEFAULT_FACTOR_WEIGHTS.weightCut,
+    trainingVolume: currentUser?.factorWeights?.trainingVolume ?? DEFAULT_FACTOR_WEIGHTS.trainingVolume,
+    sessionQuality: currentUser?.factorWeights?.sessionQuality ?? DEFAULT_FACTOR_WEIGHTS.sessionQuality,
+    sparring: currentUser?.factorWeights?.sparring ?? DEFAULT_FACTOR_WEIGHTS.sparring,
+    conditioning: currentUser?.factorWeights?.conditioning ?? DEFAULT_FACTOR_WEIGHTS.conditioning,
+    nutrition: currentUser?.factorWeights?.nutrition ?? DEFAULT_FACTOR_WEIGHTS.nutrition,
+  };
 
   const now = new Date();
   const fightDate = parseISO(activeCamp.fightDate ?? '');
@@ -51,57 +62,61 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const recent7 = subDays(now, 7);
   const recentWorkouts = campWorkouts.filter(w => parseISO(w.date) >= recent14);
 
-  // ── 1. Weight Cut (20 pts) ───────────────────────────────────────────────
+  // Each section computes a 0..1 ratio, then scales to its per-fighter max.
+  const scale = (ratio: number, max: number) => Math.round(ratio * max);
+
+  // ── 1. Weight Cut (max = w.weightCut) ────────────────────────────────────
   const latestWeight = campWeights[campWeights.length - 1];
   const currentW = latestWeight ? latestWeight.weight : activeCamp.currentWeight;
   const targetW = activeCamp.targetWeight;
   const lbsToGo = Math.max(0, currentW - targetW);
 
-  let weightScore: number;
+  let weightRatio: number;
   let weightDetail: string;
   if (!latestWeight) {
-    weightScore = 10;
+    weightRatio = 0.5;
     weightDetail = 'No weigh-ins logged yet';
   } else if (lbsToGo <= 0) {
-    weightScore = 20;
+    weightRatio = 1;
     weightDetail = 'At or below fight weight ✓';
   } else {
     const pace = lbsToGo / daysUntilFight;
-    if (pace <= 0.3)      { weightScore = 18; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — comfortable pace`; }
-    else if (pace <= 0.5) { weightScore = 14; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — manageable`; }
-    else if (pace <= 0.8) { weightScore = 9;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — tight timeline`; }
-    else if (pace <= 1.2) { weightScore = 4;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — very difficult`; }
-    else                  { weightScore = 1;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — critical`; }
+    if (pace <= 0.3)      { weightRatio = 0.9;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — comfortable pace`; }
+    else if (pace <= 0.5) { weightRatio = 0.7;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — manageable`; }
+    else if (pace <= 0.8) { weightRatio = 0.45; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — tight timeline`; }
+    else if (pace <= 1.2) { weightRatio = 0.2;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — very difficult`; }
+    else                  { weightRatio = 0.05; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — critical`; }
   }
+  const weightScore = scale(weightRatio, w.weightCut);
 
-  // ── 2. Training Volume (25 pts) ─────────────────────────────────────────
-  // Expected sessions based on average 4.5/week and how far into camp we are
+  // ── 2. Training Volume (max = w.trainingVolume) ──────────────────────────
   const expectedSessions = Math.max(1, Math.round(campProgress * activeCamp.campWeeks * 4.5));
   const totalLogged = campWorkouts.length;
   const volumeRatio = Math.min(1, totalLogged / expectedSessions);
-  const volumeScore = Math.round(volumeRatio * 25);
+  const volumeScore = scale(volumeRatio, w.trainingVolume);
   const gap = Math.max(0, expectedSessions - totalLogged);
   const volumeDetail = gap > 0
     ? `${totalLogged} logged · ${gap} behind pace`
     : `${totalLogged} sessions logged · on pace`;
 
-  // ── 3. Session Quality / RPE (15 pts) ───────────────────────────────────
-  const recentRPEs = recentWorkouts.map(w => w.rpe).filter(r => r > 0);
-  let qualityScore: number;
+  // ── 3. Session Quality / RPE (max = w.sessionQuality) ────────────────────
+  const recentRPEs = recentWorkouts.map(wl => wl.rpe).filter(r => r > 0);
+  let qualityRatio: number;
   let qualityDetail: string;
   if (recentRPEs.length === 0) {
-    qualityScore = 8;
+    qualityRatio = 0.5;
     qualityDetail = 'Log sessions with RPE to score this';
   } else {
     const avg = recentRPEs.reduce((a, b) => a + b, 0) / recentRPEs.length;
-    if (avg >= 7 && avg <= 8.5)   { qualityScore = 15; qualityDetail = `Avg RPE ${avg.toFixed(1)} — ideal intensity`; }
-    else if (avg >= 6 && avg < 7) { qualityScore = 11; qualityDetail = `Avg RPE ${avg.toFixed(1)} — could push harder`; }
-    else if (avg > 8.5 && avg <= 9.5) { qualityScore = 10; qualityDetail = `Avg RPE ${avg.toFixed(1)} — monitor recovery`; }
-    else if (avg < 6)             { qualityScore = 5;  qualityDetail = `Avg RPE ${avg.toFixed(1)} — intensity too low`; }
-    else                          { qualityScore = 7;  qualityDetail = `Avg RPE ${avg.toFixed(1)} — overtraining risk`; }
+    if (avg >= 7 && avg <= 8.5)       { qualityRatio = 1;    qualityDetail = `Avg RPE ${avg.toFixed(1)} — ideal intensity`; }
+    else if (avg >= 6 && avg < 7)     { qualityRatio = 0.75; qualityDetail = `Avg RPE ${avg.toFixed(1)} — could push harder`; }
+    else if (avg > 8.5 && avg <= 9.5) { qualityRatio = 0.65; qualityDetail = `Avg RPE ${avg.toFixed(1)} — monitor recovery`; }
+    else if (avg < 6)                  { qualityRatio = 0.33; qualityDetail = `Avg RPE ${avg.toFixed(1)} — intensity too low`; }
+    else                               { qualityRatio = 0.45; qualityDetail = `Avg RPE ${avg.toFixed(1)} — overtraining risk`; }
   }
+  const qualityScore = scale(qualityRatio, w.sessionQuality);
 
-  // ── 4. Sparring (20 pts) ────────────────────────────────────────────────
+  // ── 4. Sparring (max = w.sparring) ───────────────────────────────────────
   const sortedSpar = [...campSparring].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
@@ -111,44 +126,46 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     : 999;
   const totalSparRounds = campSparring.reduce((sum, s) => sum + s.rounds, 0);
 
-  let sparScore: number;
+  let sparRatio: number;
   let sparDetail: string;
   if (campSparring.length === 0) {
-    sparScore = 0;
+    sparRatio = 0;
     sparDetail = 'No sparring logged yet';
   } else {
-    const base = Math.min(15, campSparring.length * 3);
-    const recency = daysSinceSpar <= 7 ? 5 : daysSinceSpar <= 14 ? 2 : daysSinceSpar > 21 ? -3 : 0;
-    sparScore = Math.max(0, Math.min(20, base + recency));
+    const baseRatio = Math.min(0.75, campSparring.length * 0.15);
+    const recencyBonus = daysSinceSpar <= 7 ? 0.25 : daysSinceSpar <= 14 ? 0.1 : daysSinceSpar > 21 ? -0.15 : 0;
+    sparRatio = Math.max(0, Math.min(1, baseRatio + recencyBonus));
     sparDetail = `${campSparring.length} session${campSparring.length > 1 ? 's' : ''} · ${totalSparRounds} rounds · last ${daysSinceSpar}d ago`;
   }
+  const sparScore = scale(sparRatio, w.sparring);
 
-  // ── 5. Conditioning (10 pts) ────────────────────────────────────────────
-  let condScore: number;
+  // ── 5. Conditioning (max = w.conditioning) ───────────────────────────────
+  let condRatio: number;
   let condDetail: string;
   if (campTests.length === 0) {
-    condScore = 5;
+    condRatio = 0.5;
     condDetail = 'Log a test to benchmark fitness';
   } else if (campTests.length === 1) {
-    condScore = 7;
+    condRatio = 0.7;
     condDetail = `${campTests[0].testType}: ${campTests[0].value} ${campTests[0].unit}`;
   } else {
     const first = campTests[0].value;
     const last = campTests[campTests.length - 1].value;
     const pct = ((last - first) / Math.abs(Math.max(1, first))) * 100;
-    if (pct > 2)        { condScore = 10; condDetail = `${campTests[0].testType} improving ↑`; }
-    else if (pct >= -2) { condScore = 7;  condDetail = `${campTests[0].testType} stable`; }
-    else                { condScore = 4;  condDetail = `${campTests[0].testType} declining ↓`; }
+    if (pct > 2)        { condRatio = 1;   condDetail = `${campTests[0].testType} improving ↑`; }
+    else if (pct >= -2) { condRatio = 0.7; condDetail = `${campTests[0].testType} stable`; }
+    else                { condRatio = 0.4; condDetail = `${campTests[0].testType} declining ↓`; }
   }
+  const condScore = scale(condRatio, w.conditioning);
 
-  // ── 6. Nutrition & Recovery (10 pts) ────────────────────────────────────
+  // ── 6. Nutrition & Recovery (max = w.nutrition) ──────────────────────────
   const recentNutrition = nutritionLogs.filter(
     n => n.campId === activeCamp.id && parseISO(n.date) >= recent7
   );
-  let nutritionScore: number;
+  let nutritionRatio: number;
   let nutritionDetail: string;
   if (recentNutrition.length === 0) {
-    nutritionScore = 5;
+    nutritionRatio = 0.5;
     nutritionDetail = 'Log nutrition to score this';
   } else {
     let mealPts = 0, mealTotal = 0, goodHydration = 0;
@@ -159,12 +176,13 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
       }
       if ((log.waterOz ?? 0) >= 80) goodHydration++;
     }
-    const mealScore = mealTotal > 0 ? (mealPts / mealTotal) * 5 : 2.5;
-    const waterScore = (goodHydration / recentNutrition.length) * 5;
-    nutritionScore = Math.min(10, Math.round(mealScore + waterScore));
-    const hydPct = Math.round((goodHydration / recentNutrition.length) * 100);
+    const mealRatio = mealTotal > 0 ? mealPts / mealTotal : 0.5;
+    const waterRatio = goodHydration / recentNutrition.length;
+    nutritionRatio = (mealRatio + waterRatio) / 2;
+    const hydPct = Math.round(waterRatio * 100);
     nutritionDetail = `${hydPct}% hydration days · ${recentNutrition.length}d tracked`;
   }
+  const nutritionScore = scale(nutritionRatio, w.nutrition);
 
   // ── Overall ─────────────────────────────────────────────────────────────
   const overall = Math.min(
@@ -173,12 +191,12 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   );
 
   const breakdown: ReadinessBreakdownItem[] = [
-    { label: 'Weight Cut',      score: weightScore,    max: 20, detail: weightDetail,    icon: 'scale' },
-    { label: 'Training Volume', score: volumeScore,    max: 25, detail: volumeDetail,    icon: 'activity' },
-    { label: 'Session Quality', score: qualityScore,   max: 15, detail: qualityDetail,   icon: 'flame' },
-    { label: 'Sparring',        score: sparScore,      max: 20, detail: sparDetail,       icon: 'zap' },
-    { label: 'Conditioning',    score: condScore,      max: 10, detail: condDetail,       icon: 'timer' },
-    { label: 'Nutrition',       score: nutritionScore, max: 10, detail: nutritionDetail,  icon: 'droplets' },
+    { label: 'Weight Cut',      score: weightScore,    max: w.weightCut,       detail: weightDetail,    icon: 'scale' },
+    { label: 'Training Volume', score: volumeScore,    max: w.trainingVolume,  detail: volumeDetail,    icon: 'activity' },
+    { label: 'Session Quality', score: qualityScore,   max: w.sessionQuality,  detail: qualityDetail,   icon: 'flame' },
+    { label: 'Sparring',        score: sparScore,      max: w.sparring,        detail: sparDetail,       icon: 'zap' },
+    { label: 'Conditioning',    score: condScore,      max: w.conditioning,    detail: condDetail,       icon: 'timer' },
+    { label: 'Nutrition',       score: nutritionScore, max: w.nutrition,       detail: nutritionDetail,  icon: 'droplets' },
   ];
 
   // ── Insights (flag weakest areas) ───────────────────────────────────────

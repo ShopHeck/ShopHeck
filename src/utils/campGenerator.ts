@@ -1,5 +1,5 @@
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
-import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession, OffSeasonGoal } from '../types';
+import type { FightCamp, TrainingWeek, TrainingDay, TrainingSession, OffSeasonGoal, CampFactorWeights } from '../types';
 
 type Phase = 'Base Building' | 'Strength & Conditioning' | 'Fight Specific' | 'Peak' | 'Taper';
 
@@ -457,12 +457,45 @@ export function getCurrentOffSeasonCycle(camp: FightCamp): number {
   return Math.ceil(weekNum / 4);
 }
 
-export function generateTrainingCamp(camp: FightCamp): TrainingWeek[] {
+function applyFactorWeightsToPhases(phases: PhaseConfig[], weights: CampFactorWeights): PhaseConfig[] {
+  if (!weights.sparringRoundsTarget && !weights.conditioningFocus && !weights.strengthEmphasis) return phases;
+
+  // Proportionally scale peak-phase sparring rounds toward the fighter's target.
+  const peakRounds = phases.filter(p => p.phase === 'Peak').map(p => p.sparringRounds);
+  const peakMax = peakRounds.length ? Math.max(...peakRounds) : 0;
+  const targetPeak = weights.sparringRoundsTarget ? Math.round(weights.sparringRoundsTarget / 4) : peakMax;
+  const scale = peakMax > 0 && targetPeak > 0 ? targetPeak / peakMax : 1;
+
+  return phases.map(p => {
+    let sparringRounds = p.sparringRounds;
+    let conditioningLoad = p.conditioningLoad;
+
+    if (weights.sparringRoundsTarget && sparringRounds > 0) {
+      sparringRounds = Math.max(p.sparringRounds, Math.round(p.sparringRounds * scale));
+    }
+
+    if (weights.conditioningFocus === 'aerobic' && p.phase !== 'Taper') {
+      // Aerobic emphasis: raise Base Building & early S&C load.
+      if (p.phase === 'Base Building' || p.phase === 'Strength & Conditioning') {
+        conditioningLoad = Math.min(5, conditioningLoad + 1);
+      }
+    } else if (weights.conditioningFocus === 'anaerobic') {
+      if (p.phase === 'Fight Specific' || p.phase === 'Peak') {
+        conditioningLoad = Math.min(5, conditioningLoad + 1);
+      }
+    }
+
+    return { ...p, sparringRounds, conditioningLoad };
+  });
+}
+
+export function generateTrainingCamp(camp: FightCamp, weights?: CampFactorWeights): TrainingWeek[] {
   if (camp.isOffSeason) return generateOffSeasonSchedule(camp);
 
   const { campWeeks, startDate, experienceLevel, sport } = camp;
   const isAdvanced = experienceLevel === 'Professional' || experienceLevel === 'Semi-Pro';
-  const phaseConfigs = getPhaseConfigs(campWeeks, experienceLevel);
+  let phaseConfigs = getPhaseConfigs(campWeeks, experienceLevel);
+  if (weights) phaseConfigs = applyFactorWeightsToPhases(phaseConfigs, weights);
   const weeks: TrainingWeek[] = [];
 
   for (let i = 0; i < campWeeks; i++) {

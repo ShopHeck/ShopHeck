@@ -1,4 +1,4 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 
 const STORAGE_KEY = 'fightcamp_app';
@@ -21,6 +21,7 @@ export const defaultState: AppState = {
   coachNotes: [],
   subscription: DEFAULT_SUBSCRIPTION,
   hrvEntries: [],
+  fightResults: [],
 };
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
@@ -185,6 +186,38 @@ export function deleteHRVEntry(state: AppState, id: string): AppState {
 
 export function setFitbitConfig(state: AppState, config: FitbitConfig | null): AppState {
   return { ...state, fitbitConfig: config ?? undefined };
+}
+
+// ─── Fight Results ────────────────────────────────────────────────────────
+
+export function buildFightResult(input: Omit<FightResult, 'id' | 'createdAt'>): FightResult {
+  return { ...input, id: generateId(), createdAt: new Date().toISOString() };
+}
+
+export function addFightResult(state: AppState, result: FightResult): AppState {
+  return { ...state, fightResults: [result, ...(state.fightResults ?? [])] };
+}
+
+export function updateFightResult(state: AppState, result: FightResult): AppState {
+  return {
+    ...state,
+    fightResults: (state.fightResults ?? []).map(r => r.id === result.id ? result : r),
+  };
+}
+
+export function deleteFightResult(state: AppState, id: string): AppState {
+  return { ...state, fightResults: (state.fightResults ?? []).filter(r => r.id !== id) };
+}
+
+export function applyFactorWeights(state: AppState, fighterId: string, weights: CampFactorWeights): AppState {
+  const updateFn = (p: FighterProfile): FighterProfile =>
+    p.id === fighterId ? { ...p, factorWeights: weights } : p;
+  return {
+    ...state,
+    fighters: state.fighters.map(updateFn),
+    coaches: state.coaches.map(updateFn),
+    currentUser: state.currentUser?.id === fighterId ? updateFn(state.currentUser) : state.currentUser,
+  };
 }
 
 // ─── Custom Timer Presets ─────────────────────────────────────────────────
