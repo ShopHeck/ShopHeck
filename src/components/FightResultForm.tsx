@@ -318,24 +318,22 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
         </div>
       )}
 
-      {/* Nav buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-dark-800 border-t border-dark-500 p-4 safe-area-bottom z-40">
-        <div className="max-w-lg mx-auto flex gap-2">
-          {step > 0 && (
-            <button onClick={() => setStep(step - 1)} className="btn-secondary flex items-center gap-1 px-4">
-              <ChevronLeft size={16} /> Back
-            </button>
-          )}
-          {step < 3 ? (
-            <button onClick={() => setStep(step + 1)} className="btn-primary flex-1 flex items-center justify-center gap-1">
-              Next <ChevronRight size={16} />
-            </button>
-          ) : (
-            <button onClick={submit} className="btn-primary flex-1 flex items-center justify-center gap-1">
-              <Check size={16} /> Save Fight Result
-            </button>
-          )}
-        </div>
+      {/* Nav buttons — inline so the app's BottomNav doesn't cover them. */}
+      <div className="mx-4 mt-6 flex gap-2">
+        {step > 0 && (
+          <button onClick={() => setStep(step - 1)} className="btn-secondary flex items-center gap-1 px-4">
+            <ChevronLeft size={16} /> Back
+          </button>
+        )}
+        {step < 3 ? (
+          <button onClick={() => setStep(step + 1)} className="btn-primary flex-1 flex items-center justify-center gap-1">
+            Next <ChevronRight size={16} />
+          </button>
+        ) : (
+          <button onClick={submit} className="btn-primary flex-1 flex items-center justify-center gap-1">
+            <Check size={16} /> Save Fight Result
+          </button>
+        )}
       </div>
     </div>
   );
