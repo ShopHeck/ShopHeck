@@ -37,15 +37,14 @@ export function isCoachPro(s: SubscriptionState): boolean {
 
 /**
  * Checks the user's active entitlements via RevenueCat (native iOS only).
- * Returns true/false when RevenueCat responds, null when it errors (network
- * unavailable, SDK not yet configured, etc.) so callers can skip state changes
- * rather than accidentally downgrading an offline user.
+ * Returns { isPro, tier } when RevenueCat responds, null when it errors
+ * (network unavailable, SDK not yet configured) so callers leave state
+ * unchanged rather than accidentally downgrading an offline user.
  */
-export async function checkNativeSubscription(): Promise<boolean | null> {
+export async function checkNativeSubscription(): Promise<{ isPro: boolean; tier: string } | null> {
   if (!Capacitor.isNativePlatform()) return null;
   try {
-    const { isPro } = await RevenueCat.getCustomerInfo();
-    return isPro;
+    return await RevenueCat.getCustomerInfo();
   } catch {
     return null;
   }

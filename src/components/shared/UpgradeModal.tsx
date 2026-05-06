@@ -46,24 +46,32 @@ const PRICES = {
   coach:   { monthly: '$19.99', annual: '$149.99', annualMonthly: '$12.50', saving: '37%' },
 };
 
-const PRO_SUBSCRIPTION = { tier: 'fighter_pro' as const, expiresAt: null, source: 'revenuecat' as const };
-
 export default function UpgradeModal({ onClose }: Props) {
   const { dispatch } = useApp();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
+  function applyRevenueCatResult(isPro: boolean, tier: string) {
+    if (!isPro) return false;
+    dispatch({
+      type: 'SET_SUBSCRIPTION',
+      payload: {
+        tier: (tier === 'coach_pro' ? 'coach_pro' : 'fighter_pro') as import('../../types').SubscriptionTier,
+        expiresAt: null,
+        source: 'revenuecat',
+      },
+    });
+    return true;
+  }
+
   async function handleSubscribe(tier: 'fighter' | 'coach') {
     if (Capacitor.isNativePlatform()) {
       setLoading(true);
       try {
         await RevenueCat.presentPaywall();
-        const { isPro } = await RevenueCat.getCustomerInfo();
-        if (isPro) {
-          dispatch({ type: 'SET_SUBSCRIPTION', payload: PRO_SUBSCRIPTION });
-          onClose();
-        }
+        const result = await RevenueCat.getCustomerInfo();
+        if (applyRevenueCatResult(result.isPro, result.tier)) onClose();
       } catch {
         setNotice('Purchase failed. Please try again.');
       } finally {
@@ -83,9 +91,8 @@ export default function UpgradeModal({ onClose }: Props) {
     if (!Capacitor.isNativePlatform()) return;
     setLoading(true);
     try {
-      const { isPro } = await RevenueCat.restorePurchases();
-      if (isPro) {
-        dispatch({ type: 'SET_SUBSCRIPTION', payload: PRO_SUBSCRIPTION });
+      const result = await RevenueCat.restorePurchases();
+      if (applyRevenueCatResult(result.isPro, result.tier)) {
         onClose();
       } else {
         setNotice('No active subscription found to restore.');

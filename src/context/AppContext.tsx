@@ -227,16 +227,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // null = error/offline — leave state unchanged to avoid downgrading offline users.
   useEffect(() => {
     const currentSource = state.subscription.source;
-    checkNativeSubscription().then(isProResult => {
-      if (isProResult === true) {
+    checkNativeSubscription().then(result => {
+      if (result === null) return; // network error — leave state unchanged
+      if (result.isPro) {
         dispatch({
           type: 'SET_SUBSCRIPTION',
-          payload: { tier: 'fighter_pro', expiresAt: null, source: 'revenuecat' },
+          payload: {
+            tier: result.tier === 'coach_pro' ? 'coach_pro' : 'fighter_pro',
+            expiresAt: null,
+            source: 'revenuecat',
+          },
         });
-      } else if (isProResult === false && (currentSource === 'revenuecat' || currentSource === 'none')) {
+      } else if (currentSource === 'revenuecat' || currentSource === 'none') {
         // RevenueCat confirmed no active entitlement. Only reset if the stored
         // subscription was from RevenueCat (not a Stripe web purchase) so we don't
-        // accidentally revoke web subscribers opening the app.
+        // accidentally revoke web subscribers opening the app on iOS.
         dispatch({
           type: 'SET_SUBSCRIPTION',
           payload: { tier: 'free', expiresAt: null, source: 'none' },

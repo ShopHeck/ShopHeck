@@ -14,9 +14,16 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restorePurchases",       returnType: CAPPluginReturnPromise),
     ]
 
-    private let entitlementId = "Fight Camp Pro"
+    /// Maps active RevenueCat entitlements to the app's subscription tier string.
+    /// Checks "Coach Pro" first (superset) so coach users don't get downgraded to fighter_pro.
+    /// Add a "Coach Pro" entitlement in the RevenueCat dashboard to enable coach-tier purchases.
+    private func tierFromEntitlements(_ entitlements: EntitlementInfos) -> String {
+        if entitlements["Coach Pro"]?.isActive == true { return "coach_pro" }
+        if entitlements["Fight Camp Pro"]?.isActive == true { return "fighter_pro" }
+        return "free"
+    }
 
-    /// Returns whether the signed-in user has an active "Fight Camp Pro" entitlement.
+    /// Returns whether the user has an active entitlement and which tier they hold.
     @objc func getCustomerInfo(_ call: CAPPluginCall) {
         Purchases.shared.getCustomerInfo { [weak self] customerInfo, error in
             guard let self else { return }
@@ -28,8 +35,8 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("No customer info available")
                 return
             }
-            let isPro = info.entitlements[self.entitlementId]?.isActive == true
-            call.resolve(["isPro": isPro])
+            let tier = self.tierFromEntitlements(info.entitlements)
+            call.resolve(["isPro": tier != "free", "tier": tier])
         }
     }
 
@@ -80,8 +87,8 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.localizedDescription)
                 return
             }
-            let isPro = customerInfo?.entitlements[self.entitlementId]?.isActive == true
-            call.resolve(["isPro": isPro])
+            let tier = self.tierFromEntitlements(customerInfo?.entitlements ?? [:] as EntitlementInfos)
+            call.resolve(["isPro": tier != "free", "tier": tier])
         }
     }
 }
