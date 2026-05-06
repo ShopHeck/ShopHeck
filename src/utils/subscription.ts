@@ -37,15 +37,17 @@ export function isCoachPro(s: SubscriptionState): boolean {
 
 /**
  * Checks the user's active entitlements via RevenueCat (native iOS only).
- * Falls back to false on web — web uses the Stripe localStorage path.
+ * Returns true/false when RevenueCat responds, null when it errors (network
+ * unavailable, SDK not yet configured, etc.) so callers can skip state changes
+ * rather than accidentally downgrading an offline user.
  */
-export async function checkNativeSubscription(): Promise<boolean> {
-  if (!Capacitor.isNativePlatform()) return false;
+export async function checkNativeSubscription(): Promise<boolean | null> {
+  if (!Capacitor.isNativePlatform()) return null;
   try {
     const { isPro } = await RevenueCat.getCustomerInfo();
     return isPro;
   } catch {
-    return false;
+    return null;
   }
 }
 

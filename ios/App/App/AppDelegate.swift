@@ -9,7 +9,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // RevenueCat — must be configured before any purchase calls
+        // RevenueCat — must be configured before any purchase calls.
+        // TODO: Replace with your production Apple public SDK key (starts with "appl_")
+        // from app.revenuecat.com → Project Settings → API Keys before App Store submission.
+        // The current key is the one provided during development; verify it matches your
+        // live iOS app key in the RevenueCat dashboard.
+        #warning("Verify this is your production RevenueCat Apple SDK key before App Store submission")
         Purchases.configure(withAPIKey: "test_mBilIsHfjVigPCEOYsqCIXnASUg")
 
         // Configure the audio session so that timer bells and coaching voice duck

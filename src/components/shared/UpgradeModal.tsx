@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Check, Zap, Trophy } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../../plugins/RevenueCat';
+import { useApp } from '../../context/AppContext';
 
 interface Props {
   onClose: () => void;
@@ -45,7 +46,10 @@ const PRICES = {
   coach:   { monthly: '$19.99', annual: '$149.99', annualMonthly: '$12.50', saving: '37%' },
 };
 
+const PRO_SUBSCRIPTION = { tier: 'fighter_pro' as const, expiresAt: null, source: 'revenuecat' as const };
+
 export default function UpgradeModal({ onClose }: Props) {
+  const { dispatch } = useApp();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,7 +60,10 @@ export default function UpgradeModal({ onClose }: Props) {
       try {
         await RevenueCat.presentPaywall();
         const { isPro } = await RevenueCat.getCustomerInfo();
-        if (isPro) onClose();
+        if (isPro) {
+          dispatch({ type: 'SET_SUBSCRIPTION', payload: PRO_SUBSCRIPTION });
+          onClose();
+        }
       } catch {
         setNotice('Purchase failed. Please try again.');
       } finally {
@@ -78,6 +85,7 @@ export default function UpgradeModal({ onClose }: Props) {
     try {
       const { isPro } = await RevenueCat.restorePurchases();
       if (isPro) {
+        dispatch({ type: 'SET_SUBSCRIPTION', payload: PRO_SUBSCRIPTION });
         onClose();
       } else {
         setNotice('No active subscription found to restore.');

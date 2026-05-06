@@ -223,13 +223,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // On native iOS: sync subscription status from RevenueCat on every launch
+  // On native iOS: sync subscription status from RevenueCat on every launch.
+  // null = error/offline — leave state unchanged to avoid downgrading offline users.
   useEffect(() => {
-    checkNativeSubscription().then(isPro => {
-      if (isPro) {
+    const currentSource = state.subscription.source;
+    checkNativeSubscription().then(isProResult => {
+      if (isProResult === true) {
         dispatch({
           type: 'SET_SUBSCRIPTION',
           payload: { tier: 'fighter_pro', expiresAt: null, source: 'revenuecat' },
+        });
+      } else if (isProResult === false && (currentSource === 'revenuecat' || currentSource === 'none')) {
+        // RevenueCat confirmed no active entitlement. Only reset if the stored
+        // subscription was from RevenueCat (not a Stripe web purchase) so we don't
+        // accidentally revoke web subscribers opening the app.
+        dispatch({
+          type: 'SET_SUBSCRIPTION',
+          payload: { tier: 'free', expiresAt: null, source: 'none' },
         });
       }
     });
