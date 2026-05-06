@@ -1,7 +1,7 @@
 {
   "name": "shopheck",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,8 @@
     "@capacitor/keyboard": "^6.0.4",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
+    "@sentry/capacitor": "^4.0.0",
+    "@sentry/react": "^10.43.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",

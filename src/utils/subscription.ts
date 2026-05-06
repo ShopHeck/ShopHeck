@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { RevenueCat } from '../plugins/RevenueCat';
 import type { SubscriptionState, SubscriptionTier } from '../types';
 
 const SUB_KEY = 'fightcamp_subscription';
@@ -31,6 +33,20 @@ export function isPro(s: SubscriptionState): boolean {
 
 export function isCoachPro(s: SubscriptionState): boolean {
   return s.tier === 'coach_pro' && isPro(s);
+}
+
+/**
+ * Checks the user's active entitlements via RevenueCat (native iOS only).
+ * Falls back to false on web — web uses the Stripe localStorage path.
+ */
+export async function checkNativeSubscription(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    const { isPro } = await RevenueCat.getCustomerInfo();
+    return isPro;
+  } catch {
+    return false;
+  }
 }
 
 /**

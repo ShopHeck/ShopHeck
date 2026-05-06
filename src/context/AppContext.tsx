@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
-import { processStripeReturn, saveSubscription } from '../utils/subscription';
+import { processStripeReturn, saveSubscription, checkNativeSubscription } from '../utils/subscription';
 import {
   loadState,
   saveState,
@@ -216,10 +216,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return loaded;
   });
 
-  // Process Stripe Payment Link return on mount
+  // Process Stripe Payment Link return on web mount
   useEffect(() => {
     const sub = processStripeReturn();
     if (sub) dispatch({ type: 'SET_SUBSCRIPTION', payload: sub });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On native iOS: sync subscription status from RevenueCat on every launch
+  useEffect(() => {
+    checkNativeSubscription().then(isPro => {
+      if (isPro) {
+        dispatch({
+          type: 'SET_SUBSCRIPTION',
+          payload: { tier: 'fighter_pro', expiresAt: null, source: 'revenuecat' },
+        });
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

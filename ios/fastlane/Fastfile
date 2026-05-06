@@ -1,0 +1,56 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Sync code signing certificates via Match"
+  lane :certificates do
+    match(
+      type: "appstore",
+      app_identifier: "app.fightcamptraining",
+      readonly: is_ci
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    certificates
+
+    increment_build_number(
+      xcodeproj: "App/App.xcodeproj"
+    )
+
+    build_app(
+      scheme: "App",
+      workspace: "App/App.xcworkspace",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "./build",
+      output_name: "FightCampTraining.ipa"
+    )
+
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build and submit to App Store"
+  lane :release do
+    certificates
+
+    increment_build_number(
+      xcodeproj: "App/App.xcodeproj"
+    )
+
+    build_app(
+      scheme: "App",
+      workspace: "App/App.xcworkspace",
+      export_method: "app-store",
+      clean: true
+    )
+
+    upload_to_app_store(
+      submit_for_review: true,
+      automatic_release: false,
+      force: true
+    )
+  end
+end

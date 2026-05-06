@@ -776,6 +776,13 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               <ChevronRight size={20} />
             </button>
 
+            <p className="text-xs text-gray-600 -mt-2">
+              By continuing you agree to our{' '}
+              <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Terms of Service</a>
+              {' '}and{' '}
+              <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Privacy Policy</a>.
+            </p>
+
             {/* Subtle review ask */}
             <div className="pt-2 border-t border-dark-600">
               <div className="flex justify-center gap-1 mb-2">

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { X, Check, Zap, Trophy } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { RevenueCat } from '../../plugins/RevenueCat';
 
 interface Props {
   onClose: () => void;
@@ -46,13 +48,44 @@ const PRICES = {
 export default function UpgradeModal({ onClose }: Props) {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubscribe(tier: 'fighter' | 'coach') {
-    const url = LINKS[tier][billing];
-    if (url) {
-      window.location.href = url;
+  async function handleSubscribe(tier: 'fighter' | 'coach') {
+    if (Capacitor.isNativePlatform()) {
+      setLoading(true);
+      try {
+        await RevenueCat.presentPaywall();
+        const { isPro } = await RevenueCat.getCustomerInfo();
+        if (isPro) onClose();
+      } catch {
+        setNotice('Purchase failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     } else {
-      setNotice('Payment links not yet configured — check back soon!');
+      const url = LINKS[tier][billing];
+      if (url) {
+        window.location.href = url;
+      } else {
+        setNotice('Payment links not yet configured — check back soon!');
+      }
+    }
+  }
+
+  async function handleRestore() {
+    if (!Capacitor.isNativePlatform()) return;
+    setLoading(true);
+    try {
+      const { isPro } = await RevenueCat.restorePurchases();
+      if (isPro) {
+        onClose();
+      } else {
+        setNotice('No active subscription found to restore.');
+      }
+    } catch {
+      setNotice('Restore failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -125,9 +158,10 @@ export default function UpgradeModal({ onClose }: Props) {
               </div>
               <button
                 onClick={() => handleSubscribe('fighter')}
-                className="btn-primary text-sm py-2 px-4"
+                disabled={loading}
+                className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
               >
-                Start Free Trial
+                {loading ? '...' : 'Start Free Trial'}
               </button>
             </div>
           </div>
@@ -164,9 +198,10 @@ export default function UpgradeModal({ onClose }: Props) {
               </div>
               <button
                 onClick={() => handleSubscribe('coach')}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95"
+                disabled={loading}
+                className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
               >
-                Start Free Trial
+                {loading ? '...' : 'Start Free Trial'}
               </button>
             </div>
           </div>
@@ -178,6 +213,16 @@ export default function UpgradeModal({ onClose }: Props) {
           <p className="text-center text-xs text-gray-600">
             Cancel anytime. No commitment required.
           </p>
+
+          {Capacitor.isNativePlatform() && (
+            <button
+              onClick={handleRestore}
+              disabled={loading}
+              className="text-xs text-gray-500 underline block mx-auto disabled:opacity-50"
+            >
+              Restore Purchases
+            </button>
+          )}
         </div>
       </div>
     </div>

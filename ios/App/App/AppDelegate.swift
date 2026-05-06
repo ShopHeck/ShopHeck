@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AVFoundation
+import RevenueCat
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,6 +9,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // RevenueCat — must be configured before any purchase calls
+        Purchases.configure(withAPIKey: "test_mBilIsHfjVigPCEOYsqCIXnASUg")
+
         // Configure the audio session so that timer bells and coaching voice duck
         // (fade) background music rather than interrupting it entirely, and music
         // resumes at full volume once the audio session becomes inactive between sounds.

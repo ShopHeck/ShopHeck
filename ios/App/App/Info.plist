@@ -28,7 +28,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -45,5 +45,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Fight Camp Training uses Bluetooth to connect to heart rate monitors during training sessions.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Fight Camp Training uses Bluetooth to connect to heart rate monitors during training sessions.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Fight Camp Training reads your health data to track training performance and recovery.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Fight Camp Training saves workout data to Apple Health.</string>
 </dict>
 </plist>
