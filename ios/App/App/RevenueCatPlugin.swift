@@ -14,9 +14,11 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restorePurchases",       returnType: CAPPluginReturnPromise),
     ]
 
+    /// Retains the dismiss coordinator for the lifetime of the presented sheet.
+    private static var coordinatorKey = 0
+
     /// Maps active RevenueCat entitlements to the app's subscription tier string.
     /// Checks "Coach Pro" first (superset) so coach users don't get downgraded to fighter_pro.
-    /// Add a "Coach Pro" entitlement in the RevenueCat dashboard to enable coach-tier purchases.
     private func tierFromEntitlements(_ entitlements: EntitlementInfos) -> String {
         if entitlements["Coach Pro"]?.isActive == true { return "coach_pro" }
         if entitlements["Fight Camp Pro"]?.isActive == true { return "fighter_pro" }
@@ -41,7 +43,8 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// Presents the RevenueCat native paywall as a sheet over the Capacitor WebView.
-    /// After the sheet is dismissed the caller should re-check getCustomerInfo.
+    /// The JS promise resolves with { isPro, tier } only after the sheet is dismissed
+    /// (whether via purchase, restore, or cancel) so callers get accurate post-purchase state.
     @objc func presentPaywall(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
             guard let self, let rootVC = self.bridge?.viewController else {
@@ -49,16 +52,50 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
+            // Guard against resolving twice: once for interactive swipe-down via the
+            // presentation controller delegate, and once for button-driven dismiss.
+            var didResolve = false
+            let plugin = self
+
+            func resolveAfterDismiss() {
+                guard !didResolve else { return }
+                didResolve = true
+                Purchases.shared.getCustomerInfo { customerInfo, error in
+                    if let error {
+                        call.reject(error.localizedDescription)
+                        return
+                    }
+                    let tier = plugin.tierFromEntitlements(
+                        customerInfo?.entitlements ?? [:] as EntitlementInfos
+                    )
+                    call.resolve(["isPro": tier != "free", "tier": tier])
+                }
+            }
+
             let paywallVC = UIHostingController(rootView: PaywallView(dismissRequestedHandler: {
-                rootVC.dismiss(animated: true)
+                // User tapped the paywall's own close/done button.
+                rootVC.dismiss(animated: true) {
+                    resolveAfterDismiss()
+                }
             }))
             paywallVC.modalPresentationStyle = .pageSheet
             if let sheet = paywallVC.sheetPresentationController {
                 sheet.detents = [.large()]
                 sheet.prefersGrabberVisible = true
             }
+
+            // Present first so presentationController is non-nil, then wire the delegate
+            // to catch interactive swipe-down dismissal.
             rootVC.present(paywallVC, animated: true) {
-                call.resolve()
+                let coordinator = DismissCoordinator(onDismiss: resolveAfterDismiss)
+                paywallVC.presentationController?.delegate = coordinator
+                // Retain coordinator until the sheet is deallocated.
+                objc_setAssociatedObject(
+                    paywallVC,
+                    &RevenueCatPlugin.coordinatorKey,
+                    coordinator,
+                    .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+                )
             }
         }
     }
@@ -90,5 +127,15 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
             let tier = self.tierFromEntitlements(customerInfo?.entitlements ?? [:] as EntitlementInfos)
             call.resolve(["isPro": tier != "free", "tier": tier])
         }
+    }
+}
+
+/// Catches interactive swipe-down sheet dismissal and forwards it to the resolve closure.
+private final class DismissCoordinator: NSObject, UIAdaptivePresentationControllerDelegate {
+    private let onDismiss: () -> Void
+    init(onDismiss: @escaping () -> Void) { self.onDismiss = onDismiss }
+
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        onDismiss()
     }
 }
