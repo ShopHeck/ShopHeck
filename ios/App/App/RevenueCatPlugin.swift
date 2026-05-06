@@ -65,9 +65,11 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                         call.reject(error.localizedDescription)
                         return
                     }
-                    let tier = plugin.tierFromEntitlements(
-                        customerInfo?.entitlements ?? [:] as EntitlementInfos
-                    )
+                    guard let info = customerInfo else {
+                        call.resolve(["isPro": false, "tier": "free"])
+                        return
+                    }
+                    let tier = plugin.tierFromEntitlements(info.entitlements)
                     call.resolve(["isPro": tier != "free", "tier": tier])
                 }
             }
@@ -124,7 +126,11 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.localizedDescription)
                 return
             }
-            let tier = self.tierFromEntitlements(customerInfo?.entitlements ?? [:] as EntitlementInfos)
+            guard let info = customerInfo else {
+                call.resolve(["isPro": false, "tier": "free"])
+                return
+            }
+            let tier = self.tierFromEntitlements(info.entitlements)
             call.resolve(["isPro": tier != "free", "tier": tier])
         }
     }
