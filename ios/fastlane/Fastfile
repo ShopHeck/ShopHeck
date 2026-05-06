@@ -18,13 +18,17 @@ platform :ios do
       xcodeproj: "App/App.xcodeproj"
     )
 
+    rc_key = ENV["REVENUECAT_API_KEY"] || ""
+    UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
+
     build_app(
       scheme: "App",
       workspace: "App/App.xcworkspace",
       export_method: "app-store",
       clean: true,
       output_directory: "./build",
-      output_name: "FightCampTraining.ipa"
+      output_name: "FightCampTraining.ipa",
+      xcargs: "REVENUECAT_API_KEY='#{rc_key}'"
     )
 
     upload_to_testflight(
@@ -40,11 +44,15 @@ platform :ios do
       xcodeproj: "App/App.xcodeproj"
     )
 
+    rc_key = ENV["REVENUECAT_API_KEY"] || ""
+    UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
+
     build_app(
       scheme: "App",
       workspace: "App/App.xcworkspace",
       export_method: "app-store",
-      clean: true
+      clean: true,
+      xcargs: "REVENUECAT_API_KEY='#{rc_key}'"
     )
 
     upload_to_app_store(

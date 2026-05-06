@@ -53,5 +53,7 @@
 	<string>Fight Camp Training reads your health data to track training performance and recovery.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Fight Camp Training saves workout data to Apple Health.</string>
+	<key>RevenueCatAPIKey</key>
+	<string>$(REVENUECAT_API_KEY)</string>
 </dict>
 </plist>
