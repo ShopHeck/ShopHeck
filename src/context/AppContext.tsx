@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
-import { processStripeReturn, saveSubscription } from '../utils/subscription';
+import { processStripeReturn, saveSubscription, checkNativeSubscription } from '../utils/subscription';
 import {
   loadState,
   saveState,
@@ -216,10 +216,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return loaded;
   });
 
-  // Process Stripe Payment Link return on mount
+  // Process Stripe Payment Link return on web mount
   useEffect(() => {
     const sub = processStripeReturn();
     if (sub) dispatch({ type: 'SET_SUBSCRIPTION', payload: sub });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On native iOS: sync subscription status from RevenueCat on every launch.
+  // null = error/offline — leave state unchanged to avoid downgrading offline users.
+  useEffect(() => {
+    const currentSource = state.subscription.source;
+    checkNativeSubscription().then(result => {
+      if (result === null) return; // network error — leave state unchanged
+      if (result.isPro) {
+        dispatch({
+          type: 'SET_SUBSCRIPTION',
+          payload: {
+            tier: result.tier === 'coach_pro' ? 'coach_pro' : 'fighter_pro',
+            expiresAt: null,
+            source: 'revenuecat',
+          },
+        });
+      } else if (currentSource === 'revenuecat' || currentSource === 'none') {
+        // RevenueCat confirmed no active entitlement. Only reset if the stored
+        // subscription was from RevenueCat (not a Stripe web purchase) so we don't
+        // accidentally revoke web subscribers opening the app on iOS.
+        dispatch({
+          type: 'SET_SUBSCRIPTION',
+          payload: { tier: 'free', expiresAt: null, source: 'none' },
+        });
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

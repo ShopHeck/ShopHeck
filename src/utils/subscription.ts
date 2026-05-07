@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { RevenueCat } from '../plugins/RevenueCat';
 import type { SubscriptionState, SubscriptionTier } from '../types';
 
 const SUB_KEY = 'fightcamp_subscription';
@@ -31,6 +33,21 @@ export function isPro(s: SubscriptionState): boolean {
 
 export function isCoachPro(s: SubscriptionState): boolean {
   return s.tier === 'coach_pro' && isPro(s);
+}
+
+/**
+ * Checks the user's active entitlements via RevenueCat (native iOS only).
+ * Returns { isPro, tier } when RevenueCat responds, null when it errors
+ * (network unavailable, SDK not yet configured) so callers leave state
+ * unchanged rather than accidentally downgrading an offline user.
+ */
+export async function checkNativeSubscription(): Promise<{ isPro: boolean; tier: string } | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    return await RevenueCat.getCustomerInfo();
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AVFoundation
+import RevenueCat
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,6 +9,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // RevenueCat key is injected per build configuration via the REVENUECAT_API_KEY
+        // build setting (Debug: test key in project.pbxproj; Release: CI secret via xcargs).
+        // The app crashes immediately at launch if the release build is missing a real key
+        // so a broken key can never reach users silently.
+        guard let revenueCatKey = Bundle.main.infoDictionary?["RevenueCatAPIKey"] as? String,
+              !revenueCatKey.isEmpty else {
+            preconditionFailure("[FightCamp] RevenueCatAPIKey missing from Info.plist — set REVENUECAT_API_KEY in the build settings or CI xcargs")
+        }
+        Purchases.configure(withAPIKey: revenueCatKey)
+
         // Configure the audio session so that timer bells and coaching voice duck
         // (fade) background music rather than interrupting it entirely, and music
         // resumes at full volume once the audio session becomes inactive between sounds.

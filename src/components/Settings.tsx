@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react';
 import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
+import { RevenueCat } from '../plugins/RevenueCat';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
@@ -429,6 +431,14 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                     : 'Active'}
                 </p>
               </div>
+              {Capacitor.isNativePlatform() && (
+                <button
+                  onClick={() => RevenueCat.presentCustomerCenter()}
+                  className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors"
+                >
+                  Manage
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -721,8 +731,27 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* App Version */}
-      <div className="mx-4 text-center">
+      {/* Legal & App Version */}
+      <div className="mx-4 text-center space-y-2">
+        <div className="flex items-center justify-center gap-4">
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
+          >
+            Privacy Policy
+          </a>
+          <span className="text-gray-700">·</span>
+          <a
+            href="/terms.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
+          >
+            Terms of Service
+          </a>
+        </div>
         <p className="text-xs text-gray-700">Fight Camp v1.0 · Built for fighters</p>
       </div>
 
