@@ -14,9 +14,6 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restorePurchases",       returnType: CAPPluginReturnPromise),
     ]
 
-    /// Retains the dismiss coordinator for the lifetime of the presented sheet.
-    private static var coordinatorKey = 0
-
     /// Maps active RevenueCat entitlements to the app's subscription tier string.
     /// Checks "Coach Pro" first (superset) so coach users don't get downgraded to fighter_pro.
     private func tierFromEntitlements(_ entitlements: EntitlementInfos) -> String {
@@ -52,12 +49,15 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // Guard against resolving twice: once for interactive swipe-down via the
-            // presentation controller delegate, and once for button-driven dismiss.
+            // Guard against resolving twice — viewDidDisappear could fire repeatedly
+            // if the view is moved between window scenes during dismissal.
             var didResolve = false
             let plugin = self
 
-            func resolveAfterDismiss() {
+            let paywallVC = DismissAwareHostingController(
+                rootView: PaywallView(displayCloseButton: true)
+            )
+            paywallVC.onDismiss = {
                 guard !didResolve else { return }
                 didResolve = true
                 Purchases.shared.getCustomerInfo { customerInfo, error in
@@ -73,32 +73,13 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.resolve(["isPro": tier != "free", "tier": tier])
                 }
             }
-
-            let paywallVC = UIHostingController(rootView: PaywallView(dismissRequestedHandler: {
-                // User tapped the paywall's own close/done button.
-                rootVC.dismiss(animated: true) {
-                    resolveAfterDismiss()
-                }
-            }))
             paywallVC.modalPresentationStyle = .pageSheet
             if let sheet = paywallVC.sheetPresentationController {
                 sheet.detents = [.large()]
                 sheet.prefersGrabberVisible = true
             }
 
-            // Present first so presentationController is non-nil, then wire the delegate
-            // to catch interactive swipe-down dismissal.
-            rootVC.present(paywallVC, animated: true) {
-                let coordinator = DismissCoordinator(onDismiss: resolveAfterDismiss)
-                paywallVC.presentationController?.delegate = coordinator
-                // Retain coordinator until the sheet is deallocated.
-                objc_setAssociatedObject(
-                    paywallVC,
-                    &RevenueCatPlugin.coordinatorKey,
-                    coordinator,
-                    .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-                )
-            }
+            rootVC.present(paywallVC, animated: true)
         }
     }
 
@@ -136,12 +117,17 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
-/// Catches interactive swipe-down sheet dismissal and forwards it to the resolve closure.
-private final class DismissCoordinator: NSObject, UIAdaptivePresentationControllerDelegate {
-    private let onDismiss: () -> Void
-    init(onDismiss: @escaping () -> Void) { self.onDismiss = onDismiss }
+/// UIHostingController subclass that fires a single callback when the view disappears,
+/// catching both interactive swipe-down and programmatic close-button dismissals.
+private final class DismissAwareHostingController<Content: View>: UIHostingController<Content> {
+    var onDismiss: (() -> Void)?
 
-    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-        onDismiss()
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // isBeingDismissed is true only when the controller itself is being torn
+        // down (not when the view temporarily leaves the hierarchy for other reasons).
+        if isBeingDismissed || self.presentingViewController == nil {
+            onDismiss?()
+        }
     }
 }
