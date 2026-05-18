@@ -37,9 +37,17 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
   if (prefs.progressWidgetCollapsed) {
     return (
       <div className="mx-4">
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={onOpenProgress}
-          className="w-full flex items-center gap-3 bg-dark-700/60 border border-dark-500 rounded-xl px-3 py-2 text-left hover:border-dark-300 transition-colors"
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenProgress();
+            }
+          }}
+          className="w-full flex items-center gap-3 bg-dark-700/60 border border-dark-500 rounded-xl px-3 py-2 text-left hover:border-dark-300 transition-colors cursor-pointer"
         >
           <BeltBadge tier={belt.current} size="sm" />
           <span className="text-xs text-gray-400 truncate flex-1">{BELT_LABELS[belt.current]}</span>
@@ -54,7 +62,7 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
           >
             <ChevronDown size={14} />
           </button>
-        </button>
+        </div>
       </div>
     );
   }

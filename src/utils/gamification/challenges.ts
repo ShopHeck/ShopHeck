@@ -19,8 +19,6 @@ export const CHALLENGE_TEMPLATES: ChallengeTemplate[] = [
   { id: 'high_rpe_3',  title: 'Log 3 sessions at RPE 8+',      metric: 'high_rpe_sessions', target: 3,   xpReward: 80 },
 ];
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 /** Returns the YYYY-MM-DD of the Monday (local) for the week containing d. */
 export function getWeekKey(d: Date): string {
   const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -35,10 +33,14 @@ export function getWeekKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function weekRange(weekKey: string): { start: Date; end: Date } {
-  const start = new Date(weekKey + 'T00:00:00');
-  const end = new Date(start.getTime() + 7 * MS_PER_DAY);
-  return { start, end };
+/** YYYY-MM-DD of the day after weekKey + 6 days (i.e. next week's Monday). */
+function nextWeekKeyFor(weekKey: string): string {
+  const d = new Date(weekKey + 'T00:00:00');
+  d.setDate(d.getDate() + 7);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** Cheap deterministic 32-bit hash from a string. */
@@ -104,10 +106,13 @@ export function recomputeChallengeProgress(
   state: AppState,
   currentWeekKey: string
 ): { challenges: WeeklyChallenge[]; newlyCompleted: WeeklyChallenge[] } {
-  const range = weekRange(currentWeekKey);
-  const inWeek = (iso: string) => {
-    const t = new Date(iso).getTime();
-    return t >= range.start.getTime() && t < range.end.getTime();
+  // String comparison on YYYY-MM-DD keys avoids the UTC/local mismatch from
+  // `new Date('YYYY-MM-DD')` (UTC midnight) vs `new Date('YYYY-MM-DDT00:00:00')`
+  // (local midnight). Log `date` fields are already local YYYY-MM-DD strings.
+  const nextKey = nextWeekKeyFor(currentWeekKey);
+  const inWeek = (d: string) => {
+    const k = d.slice(0, 10);
+    return k >= currentWeekKey && k < nextKey;
   };
 
   const weekWorkouts = state.workoutLogs.filter(l => inWeek(l.date));

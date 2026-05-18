@@ -37,11 +37,13 @@ function computeCurrentPRs(state: AppState): PRComputation[] {
     if (!highestRpe || l.rpe > highestRpe.rpe) highestRpe = l;
   }
 
-  // Weekly buckets
+  // Weekly buckets. Parse log dates as local midnight ('YYYY-MM-DDT00:00:00')
+  // because `new Date('YYYY-MM-DD')` parses as UTC, which mis-buckets days
+  // around midnight for non-UTC users.
   const weekMep = new Map<string, number>();
   const weekCount = new Map<string, number>();
   for (const l of logs) {
-    const wk = getWeekKey(new Date(l.date));
+    const wk = getWeekKey(new Date(l.date.slice(0, 10) + 'T00:00:00'));
     weekMep.set(wk, (weekMep.get(wk) ?? 0) + (l.mep ?? 0));
     weekCount.set(wk, (weekCount.get(wk) ?? 0) + 1);
   }

@@ -26,7 +26,8 @@ function maxWeeklyMep(state: AppState): number {
   const weekTotals = new Map<string, number>();
   for (const log of state.workoutLogs) {
     if (!log.mep) continue;
-    const key = isoWeekKey(new Date(log.date));
+    // Parse as local midnight; `new Date('YYYY-MM-DD')` is UTC and misbuckets.
+    const key = isoWeekKey(new Date(log.date.slice(0, 10) + 'T00:00:00'));
     weekTotals.set(key, (weekTotals.get(key) ?? 0) + log.mep);
   }
   let max = 0;
