@@ -7,6 +7,14 @@ function toDateKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/** Local YYYY-MM-DD — avoids the UTC drift around midnight that toISOString() causes. */
+function toLocalDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function computeStreak(workoutLogs: WorkoutLog[], now: Date = new Date()): StreakState {
   if (workoutLogs.length === 0) {
     return {
@@ -54,15 +62,17 @@ export function computeStreak(workoutLogs: WorkoutLog[], now: Date = new Date())
     };
   }
 
-  // Walk back from today (or yesterday if today not logged) counting consecutive days.
-  const todayKey = toDateKey(now.toISOString());
+  // Walk back from the *last logged day* (not today) so the streak survives the
+  // 48h grace window even when neither today nor yesterday is logged — e.g. a
+  // Saturday-night workout checked Monday morning (~35h later) should still
+  // hold the streak as `atRisk`. Anchoring on the most recent log + the
+  // hoursSinceLast guard is what implements the stated 48h grace policy.
   const loggedSet = new Set(uniqueDays);
+  const lastKey = toDateKey(latest.date);
+  const [ly, lm, ld] = lastKey.split('-').map(Number);
+  const cursor = new Date(ly, lm - 1, ld);
   let current = 0;
-  const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (!loggedSet.has(todayKey)) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  while (loggedSet.has(toDateKey(cursor.toISOString()))) {
+  while (loggedSet.has(toLocalDateKey(cursor))) {
     current++;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -72,7 +82,7 @@ export function computeStreak(workoutLogs: WorkoutLog[], now: Date = new Date())
   return {
     current,
     best: Math.max(best, current),
-    lastWorkoutDate: toDateKey(latest.date),
+    lastWorkoutDate: lastKey,
     lastWorkoutAt: latest.createdAt,
     atRisk,
     expired: false,

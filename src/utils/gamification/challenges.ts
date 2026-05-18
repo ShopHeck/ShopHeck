@@ -27,7 +27,12 @@ export function getWeekKey(d: Date): string {
   // getDay(): 0=Sun..6=Sat. Shift so Monday=0.
   const dayShift = (monday.getDay() + 6) % 7;
   monday.setDate(monday.getDate() - dayShift);
-  return monday.toISOString().slice(0, 10);
+  // Build the key from local parts — toISOString() would shift the date back
+  // by a day for users east of UTC, mis-bucketing logs into the wrong week.
+  const y = monday.getFullYear();
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const day = String(monday.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function weekRange(weekKey: string): { start: Date; end: Date } {
