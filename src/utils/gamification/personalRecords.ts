@@ -75,14 +75,19 @@ export function computePRs(
   records: Partial<Record<PRType, PersonalRecord>>;
   newlyBroken: PersonalRecord[];
 } {
+  // Rebuild records from current logs each run so deleted/edited logs lower
+  // or clear stale PRs. `prev` is consulted only to (a) preserve the original
+  // `achievedAt` when the top value hasn't changed and (b) detect newly-broken
+  // PRs for celebrations.
   const current = computeCurrentPRs(state);
-  const records: Partial<Record<PRType, PersonalRecord>> = { ...prev };
+  const records: Partial<Record<PRType, PersonalRecord>> = {};
   const newlyBroken: PersonalRecord[] = [];
   const nowIso = new Date().toISOString();
 
   for (const c of current) {
-    const existing = records[c.type];
+    const existing = prev[c.type];
     if (!existing) {
+      // First-ever record for this PR type — not a celebration.
       records[c.type] = {
         type: c.type,
         value: c.value,
@@ -90,7 +95,6 @@ export function computePRs(
         previousValue: null,
         sourceLogId: c.sourceLogId,
       };
-      // Not "newly broken" — first-ever record. Surface as celebration only if value is meaningful.
     } else if (c.value > existing.value) {
       const rec: PersonalRecord = {
         type: c.type,
@@ -101,6 +105,18 @@ export function computePRs(
       };
       records[c.type] = rec;
       newlyBroken.push(rec);
+    } else if (c.value === existing.value) {
+      // Top value unchanged — keep the original timestamp / source.
+      records[c.type] = existing;
+    } else {
+      // Value dropped (deletion/edit). Reset with the new top; not a celebration.
+      records[c.type] = {
+        type: c.type,
+        value: c.value,
+        achievedAt: nowIso,
+        previousValue: null,
+        sourceLogId: c.sourceLogId,
+      };
     }
   }
 
