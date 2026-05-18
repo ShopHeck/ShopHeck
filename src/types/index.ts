@@ -314,6 +314,111 @@ export interface CustomTimerPreset {
   createdAt: string;
 }
 
+// ─── Gamification ─────────────────────────────────────────────────────────
+
+export type BeltTier = 'white' | 'blue' | 'purple' | 'brown' | 'black';
+
+export interface BeltProgress {
+  current: BeltTier;
+  workoutCount: number;
+  /** wins + 0.5 * camps completed without a logged win */
+  effectiveWinCredit: number;
+  nextTier: BeltTier | null;
+  /** 0-100 progress toward the next belt (whichever path is closer). */
+  progressPct: number;
+  workoutsToNext: number | null;
+  winsToNext: number | null;
+  /** ISO timestamp the user first crossed each tier. Preserved on downgrade. */
+  achievedAt: Partial<Record<BeltTier, string>>;
+}
+
+export interface StreakState {
+  current: number;
+  best: number;
+  /** YYYY-MM-DD of the most recent workout. */
+  lastWorkoutDate: string | null;
+  /** Full ISO datetime of the most recent workout. Drives the 48h rule. */
+  lastWorkoutAt: string | null;
+  /** True when 24h ≤ hoursSinceLast ≤ 48h — streak is about to expire. */
+  atRisk: boolean;
+  /** True when last workout was more than 48h ago. */
+  expired: boolean;
+}
+
+export interface Achievement {
+  id: string;
+  unlockedAt: string;
+}
+
+export type ChallengeMetric =
+  | 'workouts'
+  | 'sparring_sessions'
+  | 'weekly_mep'
+  | 'workout_minutes'
+  | 'high_rpe_sessions';
+
+export interface WeeklyChallenge {
+  id: string;
+  /** ISO date of the Monday of the week this challenge belongs to. */
+  weekKey: string;
+  templateId: string;
+  title: string;
+  metric: ChallengeMetric;
+  target: number;
+  progress: number;
+  completed: boolean;
+  xpReward: number;
+}
+
+export type PRType =
+  | 'longest_workout'
+  | 'highest_weekly_mep'
+  | 'most_workouts_week'
+  | 'highest_rpe';
+
+export interface PersonalRecord {
+  type: PRType;
+  value: number;
+  achievedAt: string;
+  previousValue: number | null;
+  sourceLogId?: string;
+}
+
+export type CelebrationKind =
+  | 'belt'
+  | 'achievement'
+  | 'pr'
+  | 'streak_milestone'
+  | 'challenge_complete';
+
+export interface CelebrationEvent {
+  id: string;
+  kind: CelebrationKind;
+  /** Display title for the toast. */
+  title: string;
+  /** Subtitle / description. */
+  subtitle: string;
+  /** Lucide icon name. */
+  icon: string;
+  ts: string;
+}
+
+export interface DashboardPrefs {
+  progressWidgetCollapsed: boolean;
+  progressWidgetHidden: boolean;
+}
+
+export interface GamificationState {
+  belt: BeltProgress;
+  streak: StreakState;
+  achievements: Achievement[];
+  challenges: WeeklyChallenge[];
+  personalRecords: Partial<Record<PRType, PersonalRecord>>;
+  totalXp: number;
+  pendingCelebrations: CelebrationEvent[];
+  lastEvaluatedAt: string | null;
+}
+
 // ─── App State ────────────────────────────────────────────────────────────
 
 export interface AppState {
@@ -339,4 +444,6 @@ export interface AppState {
   hrvEntries: HRVEntry[];
   fitbitConfig?: FitbitConfig;
   fightResults: FightResult[];
+  gamification?: GamificationState;
+  dashboardPrefs?: DashboardPrefs;
 }

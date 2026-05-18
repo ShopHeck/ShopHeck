@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription } from '../utils/subscription';
 import {
   loadState,
@@ -31,8 +31,10 @@ import {
   updateFightResult,
   deleteFightResult,
   applyFactorWeights,
+  setDashboardPrefs,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
+import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
@@ -66,9 +68,24 @@ type Action =
   | { type: 'UPDATE_FIGHT_RESULT'; payload: FightResult }
   | { type: 'DELETE_FIGHT_RESULT'; payload: string }
   | { type: 'APPLY_FACTOR_WEIGHTS'; payload: { fighterId: string; weights: CampFactorWeights } }
+  | { type: 'RECOMPUTE_GAMIFICATION' }
+  | { type: 'DISMISS_CELEBRATION'; payload: string }
+  | { type: 'SET_DASHBOARD_PREF'; payload: Partial<DashboardPrefs> }
   | { type: 'RESET' };
 
-function reducer(state: AppState, action: Action): AppState {
+/** Actions whose payloads can shift streaks/belts/achievements/PRs/challenges. */
+const GAMIFICATION_TRIGGERS = new Set([
+  'LOG_WORKOUT',
+  'DELETE_WORKOUT',
+  'LOG_SPARRING',
+  'DELETE_SPARRING',
+  'LOG_FIGHT_RESULT',
+  'UPDATE_FIGHT_RESULT',
+  'DELETE_FIGHT_RESULT',
+  'DELETE_CAMP',
+]);
+
+function baseReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_STATE':
       return action.payload;
@@ -190,12 +207,37 @@ function reducer(state: AppState, action: Action): AppState {
     case 'APPLY_FACTOR_WEIGHTS':
       return applyFactorWeights(state, action.payload.fighterId, action.payload.weights);
 
+    case 'RECOMPUTE_GAMIFICATION':
+      return state; // wrapper below will run the orchestrator
+
+    case 'DISMISS_CELEBRATION':
+      return dismissCelebration(state, action.payload);
+
+    case 'SET_DASHBOARD_PREF':
+      return setDashboardPrefs(state, action.payload);
+
     case 'RESET':
-      return { ...loadState(), currentUser: null, activeCamp: null, camps: [], fighters: [], coaches: [] };
+      return {
+        ...loadState(),
+        currentUser: null,
+        activeCamp: null,
+        camps: [],
+        fighters: [],
+        coaches: [],
+        gamification: defaultGamificationState(),
+      };
 
     default:
       return state;
   }
+}
+
+function reducer(state: AppState, action: Action): AppState {
+  const next = baseReducer(state, action);
+  if (action.type === 'RECOMPUTE_GAMIFICATION' || GAMIFICATION_TRIGGERS.has(action.type)) {
+    return applyGamificationUpdates(next, action.type);
+  }
+  return next;
 }
 
 interface AppContextValue {
@@ -254,6 +296,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  // Refresh gamification on boot (catches week rollover, streak expiry while app was closed)
+  // and re-evaluate hourly so the streak at-risk warning updates while the app stays open.
+  useEffect(() => {
+    dispatch({ type: 'RECOMPUTE_GAMIFICATION' });
+    const id = setInterval(() => dispatch({ type: 'RECOMPUTE_GAMIFICATION' }), 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

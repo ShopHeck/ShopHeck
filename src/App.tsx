@@ -34,8 +34,11 @@ const MealLibrary      = lazy(() => import('./components/MealLibrary'));
 const FightResultForm  = lazy(() => import('./components/FightResultForm'));
 const FightBreakdown   = lazy(() => import('./components/FightBreakdown'));
 const CampComparison   = lazy(() => import('./components/CampComparison'));
+const ProgressScreen   = lazy(() => import('./components/gamification/ProgressScreen'));
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history';
+import CelebrationToast from './components/gamification/CelebrationToast';
+
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -63,6 +66,7 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   'fight-log':      { title: 'Log Fight Result',    subtitle: 'Post-Fight Breakdown' },
   'fight-breakdown': { title: 'Fight Breakdown',    subtitle: 'KPIs & Analysis' },
   'camp-history':   { title: 'Camp History',        subtitle: 'Compare Past Camps' },
+  achievements:     { title: 'Achievements',        subtitle: 'Belt · Streaks · PRs' },
 };
 
 function FlashOverlay() {
@@ -114,6 +118,7 @@ function AppShell() {
   return (
     <div className="h-screen overflow-hidden bg-dark-900 flex flex-col">
       <FlashOverlay />
+      <CelebrationToast />
       <Header
         title={view === 'dashboard' ? 'Fight Camp' : title}
         subtitle={view === 'dashboard' ? dashSubtitle : subtitle}
@@ -224,6 +229,7 @@ function AppShell() {
               />
             )}
             {view === 'fighters'        && <CoachDashboard />}
+            {view === 'achievements'    && <ProgressScreen />}
             {view === 'settings'        && (
               <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
             )}

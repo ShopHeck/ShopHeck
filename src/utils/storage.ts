@@ -1,5 +1,6 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
+import { defaultGamificationState } from './gamification';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -22,7 +23,20 @@ export const defaultState: AppState = {
   subscription: DEFAULT_SUBSCRIPTION,
   hrvEntries: [],
   fightResults: [],
+  gamification: defaultGamificationState(),
+  dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false },
 };
+
+export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs>): AppState {
+  return {
+    ...state,
+    dashboardPrefs: {
+      progressWidgetCollapsed: state.dashboardPrefs?.progressWidgetCollapsed ?? false,
+      progressWidgetHidden: state.dashboardPrefs?.progressWidgetHidden ?? false,
+      ...prefs,
+    },
+  };
+}
 
 export function toggleSessionComplete(state: AppState, key: string): AppState {
   return {
