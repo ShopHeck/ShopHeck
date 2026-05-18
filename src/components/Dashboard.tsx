@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
 import { format, parseISO } from 'date-fns';
+import ProgressWidget from './gamification/ProgressWidget';
 
 const PHASE_COLORS: Record<string, string> = {
   'Base Building': 'bg-blue-900/40 text-blue-400 border-blue-800',
@@ -116,6 +117,8 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           </div>
         </div>
       </div>
+
+      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
 
       {/* Post-fight CTA — shows after fight date until a result is logged. */}
       {showPostFightCta && (

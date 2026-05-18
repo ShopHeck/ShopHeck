@@ -1,8 +1,9 @@
 import { Activity, Brain, Bluetooth, ChevronRight, Clock, Dumbbell, Droplets, Flame, Target, UtensilsCrossed, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGenerator';
-import { format, parseISO, subDays, startOfDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
+import ProgressWidget from './gamification/ProgressWidget';
 
 const GOAL_LABELS: Record<string, string> = {
   'base-building': 'Base Building',
@@ -31,51 +32,9 @@ interface Props {
   onNavigate: (view: string, prefill?: LogPrefill) => void;
 }
 
-/** Compute current training streak (consecutive days with at least 1 logged workout for this camp) */
-function computeStreak(workoutLogs: { campId: string; date: string }[], campId: string): { current: number; best: number } {
-  const campLogs = workoutLogs.filter(l => l.campId === campId);
-  const loggedDays = new Set(campLogs.map(l => l.date.slice(0, 10)));
-
-  let current = 0;
-  const today = startOfDay(new Date());
-  let check = today;
-
-  // Count backwards from today (include today if logged)
-  while (loggedDays.has(format(check, 'yyyy-MM-dd'))) {
-    current++;
-    check = subDays(check, 1);
-  }
-  // If today isn't logged yet, start from yesterday
-  if (current === 0) {
-    check = subDays(today, 1);
-    while (loggedDays.has(format(check, 'yyyy-MM-dd'))) {
-      current++;
-      check = subDays(check, 1);
-    }
-  }
-
-  // Best streak: scan all sorted dates
-  const sorted = Array.from(loggedDays).sort();
-  let best = 0;
-  let run = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    if (i === 0) {
-      run = 1;
-    } else {
-      const prev = parseISO(sorted[i - 1]);
-      const curr = parseISO(sorted[i]);
-      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-      run = diffDays === 1 ? run + 1 : 1;
-    }
-    if (run > best) best = run;
-  }
-
-  return { current, best: Math.max(best, current) };
-}
-
 export default function OffSeasonDashboard({ onNavigate }: Props) {
   const { state } = useApp();
-  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, completedSessions, currentUser } = state;
+  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, completedSessions, currentUser, gamification } = state;
 
   if (!activeCamp) return null;
 
@@ -107,8 +66,8 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const todayDayOfWeek = today.getDay();
   const todaySessions = currentWeek?.days.find(d => d.dayOfWeek === todayDayOfWeek);
 
-  // Streak
-  const streak = computeStreak(workoutLogs, activeCamp.id);
+  // Streak — central source of truth via gamification slice
+  const streak = gamification?.streak ?? { current: 0, best: 0, atRisk: false, expired: false };
 
   // Weight
   const latestWeight = weightEntries
@@ -158,6 +117,8 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
 
       {/* Streak Card */}
       <div className="mx-4">

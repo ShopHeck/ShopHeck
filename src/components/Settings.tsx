@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronRight, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -581,6 +581,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             <ChevronRight size={15} className="text-gray-600" />
           </button>
 
+          {/* Achievements & Belt */}
+          <button
+            onClick={() => onNavigate?.('achievements')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-yellow-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Award size={15} className="text-yellow-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Achievements & Belt</p>
+              <p className="text-xs text-gray-600">Rank · streak · PRs · weekly challenges</p>
+            </div>
+            <ChevronRight size={15} className="text-gray-600" />
+          </button>
+
           {/* AI Insights */}
           <button
             onClick={() => onNavigate?.('aiinsights')}
@@ -716,6 +731,26 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">App</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          <button
+            onClick={() => {
+              const hidden = !(state.dashboardPrefs?.progressWidgetHidden ?? false);
+              dispatch({ type: 'SET_DASHBOARD_PREF', payload: { progressWidgetHidden: hidden } });
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              {state.dashboardPrefs?.progressWidgetHidden
+                ? <EyeOff size={15} className="text-gray-500" />
+                : <Eye size={15} className="text-gray-400" />}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Progress widget on dashboard</p>
+              <p className="text-xs text-gray-600">
+                {state.dashboardPrefs?.progressWidgetHidden ? 'Hidden — tap to show' : 'Visible — tap to hide'}
+              </p>
+            </div>
+          </button>
+
           <button
             onClick={() => setConfirmReset(true)}
             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
