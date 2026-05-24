@@ -27,7 +27,7 @@ const config: CapacitorConfig = {
     backgroundColor: '#0a0a0a',
     contentInset: 'always',    // Respect safe-area (notch / home indicator)
     allowsLinkPreview: false,
-    scrollEnabled: false,      // Prevent root-level rubber-band scrolling
+    scrollEnabled: true,       // WKWebView scrolling enabled; rubber-band is suppressed via CSS overscroll-behavior on body
   },
 
   android: {
