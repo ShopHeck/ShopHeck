@@ -2,7 +2,19 @@
 
 End-to-end steps to take the iOS build (Capacitor wrapper of the Vite/React PWA) from this repo to a live App Store release. Bundle ID: `app.fightcamptraining`.
 
-Prereqs: macOS with Xcode 15+, an Apple Developer Program membership ($99/yr), `bundle install` in `ios/` for Fastlane, and the `REVENUECAT_API_KEY` env var.
+Prereqs: macOS with Xcode 15+, an Apple Developer Program membership ($99/yr), `bundle install` in `ios/` for Fastlane, and a configured `ios/App/App/Secrets.xcconfig` (see §0 below).
+
+## 0. One-time secrets setup
+
+The Release build reads `REVENUECAT_API_KEY` from a gitignored xcconfig. Without it, the app crashes immediately on launch (intentional — `AppDelegate.swift` calls `preconditionFailure` so a broken key never ships silently).
+
+```bash
+cp ios/App/App/Secrets.xcconfig.example ios/App/App/Secrets.xcconfig
+# Edit ios/App/App/Secrets.xcconfig and replace the placeholder with your
+# real RevenueCat "Public app-specific Apple API key" (starts with `appl_`).
+```
+
+For CI / Fastlane: instead of editing the file, export `REVENUECAT_API_KEY` and either write the xcconfig on the fly or pass it as an `xcargs` build setting in the Fastlane lane.
 
 ---
 

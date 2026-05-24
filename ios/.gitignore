@@ -11,3 +11,7 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# iOS build secrets — real key lives only on the dev machine / CI.
+# Copy App/App/Secrets.xcconfig.example to App/App/Secrets.xcconfig and fill in.
+App/App/Secrets.xcconfig

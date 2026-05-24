@@ -1,0 +1,11 @@
+// Release build configuration.
+//
+// Layer order matters:
+//   1. CocoaPods' generated xcconfig — preserves all Pods build settings.
+//   2. Secrets.xcconfig (optional, gitignored) — provides REVENUECAT_API_KEY
+//      and any future production secrets. Use #include? so missing-file does
+//      not break the build; AppDelegate will still crash-on-launch if the key
+//      ends up empty in a Release build, which is the intended fail-fast.
+
+#include "../Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"
+#include? "Secrets.xcconfig"
