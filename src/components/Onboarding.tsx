@@ -85,11 +85,6 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
   }
 
   function handleFinish() {
-    const campWeeksNum = isOffSeason ? 12 : parseInt(campWeeks);
-    const startDate = isOffSeason
-      ? format(new Date(), 'yyyy-MM-dd')
-      : format(addDays(new Date(fightDate), -(campWeeksNum * 7)), 'yyyy-MM-dd');
-
     if (!campOnly) {
       dispatch({
         type: 'CREATE_PROFILE',
@@ -106,6 +101,13 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
     }
 
     if (campOnly || role === 'fighter') {
+      // Date math is camp-only — coaches skip CREATE_CAMP and never reach this branch.
+      // Computing startDate unconditionally would throw for coaches because fightDate is empty.
+      const campWeeksNum = isOffSeason ? 12 : parseInt(campWeeks);
+      const startDate = isOffSeason
+        ? format(new Date(), 'yyyy-MM-dd')
+        : format(addDays(new Date(fightDate), -(campWeeksNum * 7)), 'yyyy-MM-dd');
+
       const user = state.currentUser;
       dispatch({
         type: 'CREATE_CAMP',
