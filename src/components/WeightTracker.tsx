@@ -14,6 +14,9 @@ import {
   ReferenceLine,
 } from 'recharts';
 import Modal from './shared/Modal';
+import ProGate from './shared/ProGate';
+import CutCoach from './CutCoach';
+import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -34,7 +37,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 
 export default function WeightTracker() {
   const { state, dispatch } = useApp();
-  const { activeCamp, weightEntries } = state;
+  const { activeCamp, weightEntries, currentUser } = state;
   const [showModal, setShowModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -57,15 +60,27 @@ export default function WeightTracker() {
 
   const daysUntilFight = differenceInDays(parseISO(activeCamp.fightDate ?? ''), new Date());
 
-  // Build chart data: include camp start, all entries, and target
+  // Cut pace projection — on pace / ahead / behind + projected weigh-in.
+  const proj = computeCutProjection(activeCamp, weightEntries);
+  const paceUi = {
+    ahead:      { label: 'Ahead of pace', text: 'text-green-400',  border: 'border-green-800/50' },
+    'on-pace':  { label: 'On pace',       text: 'text-blue-400',   border: 'border-blue-800/50' },
+    behind:     { label: 'Behind pace',   text: 'text-yellow-400', border: 'border-yellow-800/50' },
+    made:       { label: 'On weight ✓',   text: 'text-green-400',  border: 'border-green-800/50' },
+    'no-fight': { label: '',              text: '',                border: '' },
+  }[proj.status];
+
+  // Build chart data: include camp start, all entries, target, and the ideal
+  // "pace" line a steady cut would follow.
   const chartData = (() => {
-    const data: { date: string; weight: number; target: number }[] = [];
+    const data: { date: string; weight: number; target: number; pace: number }[] = [];
 
     // Add a start point
     data.push({
       date: format(parseISO(activeCamp.startDate), 'MMM d'),
       weight: activeCamp.currentWeight,
       target: activeCamp.targetWeight,
+      pace: idealWeightAt(activeCamp, parseISO(activeCamp.startDate)),
     });
 
     campEntries.forEach(e => {
@@ -73,6 +88,7 @@ export default function WeightTracker() {
         date: format(parseISO(e.date), 'MMM d'),
         weight: e.weight,
         target: activeCamp.targetWeight,
+        pace: idealWeightAt(activeCamp, parseISO(e.date)),
       });
     });
 
@@ -172,6 +188,41 @@ export default function WeightTracker() {
         </div>
       </div>
 
+      {/* Cut Pace projection */}
+      {proj.trackable && proj.status !== 'made' && (
+        <div className="mx-4">
+          <div className={`card border ${paceUi.border}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">Cut Pace</p>
+                <p className={`text-lg font-black ${paceUi.text}`}>{paceUi.label}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Projected weigh-in</p>
+                <p className="text-lg font-black text-white">
+                  {proj.projectedWeighIn}<span className="text-xs text-gray-500"> lbs</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="bg-dark-600 rounded-lg px-3 py-2">
+                <p className="text-xs text-gray-500">Need / day</p>
+                <p className="text-sm text-white font-semibold">{proj.lbsPerDayNeeded} lbs</p>
+              </div>
+              <div className="bg-dark-600 rounded-lg px-3 py-2">
+                <p className="text-xs text-gray-500">Avg so far / day</p>
+                <p className="text-sm text-white font-semibold">{proj.lbsPerDayActual} lbs</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2.5">
+              {proj.projectedMiss > 0
+                ? `At your current rate you'll be ~${proj.projectedMiss} lbs over on fight day (${proj.daysRemaining} days out).`
+                : `At your current rate you'll make weight with ~${Math.abs(proj.projectedMiss)} lbs to spare.`}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Chart */}
       {chartData.length > 1 && (
         <div className="mx-4">
@@ -194,6 +245,17 @@ export default function WeightTracker() {
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine y={targetW} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1.5} label={{ value: 'Target', fill: '#f97316', fontSize: 10 }} />
+                {activeCamp.fightDate && (
+                  <Line
+                    type="monotone"
+                    dataKey="pace"
+                    stroke="#9ca3af"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    activeDot={false}
+                  />
+                )}
                 <Line
                   type="monotone"
                   dataKey="weight"
@@ -205,6 +267,15 @@ export default function WeightTracker() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {/* AI Cut Coach — Fighter Pro */}
+      {activeCamp.fightDate && proj.status !== 'made' && (
+        <div className="mx-4">
+          <ProGate required="fighter_pro">
+            <CutCoach camp={activeCamp} user={currentUser} proj={proj} entries={weightEntries} />
+          </ProGate>
         </div>
       )}
 
