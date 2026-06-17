@@ -6,6 +6,7 @@ on:
   # config-only changes are filtered out so they don't burn a macOS build.
   push:
     branches:
+      - main
       - claude/fight-training-camp-app-ggs3g
     paths:
       - 'src/**'
