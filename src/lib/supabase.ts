@@ -1,24 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-if (!url || !key) {
-  throw new Error(
-    '[FightCamp] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
-      'Copy .env.example to .env.local and fill them in.'
-  );
-}
+/**
+ * True when Supabase env vars are present. The app is local-first: when this is
+ * false everything still works offline — sign-in / cloud sync just stay hidden.
+ */
+export const isSupabaseConfigured = !!(url && key);
 
-export const supabase = createClient<Database>(url, key, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    // Capacitor WKWebView doesn't expose the OAuth redirect URL hash on
-    // window.location the same way a browser tab does — detectSessionInUrl
-    // off prevents a confused initial-session attempt; we handle the OAuth
-    // callback explicitly in the SignInWithApple / Google flows.
-    detectSessionInUrl: false,
-  },
-});
+/**
+ * The Supabase client, or null when unconfigured. Callers must null-check
+ * (or gate on `isSupabaseConfigured`) so a missing env never crashes the app.
+ */
+export const supabase: SupabaseClient<Database> | null = isSupabaseConfigured
+  ? createClient<Database>(url!, key!, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        // Capacitor WKWebView doesn't expose the OAuth redirect hash the way a
+        // browser tab does; we handle the Apple/Google callback explicitly.
+        detectSessionInUrl: false,
+      },
+    })
+  : null;
