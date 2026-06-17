@@ -1,10 +1,35 @@
 name: iOS Build → TestFlight
 
 on:
+  # Auto-ship every improvement: any push to the trunk branch that touches
+  # app code builds and uploads a new TestFlight build. Docs-only and
+  # config-only changes are filtered out so they don't burn a macOS build.
   push:
+    branches:
+      - claude/fight-training-camp-app-ggs3g
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'ios/**'
+      - 'index.html'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'tsconfig*.json'
+      - '.github/workflows/ios.yml'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+
+# Only one TestFlight build at a time. A newer push cancels an in-flight run so
+# we always ship the latest commit and never race on the auto-incremented build
+# number (which is derived from the highest build already on TestFlight).
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: true
 
 jobs:
   build:
