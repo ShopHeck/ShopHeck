@@ -146,7 +146,22 @@ export default function ProgressCharts() {
   const { state } = useApp();
   const { activeCamp, workoutLogs, sparringLogs, conditioningTests, trainingSchedule, completedSessions, currentUser } = state;
 
-  if (!activeCamp) return null;
+  // Coaches never own a camp, and a fighter may not have started one yet —
+  // show a friendly empty state instead of a blank screen.
+  if (!activeCamp) {
+    const isCoach = currentUser?.role === 'coach';
+    return (
+      <div className="mx-4 mt-10 card text-center py-12">
+        <BarChart3 size={32} className="text-gray-600 mx-auto mb-3" />
+        <p className="text-gray-400 font-medium">No progress to show yet</p>
+        <p className="text-sm text-gray-600 mt-1 max-w-xs mx-auto">
+          {isCoach
+            ? 'Progress charts track an individual camp. Open the Fighters tab to view each athlete’s training progress.'
+            : 'Start a fight camp or off-season plan to see your training charts here.'}
+        </p>
+      </div>
+    );
+  }
 
   const campWorkouts = workoutLogs.filter(l => l.campId === activeCamp.id);
   const campSparring = sparringLogs.filter(l => l.campId === activeCamp.id);

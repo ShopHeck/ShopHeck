@@ -16,7 +16,19 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SentryReact.ErrorBoundary fallback={<div style={{ color: '#fff', padding: '2rem', textAlign: 'center' }}>Something went wrong. Please restart the app.</div>}>
+    <SentryReact.ErrorBoundary
+      fallback={
+        <div style={{ color: '#fff', padding: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', minHeight: '100vh', justifyContent: 'center' }}>
+          <p style={{ fontWeight: 700 }}>Something went wrong.</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: '0.75rem', padding: '0.75rem 1.5rem', fontWeight: 600, fontSize: '1rem' }}
+          >
+            Reload
+          </button>
+        </div>
+      }
+    >
       <App />
     </SentryReact.ErrorBoundary>
   </StrictMode>,
