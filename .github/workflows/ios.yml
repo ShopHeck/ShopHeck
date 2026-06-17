@@ -39,6 +39,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Apple requires the iOS 26 SDK (Xcode 26+) for App Store uploads. The
+      # runner ships several Xcode versions and may default to an older one, so
+      # explicitly select the newest installed Xcode_*.app.
+      - name: Select latest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:

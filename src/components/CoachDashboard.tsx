@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown } from 'lucide-react';
+import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown, Lock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
+import { isCoachPro } from '../utils/subscription';
+import UpgradeModal from './shared/UpgradeModal';
 import type { CoachNoteCategory } from '../types';
 import {
   LineChart,
@@ -49,6 +51,15 @@ export default function CoachDashboard() {
   const [noteContent, setNoteContent] = useState('');
   const [noteCategory, setNoteCategory] = useState<CoachNoteCategory>('general');
   const [showAllNotes, setShowAllNotes] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  // The coach side is a paid tier. Free coaches see the roster shell, but
+  // opening a fighter's data / notes requires Coach Pro.
+  const coachPro = isCoachPro(state.subscription);
+  function openFighter(id: string) {
+    if (coachPro) setSelectedFighter(id);
+    else setShowUpgrade(true);
+  }
 
   const activeFighters = fighters.filter(f => f.role === 'fighter');
   const filtered = activeFighters.filter(f =>
@@ -370,6 +381,23 @@ export default function CoachDashboard() {
           />
         </div>
 
+        {/* Coach Pro CTA — coach features are a paid tier */}
+        {!coachPro && (
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="w-full mb-4 flex items-center gap-3 p-3.5 rounded-xl border border-purple-700/40 bg-gradient-to-br from-purple-900/30 to-dark-700 text-left hover:border-purple-600 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-purple-900/40 flex items-center justify-center flex-shrink-0">
+              <Lock size={16} className="text-purple-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Unlock Coach Pro</p>
+              <p className="text-xs text-gray-400 mt-0.5">View fighter analytics, add notes &amp; manage unlimited fighters</p>
+            </div>
+            <ChevronRight size={16} className="text-purple-400 flex-shrink-0" />
+          </button>
+        )}
+
         {/* Camp Overview */}
         {activeCamp && (
           <div className="bg-gradient-to-br from-dark-700 to-dark-600 border border-dark-400 rounded-xl p-4 mb-4">
@@ -413,7 +441,7 @@ export default function CoachDashboard() {
               return (
                 <button
                   key={f.id}
-                  onClick={() => setSelectedFighter(f.id)}
+                  onClick={() => openFighter(f.id)}
                   className="w-full card hover:border-brand-700 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
@@ -433,7 +461,9 @@ export default function CoachDashboard() {
                         <span className="badge bg-dark-500 text-gray-500 text-xs">{f.weightClass}</span>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-gray-600" />
+                    {coachPro
+                      ? <ChevronRight size={16} className="text-gray-600" />
+                      : <Lock size={14} className="text-brand-500" />}
                   </div>
 
                   {fCamp && (
@@ -466,6 +496,8 @@ export default function CoachDashboard() {
           <p className="text-gray-400 text-sm">Fighters will appear here once they create accounts and link you as their coach in their Settings.</p>
         </div>
       )}
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }
