@@ -1,0 +1,3 @@
+app_identifier("app.fightcamptraining")
+# Authentication uses the App Store Connect API key (see Fastfile before_all),
+# so no apple_id / Apple ID session is required.

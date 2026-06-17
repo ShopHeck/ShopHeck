@@ -1,64 +1,94 @@
 default_platform(:ios)
 
+# Signing strategy: App Store Connect API key + Xcode automatic ("cloud")
+# signing via -allowProvisioningUpdates. No Fastlane Match / certificates repo
+# is required — Xcode creates and downloads the distribution certificate and
+# App Store provisioning profile on demand, authenticated by the API key below.
+
+APP_IDENTIFIER = "app.fightcamptraining".freeze
+TEAM_ID = "WV4L598A44".freeze
+
 platform :ios do
-  desc "Sync code signing certificates via Match"
-  lane :certificates do
-    match(
-      type: "appstore",
-      app_identifier: "app.fightcamptraining",
-      readonly: is_ci
+  before_all do
+    # Authenticate every lane with the App Store Connect API key. Reads CI
+    # secrets. ASC_KEY_CONTENT may be the raw .p8 (PEM) text or base64-encoded —
+    # we detect which so either form works.
+    key_content = ENV["ASC_KEY_CONTENT"].to_s
+    UI.user_error!("ASC_KEY_CONTENT env var is required") if key_content.empty?
+
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: key_content,
+      is_key_content_base64: !key_content.include?("PRIVATE KEY"),
+      in_house: false
     )
   end
 
   desc "Build and upload to TestFlight"
   lane :beta do
-    certificates
-
-    increment_build_number(
-      xcodeproj: "App/App.xcodeproj"
-    )
-
-    rc_key = ENV["REVENUECAT_API_KEY"] || ""
-    UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
-
-    build_app(
-      scheme: "App",
-      workspace: "App/App.xcworkspace",
-      export_method: "app-store",
-      clean: true,
-      output_directory: "./build",
-      output_name: "FightCampTraining.ipa",
-      xcargs: "REVENUECAT_API_KEY='#{rc_key}'"
-    )
-
+    bump_build_number
+    archive_app
     upload_to_testflight(
+      app_identifier: APP_IDENTIFIER,
       skip_waiting_for_build_processing: true
     )
   end
 
-  desc "Build and submit to App Store"
+  desc "Build and submit to the App Store"
   lane :release do
-    certificates
-
-    increment_build_number(
-      xcodeproj: "App/App.xcodeproj"
+    bump_build_number
+    archive_app
+    # Metadata, screenshots, and the App Privacy questionnaire are managed in
+    # App Store Connect directly, so we skip them here and just attach the build
+    # and submit it for review.
+    upload_to_app_store(
+      app_identifier: APP_IDENTIFIER,
+      submit_for_review: true,
+      automatic_release: false,
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false,
+      force: true
     )
+  end
 
-    rc_key = ENV["REVENUECAT_API_KEY"] || ""
+  # --- helpers -------------------------------------------------------------
+
+  # Set the build number to one above the highest build already on TestFlight
+  # for this app, so every upload is strictly increasing. Falls back to 1 on the
+  # very first upload (no existing builds).
+  private_lane :bump_build_number do
+    latest = latest_testflight_build_number(
+      app_identifier: APP_IDENTIFIER,
+      initial_build_number: 0
+    )
+    increment_build_number(
+      xcodeproj: "App/App.xcodeproj",
+      build_number: latest + 1
+    )
+  end
+
+  # Archive an app-store IPA with automatic signing. The production RevenueCat
+  # key is injected as a build setting so it lands in Info.plist's
+  # RevenueCatAPIKey (AppDelegate crashes on launch if it's empty in Release).
+  private_lane :archive_app do
+    rc_key = ENV["REVENUECAT_API_KEY"].to_s
     UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
 
     build_app(
       scheme: "App",
       workspace: "App/App.xcworkspace",
+      configuration: "Release",
       export_method: "app-store",
       clean: true,
-      xcargs: "REVENUECAT_API_KEY='#{rc_key}'"
-    )
-
-    upload_to_app_store(
-      submit_for_review: true,
-      automatic_release: false,
-      force: true
+      output_directory: "./build",
+      output_name: "FightCampTraining.ipa",
+      xcargs: "-allowProvisioningUpdates REVENUECAT_API_KEY='#{rc_key}'",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: TEAM_ID
+      }
     )
   end
 end
