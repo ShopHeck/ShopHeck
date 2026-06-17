@@ -398,3 +398,120 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+------------------------------------------------------------
+-- Coach ↔ fighter linking (v1.1)
+-- A coach (Coach Pro) invites fighters via a short code. Redeeming the code
+-- creates a link, which grants the coach READ access to that fighter's data.
+------------------------------------------------------------
+
+-- coach_fighter_links — one row per coach↔fighter relationship.
+create table if not exists public.coach_fighter_links (
+  id          uuid primary key default uuid_generate_v4(),
+  coach_id    uuid not null references public.profiles(id) on delete cascade,
+  fighter_id  uuid not null references public.profiles(id) on delete cascade,
+  status      text not null default 'active' check (status in ('active','revoked')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (coach_id, fighter_id)
+);
+create index if not exists cfl_coach_idx   on public.coach_fighter_links(coach_id);
+create index if not exists cfl_fighter_idx on public.coach_fighter_links(fighter_id);
+drop trigger if exists cfl_touch on public.coach_fighter_links;
+create trigger cfl_touch before update on public.coach_fighter_links
+  for each row execute function public.touch_updated_at();
+
+-- coach_invites — short shareable codes a coach hands out.
+create table if not exists public.coach_invites (
+  code        text primary key,
+  coach_id    uuid not null references public.profiles(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null default (now() + interval '30 days')
+);
+create index if not exists coach_invites_coach_idx on public.coach_invites(coach_id);
+
+-- Helper: is the current user an active coach of `fighter`?
+create or replace function public.is_coach_of(fighter uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.coach_fighter_links l
+    where l.coach_id = auth.uid()
+      and l.fighter_id = fighter
+      and l.status = 'active'
+  );
+$$;
+
+-- Fighter redeems an invite code → creates/reactivates the link. Security
+-- definer so the fighter doesn't need read access to the coach's invite row.
+create or replace function public.redeem_coach_invite(invite_code text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare c uuid;
+begin
+  select coach_id into c from public.coach_invites
+    where code = invite_code and (expires_at is null or expires_at > now());
+  if c is null then raise exception 'Invalid or expired invite code'; end if;
+  if c = auth.uid() then raise exception 'You cannot link to yourself'; end if;
+  insert into public.coach_fighter_links (coach_id, fighter_id, status)
+    values (c, auth.uid(), 'active')
+    on conflict (coach_id, fighter_id) do update set status = 'active', updated_at = now();
+  return c;
+end;
+$$;
+
+-- RLS for the linking tables.
+alter table public.coach_fighter_links enable row level security;
+alter table public.coach_invites       enable row level security;
+
+drop policy if exists "cfl_select" on public.coach_fighter_links;
+create policy "cfl_select" on public.coach_fighter_links
+  for select using (coach_id = auth.uid() or fighter_id = auth.uid());
+-- Either party can revoke the link; new links are created via redeem_coach_invite.
+drop policy if exists "cfl_delete" on public.coach_fighter_links;
+create policy "cfl_delete" on public.coach_fighter_links
+  for delete using (coach_id = auth.uid() or fighter_id = auth.uid());
+drop policy if exists "cfl_update" on public.coach_fighter_links;
+create policy "cfl_update" on public.coach_fighter_links
+  for update using (coach_id = auth.uid() or fighter_id = auth.uid())
+            with check (coach_id = auth.uid() or fighter_id = auth.uid());
+
+drop policy if exists "coach_invites_own" on public.coach_invites;
+create policy "coach_invites_own" on public.coach_invites
+  for all using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+
+-- Coach READ access to linked fighters' data. These are additive SELECT
+-- policies (RLS OR-combines), so they don't weaken the owner-only policies.
+do $$
+declare
+  t text;
+  tables text[] := array[
+    'camps','workout_logs','sparring_logs','conditioning_tests',
+    'weight_entries','nutrition_logs','hrv_entries','fight_results'
+  ];
+begin
+  foreach t in array tables loop
+    execute format('drop policy if exists "%1$s_coach_read" on public.%1$s;', t);
+    execute format($f$
+      create policy "%1$s_coach_read" on public.%1$s
+        for select using (public.is_coach_of(user_id));
+    $f$, t);
+  end loop;
+end $$;
+
+-- Coach can read a linked fighter's profile row.
+drop policy if exists "profiles_coach_read" on public.profiles;
+create policy "profiles_coach_read" on public.profiles
+  for select using (public.is_coach_of(id));
+
+------------------------------------------------------------
+-- Function hardening (satisfies the Supabase security linter)
+------------------------------------------------------------
+alter function public.touch_updated_at() set search_path = public;
+
+-- Trigger function — never meant to be called via the REST RPC endpoint.
+revoke execute on function public.handle_new_user() from public;
+
+-- SECURITY DEFINER helpers: signed-in users only (anon cannot call via RPC).
+revoke execute on function public.is_coach_of(uuid) from public;
+grant  execute on function public.is_coach_of(uuid) to authenticated;
+revoke execute on function public.redeem_coach_invite(text) from public;
+grant  execute on function public.redeem_coach_invite(text) to authenticated;
