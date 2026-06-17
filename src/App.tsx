@@ -18,6 +18,7 @@ import AdBanner from './components/shared/AdBanner';
 import ProGate from './components/shared/ProGate';
 import UpgradeModal from './components/shared/UpgradeModal';
 import { isPro } from './utils/subscription';
+import { remindersEnabled, syncReminders } from './utils/notifications';
 
 // ── Lazy imports — loaded on first navigation to that view ────────────────
 const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
@@ -99,6 +100,17 @@ function AppShell() {
     StatusBar.setBackgroundColor({ color: '#0a0a0a' }).catch(() => {});
     SplashScreen.hide().catch(() => {});
   }, []);
+
+  // Keep daily reminders in sync with the active camp (adds the weigh-in nudge
+  // only during a real fight-camp cut). No-op on web / when reminders are off.
+  const activeCampId = state.activeCamp?.id;
+  useEffect(() => {
+    if (!remindersEnabled()) return;
+    const camp = state.activeCamp;
+    const weighIn = !!(camp && !camp.isOffSeason && camp.fightDate);
+    syncReminders({ weighIn });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCampId]);
 
   if (!state.currentUser) {
     return <Onboarding />;

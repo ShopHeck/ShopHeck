@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -8,6 +8,7 @@ import { RevenueCat } from '../plugins/RevenueCat';
 import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
+import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -102,6 +103,22 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const [bellFile, setBellFile] = useState<File | null>(null);
   const [bellSaved, setBellSaved] = useState(false);
   const [hasBell, setHasBell] = useState(hasCustomBell());
+
+  // Training reminders (local notifications)
+  const [reminders, setReminders] = useState(remindersEnabled());
+  async function toggleReminders() {
+    if (reminders) {
+      await disableReminders();
+      setReminders(false);
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    if (!granted) return; // user denied at OS level
+    setRemindersEnabled(true);
+    setReminders(true);
+    const weighIn = !!(activeCamp && !activeCamp.isOffSeason && activeCamp.fightDate);
+    await syncReminders({ weighIn });
+  }
 
   async function handleSaveBell() {
     if (!bellFile) return;
@@ -731,6 +748,25 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">App</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          {notificationsSupported() && (
+            <button
+              onClick={toggleReminders}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+            >
+              <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Bell size={15} className={reminders ? 'text-brand-400' : 'text-gray-500'} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">Training reminders</p>
+                <p className="text-xs text-gray-600">
+                  {reminders ? 'On — daily check-in & weigh-in nudges' : 'Off — tap to enable'}
+                </p>
+              </div>
+              <div className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${reminders ? 'bg-brand-600' : 'bg-dark-500'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white transition-transform ${reminders ? 'translate-x-4' : ''}`} />
+              </div>
+            </button>
+          )}
           <button
             onClick={() => {
               const hidden = !(state.dashboardPrefs?.progressWidgetHidden ?? false);
