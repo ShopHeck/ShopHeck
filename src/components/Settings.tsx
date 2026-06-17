@@ -9,6 +9,8 @@ import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
+import { useAuth } from '../context/AuthContext';
+import AuthScreen from './AuthScreen';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -103,6 +105,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const [bellFile, setBellFile] = useState<File | null>(null);
   const [bellSaved, setBellSaved] = useState(false);
   const [hasBell, setHasBell] = useState(hasCustomBell());
+
+  // Account (cloud sync — optional)
+  const { configured: authConfigured, user: authUser, signOut: authSignOut } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
 
   // Training reminders (local notifications)
   const [reminders, setReminders] = useState(remindersEnabled());
@@ -744,6 +750,40 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         </div>
       </div>
 
+      {/* Account (cloud sync — optional) */}
+      {authConfigured && (
+        <div className="mx-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Account</p>
+          <div className="card">
+            {authUser ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-brand-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <UserCheck size={18} className="text-brand-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{authUser.email}</p>
+                  <p className="text-xs text-gray-500">Synced across your devices</p>
+                </div>
+                <button onClick={() => authSignOut()} className="text-xs font-semibold text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-dark-400">
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setShowAuth(true)} className="w-full flex items-center gap-3 text-left">
+                <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <UserCheck size={18} className="text-gray-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Sign in / Create account</p>
+                  <p className="text-xs text-gray-500">Sync your camps &amp; connect with your coach</p>
+                </div>
+                <ChevronRight size={16} className="text-gray-600" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* App Settings */}
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">App</p>
@@ -990,6 +1030,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       )}
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
     </div>
   );
 }
