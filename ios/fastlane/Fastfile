@@ -8,8 +8,9 @@ default_platform(:ios)
 APP_IDENTIFIER = "app.fightcamptraining".freeze
 TEAM_ID = "WV4L598A44".freeze
 # Where we drop the App Store Connect .p8 so xcodebuild can authenticate during
-# archive (gitignored; only ever written on the runner / dev machine).
-ASC_KEY_PATH = File.expand_path("fastlane/AuthKey_asc.p8").freeze
+# archive (gitignored; only ever written on the runner / dev machine). Anchored
+# to this Fastfile's directory so it resolves regardless of fastlane's cwd.
+ASC_KEY_PATH = File.expand_path("AuthKey_asc.p8", __dir__).freeze
 
 platform :ios do
   before_all do
