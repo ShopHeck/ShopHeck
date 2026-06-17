@@ -15,6 +15,9 @@ import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
+import ProGate from './components/shared/ProGate';
+import UpgradeModal from './components/shared/UpgradeModal';
+import { isPro } from './utils/subscription';
 
 // ── Lazy imports — loaded on first navigation to that view ────────────────
 const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
@@ -82,6 +85,7 @@ function AppShell() {
   const [view, setView] = useState<View>('dashboard');
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewOffSeason, setShowNewOffSeason] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
   /** Fight being viewed in the breakdown screen. */
   const [activeFightId, setActiveFightId] = useState<string | null>(null);
@@ -113,6 +117,16 @@ function AppShell() {
   function navigateToLog(prefill?: LogPrefill) {
     if (prefill) setLogPrefill(prefill);
     setView('log');
+  }
+
+  // Free tier is capped at a single camp; creating another requires Fighter Pro.
+  function requestNewCamp(offSeason: boolean) {
+    if (!isPro(state.subscription) && state.camps.length >= 1) {
+      setShowUpgrade(true);
+      return;
+    }
+    if (offSeason) setShowNewOffSeason(true);
+    else setShowNewCamp(true);
   }
 
   return (
@@ -158,7 +172,7 @@ function AppShell() {
                   <p className="text-gray-500 text-sm mt-1">Choose your mode to get started</p>
                 </div>
                 <button
-                  onClick={() => setShowNewCamp(true)}
+                  onClick={() => requestNewCamp(false)}
                   className="card flex items-center gap-4 hover:border-brand-600 transition-colors text-left"
                 >
                   <div className="w-12 h-12 rounded-xl bg-brand-900/50 flex items-center justify-center flex-shrink-0">
@@ -170,7 +184,7 @@ function AppShell() {
                   </div>
                 </button>
                 <button
-                  onClick={() => setShowNewOffSeason(true)}
+                  onClick={() => requestNewCamp(true)}
                   className="card flex items-center gap-4 hover:border-teal-700 transition-colors text-left"
                 >
                   <div className="w-12 h-12 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
@@ -195,11 +209,11 @@ function AppShell() {
             )}
             {view === 'timer'           && <RoundTimer />}
             {view === 'weight'          && <WeightTracker />}
-            {view === 'nutrition'       && <NutritionTracker />}
+            {view === 'nutrition'       && <ProGate required="fighter_pro"><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
-            {view === 'gameplan'        && <GamePlanBuilder />}
-            {view === 'aiinsights'      && <AIInsights />}
-            {view === 'health'          && <AppleHealthSync />}
+            {view === 'gameplan'        && <ProGate required="fighter_pro"><GamePlanBuilder /></ProGate>}
+            {view === 'aiinsights'      && <ProGate required="fighter_pro"><AIInsights /></ProGate>}
+            {view === 'health'          && <ProGate required="fighter_pro"><AppleHealthSync /></ProGate>}
             {view === 'readiness'       && <FightReadiness />}
             {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
             {view === 'workout-library' && <WorkoutLibrary />}
@@ -231,7 +245,7 @@ function AppShell() {
             {view === 'fighters'        && <CoachDashboard />}
             {view === 'achievements'    && <ProgressScreen />}
             {view === 'settings'        && (
-              <Settings onNewCamp={() => setShowNewCamp(true)} onNavigate={v => setView(v as View)} />
+              <Settings onNewCamp={() => requestNewCamp(false)} onNavigate={v => setView(v as View)} />
             )}
 
           </div>
@@ -254,6 +268,9 @@ function AppShell() {
           <Onboarding campOnly offSeasonOnly onClose={() => setShowNewOffSeason(false)} />
         </Suspense>
       )}
+
+      {/* Upgrade paywall — shown when a free user hits the 1-camp limit */}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }
