@@ -16,6 +16,9 @@ App/App/config.xml
 # Copy App/App/Secrets.xcconfig.example to App/App/Secrets.xcconfig and fill in.
 App/App/Secrets.xcconfig
 
+# App Store Connect API key written at build time for xcodebuild auth.
+fastlane/AuthKey_asc.p8
+
 # Per-developer Xcode workspace state (regenerated automatically)
 App.xcodeproj/project.xcworkspace/
 App/App.xcodeproj/project.xcworkspace/
