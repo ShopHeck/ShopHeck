@@ -103,10 +103,13 @@ Under App Privacy → Get Started, declare data types collected. For this app, e
 
 ### Option A — GitHub Actions (recommended, no Mac required)
 
-Once the secrets in §2 are set, trigger the **iOS Build → TestFlight** workflow:
+Once the secrets in §2 are set, the **iOS Build → TestFlight** workflow runs:
 
-- Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`, **or**
-- Run it manually: GitHub → Actions → *iOS Build → TestFlight* → **Run workflow**.
+- **Automatically** on every push to the trunk branch (`claude/fight-training-camp-app-ggs3g`) that changes app code — so each merged improvement ships a new TestFlight build with no manual step. Docs/config-only pushes are skipped.
+- On a version tag: `git tag v1.0.0 && git push origin v1.0.0`, **or**
+- Manually: GitHub → Actions → *iOS Build → TestFlight* → **Run workflow**.
+
+Builds are serialized (a newer push cancels an in-flight run) so the auto-incremented build number never races.
 
 The macOS runner builds the web bundle, syncs Capacitor, archives an `app-store`
 IPA with automatic signing, and uploads to TestFlight. The build number is set
