@@ -10,6 +10,7 @@ import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/ap
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
+import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
@@ -108,7 +109,13 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
   // Account (cloud sync — optional)
   const { configured: authConfigured, user: authUser, signOut: authSignOut } = useAuth();
+  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSync();
   const [showAuth, setShowAuth] = useState(false);
+
+  const syncLabel = syncStatus === 'syncing' ? 'Syncing…'
+    : syncStatus === 'error' ? (syncError ?? 'Sync failed')
+    : lastSyncedAt ? `Backed up ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : 'Synced across your devices';
 
   // Training reminders (local notifications)
   const [reminders, setReminders] = useState(remindersEnabled());
@@ -762,11 +769,20 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{authUser.email}</p>
-                  <p className="text-xs text-gray-500">Synced across your devices</p>
+                  <p className={`text-xs ${syncStatus === 'error' ? 'text-red-400' : 'text-gray-500'}`}>{syncLabel}</p>
                 </div>
-                <button onClick={() => authSignOut()} className="text-xs font-semibold text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-dark-400">
-                  Sign out
-                </button>
+                <div className="flex flex-col items-end gap-1.5">
+                  <button
+                    onClick={() => void syncNow()}
+                    disabled={syncStatus === 'syncing'}
+                    className="text-xs font-semibold text-brand-400 hover:text-brand-300 disabled:opacity-50"
+                  >
+                    {syncStatus === 'syncing' ? '…' : 'Sync now'}
+                  </button>
+                  <button onClick={() => authSignOut()} className="text-xs font-semibold text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-dark-400">
+                    Sign out
+                  </button>
+                </div>
               </div>
             ) : (
               <button onClick={() => setShowAuth(true)} className="w-full flex items-center gap-3 text-left">
