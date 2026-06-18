@@ -12,6 +12,7 @@ import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestN
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
+import CoachConnect from './CoachConnect';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -799,6 +800,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
         </div>
       )}
+
+      {/* Coach ↔ fighter linking (cloud) */}
+      <CoachConnect />
 
       {/* App Settings */}
       <div className="mx-4">

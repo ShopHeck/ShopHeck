@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown, Lock, Cloud } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { isCoachPro } from '../utils/subscription';
+import { listLinkedFighters, getFighterDetail, type LinkedFighter, type FighterDetail } from '../lib/coachLinks';
 import UpgradeModal from './shared/UpgradeModal';
 import type { CoachNoteCategory } from '../types';
 import {
@@ -53,6 +55,27 @@ export default function CoachDashboard() {
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
+  // Cloud-linked fighters (Phase 4)
+  const { configured: authConfigured, user: authUser } = useAuth();
+  const [linked, setLinked] = useState<LinkedFighter[]>([]);
+  const [cloudFighter, setCloudFighter] = useState<LinkedFighter | null>(null);
+  const [cloudDetail, setCloudDetail] = useState<FighterDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (authConfigured && authUser && currentUser?.role === 'coach') {
+      listLinkedFighters(authUser.id).then(setLinked);
+    }
+  }, [authConfigured, authUser, currentUser?.role]);
+
+  async function openCloudFighter(f: LinkedFighter) {
+    if (!coachPro) { setShowUpgrade(true); return; }
+    setCloudFighter(f);
+    setLoadingDetail(true);
+    setCloudDetail(await getFighterDetail(f.id));
+    setLoadingDetail(false);
+  }
+
   // The coach side is a paid tier. Free coaches see the roster shell, but
   // opening a fighter's data / notes requires Coach Pro.
   const coachPro = isCoachPro(state.subscription);
@@ -86,6 +109,122 @@ export default function CoachDashboard() {
     setNoteContent('');
     setNoteCategory('general');
     setShowNoteForm(false);
+  }
+
+  // ── Cloud-linked fighter detail (read-only, from Supabase) ──
+  if (cloudFighter) {
+    const camps = [...(cloudDetail?.camps ?? [])].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const camp = camps[0] ?? null;
+    const campWorkouts = camp ? (cloudDetail?.workouts ?? []).filter(w => w.camp_id === camp.id) : [];
+    const campSparring = camp ? (cloudDetail?.sparring ?? []).filter(s => s.camp_id === camp.id) : [];
+    const campWeights = camp
+      ? (cloudDetail?.weights ?? []).filter(w => w.camp_id === camp.id)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      : [];
+    const latestW = campWeights[campWeights.length - 1]?.weight ?? camp?.current_weight ?? 0;
+
+    return (
+      <div className="space-y-4 pb-4">
+        <div className="mx-4 mt-4">
+          <button onClick={() => { setCloudFighter(null); setCloudDetail(null); }} className="flex items-center gap-2 text-brand-500 text-sm font-medium mb-4">
+            ← Back to Fighters
+          </button>
+          <div className="card flex items-center gap-4">
+            <div className="w-14 h-14 bg-brand-900/50 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <span className="text-brand-400 font-black text-2xl">{cloudFighter.name.charAt(0)}</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-black text-white">{cloudFighter.name}</h2>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="badge bg-dark-500 text-gray-400 text-xs">{cloudFighter.sport}</span>
+                <span className="badge bg-dark-500 text-gray-400 text-xs">{cloudFighter.weightClass}</span>
+                <span className="badge bg-brand-900/40 text-brand-400 text-xs flex items-center gap-1"><Cloud size={10} /> Live</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {loadingDetail ? (
+          <div className="mx-4 card text-center py-10 text-sm text-gray-500">Loading…</div>
+        ) : !camp ? (
+          <div className="mx-4 card text-center py-10 text-sm text-gray-500">This fighter hasn't started a camp yet.</div>
+        ) : (
+          <>
+            <div className="mx-4">
+              <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-800/40 rounded-xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-brand-400 font-semibold uppercase tracking-wider">{camp.is_off_season ? 'Off Season' : 'Active Camp'}</p>
+                    <p className="text-2xl font-black text-white mt-1">{camp.fight_date ? `${getDaysUntilFight(camp.fight_date)} days out` : 'Training'}</p>
+                    {camp.fight_date && <p className="text-xs text-gray-500">{format(parseISO(camp.fight_date), 'MMM d, yyyy')}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-white">{camp.rounds}R</p>
+                    <p className="text-xs text-gray-500">{camp.round_duration}min</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mx-4 grid grid-cols-3 gap-3">
+              <div className="stat-card">
+                <Activity size={14} className="text-brand-500" />
+                <div className="text-lg font-black text-white">{campWorkouts.length}</div>
+                <div className="text-xs text-gray-500">sessions</div>
+              </div>
+              <div className="stat-card">
+                <Zap size={14} className="text-yellow-400" />
+                <div className="text-lg font-black text-white">{campSparring.reduce((s, l) => s + l.rounds, 0)}</div>
+                <div className="text-xs text-gray-500">spar rounds</div>
+              </div>
+              <div className="stat-card">
+                <Scale size={14} className="text-blue-400" />
+                <div className="text-lg font-black text-white">{latestW}</div>
+                <div className="text-xs text-gray-500">lbs now</div>
+              </div>
+            </div>
+
+            {campSparring.length > 0 && (
+              <div className="mx-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Sparring</p>
+                <div className="space-y-2">
+                  {[...campSparring].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map(s => (
+                    <div key={s.id} className="card flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{s.rounds} rounds vs {s.partner_name}</p>
+                        <p className="text-xs text-gray-500">{format(parseISO(s.date), 'MMM d')} · Week {s.week_number}</p>
+                      </div>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
+                        s.performance >= 4 ? 'bg-green-900/40 text-green-400' :
+                        s.performance >= 3 ? 'bg-yellow-900/40 text-yellow-400' : 'bg-red-900/40 text-red-400'
+                      }`}>{s.performance}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {campWorkouts.length > 0 && (
+              <div className="mx-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Sessions</p>
+                <div className="space-y-2">
+                  {[...campWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map(w => (
+                    <div key={w.id} className="card flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{w.title}</p>
+                        <p className="text-xs text-gray-500">{format(parseISO(w.date), 'MMM d')} · RPE {w.rpe}</p>
+                      </div>
+                      <span className="text-xs text-gray-500">{w.duration}min</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   }
 
   if (selectedFighter && activeCamp) {
@@ -398,6 +537,51 @@ export default function CoachDashboard() {
           </button>
         )}
 
+        {/* Connected Fighters (cloud) */}
+        {authConfigured && authUser && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Cloud size={14} className="text-brand-400" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Connected Fighters</p>
+            </div>
+            {linked.length === 0 ? (
+              <div className="card text-center py-6">
+                <Users size={24} className="text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No connected fighters yet</p>
+                <p className="text-xs text-gray-600 mt-1">Generate an invite code in Settings and share it with your fighters.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {linked
+                  .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.sport.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(f => (
+                    <button key={f.id} onClick={() => openCloudFighter(f)} className="w-full card hover:border-brand-700 transition-colors text-left">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-brand-900/50 to-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <span className="text-brand-400 font-black text-lg">{f.name.charAt(0)}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-white">{f.name}</p>
+                            {f.gym && <span className="text-xs text-gray-600">· {f.gym}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="badge bg-dark-500 text-gray-500 text-xs">{f.sport}</span>
+                            <span className="badge bg-dark-500 text-gray-500 text-xs">{f.weightClass}</span>
+                            {f.latestCamp?.fight_date && (
+                              <span className="text-xs text-brand-400">{getDaysUntilFight(f.latestCamp.fight_date)}d to fight</span>
+                            )}
+                          </div>
+                        </div>
+                        {coachPro ? <ChevronRight size={16} className="text-gray-600" /> : <Lock size={14} className="text-brand-500" />}
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Camp Overview */}
         {activeCamp && (
           <div className="bg-gradient-to-br from-dark-700 to-dark-600 border border-dark-400 rounded-xl p-4 mb-4">
@@ -419,18 +603,8 @@ export default function CoachDashboard() {
           </div>
         )}
 
-        {/* Fighter List */}
-        {filtered.length === 0 ? (
-          <div className="card text-center py-10">
-            <Users size={32} className="text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 font-medium">No fighters found</p>
-            <p className="text-sm text-gray-600 mt-1">
-              {activeFighters.length === 0
-                ? 'No fighters have created accounts yet'
-                : 'No fighters match your search'}
-            </p>
-          </div>
-        ) : (
+        {/* Legacy local fighter list — only in offline/demo mode (cloud uses Connected Fighters above) */}
+        {activeFighters.length > 0 && (
           <div className="space-y-3">
             {filtered.map(f => {
               const fCamp = camps[camps.length - 1];
@@ -489,8 +663,8 @@ export default function CoachDashboard() {
         )}
       </div>
 
-      {/* Coaches list to be linked — only shown when no fighters exist */}
-      {activeFighters.length === 0 && (
+      {/* Local-mode hint — only when offline (cloud coaches use Connected Fighters) */}
+      {!authUser && activeFighters.length === 0 && (
         <div className="mx-4 card text-center py-8">
           <User size={32} className="text-gray-600 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">Fighters will appear here once they create accounts and link you as their coach in their Settings.</p>
