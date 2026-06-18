@@ -1,6 +1,14 @@
 import { supabase } from './supabase';
+import { generateId } from '../utils/storage';
 import type { Database } from './database.types';
-import type { AppState, FightCamp } from '../types';
+import type {
+  AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest,
+  WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
+  DashboardPrefs, FitbitConfig, MacroEntry, CampFactorWeights, FightRound,
+  Sport, WeightClass, ExperienceLevel, UserRole, SessionType, OffSeasonGoal, HRVSource,
+} from '../types';
+
+type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 
 /**
  * Phase 3a — push-only cloud sync (device → Supabase).
@@ -111,13 +119,16 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     // 2) Camps (parents of every log) — push before children.
     const campRows: Ins<'camps'>[] = localCamps.map(c => {
       const prefix = `${c.id}-`;
+      // Store camp-scoped keys RELATIVE to the camp (strip the local camp-id
+      // prefix) so they stay portable when a different device assigns a new
+      // local id to the same camp on pull.
       const completed: Record<string, boolean> = {};
       for (const [k, v] of Object.entries(state.completedSessions ?? {})) {
-        if (k.startsWith(prefix)) completed[k] = v;
+        if (k.startsWith(prefix)) completed[k.slice(prefix.length)] = v;
       }
       const overrides: Record<string, boolean> = {};
       for (const [k, v] of Object.entries(state.dayOverrides ?? {})) {
-        if (k.startsWith(prefix)) overrides[k] = v;
+        if (k.startsWith(prefix)) overrides[k.slice(prefix.length)] = v;
       }
       return {
         id: uuidFor(c.id),
@@ -220,4 +231,220 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     saveIdMap(map);
     return { ok: false, pushed, error: e instanceof Error ? e.message : 'Sync failed.' };
   }
+}
+
+// ─── Pull (cloud → device) ──────────────────────────────────────────────────
+
+/** A local-shaped snapshot of the signed-in user's cloud data. */
+export interface CloudSnapshot {
+  profile: FighterProfile | null;
+  camps: FightCamp[];
+  workoutLogs: WorkoutLog[];
+  sparringLogs: SparringLog[];
+  conditioningTests: ConditioningTest[];
+  weightEntries: WeightEntry[];
+  nutritionLogs: NutritionLog[];
+  hrvEntries: HRVEntry[];
+  fightResults: FightResult[];
+  gamePlans: Record<string, GamePlan>;
+  completedSessions: Record<string, boolean>;
+  dayOverrides: Record<string, boolean>;
+  gamification: GamificationState | null;
+  dashboardPrefs: DashboardPrefs | null;
+  fitbitConfig: FitbitConfig | null;
+}
+
+export interface PullResult {
+  ok: boolean;
+  snapshot?: CloudSnapshot;
+  error?: string;
+}
+
+/** Resolves cloud uuids back to stable local ids, minting+persisting new ones. */
+function makeLocalIdResolver(map: Record<string, string>) {
+  const inverse: Record<string, string> = {};
+  for (const [lid, uid] of Object.entries(map)) inverse[uid] = lid;
+  return (uuid: string): string => {
+    let lid = inverse[uuid];
+    if (!lid) {
+      lid = generateId();
+      inverse[uuid] = lid;
+      map[lid] = uuid;
+    }
+    return lid;
+  };
+}
+
+export async function pullState(userId: string): Promise<PullResult> {
+  if (!supabase) return { ok: false, error: 'Cloud sync is not configured.' };
+
+  const map = loadIdMap();
+  const lid = makeLocalIdResolver(map);
+
+  try {
+    const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('camps').select('*').eq('user_id', userId),
+      supabase.from('workout_logs').select('*').eq('user_id', userId),
+      supabase.from('sparring_logs').select('*').eq('user_id', userId),
+      supabase.from('conditioning_tests').select('*').eq('user_id', userId),
+      supabase.from('weight_entries').select('*').eq('user_id', userId),
+      supabase.from('nutrition_logs').select('*').eq('user_id', userId),
+      supabase.from('hrv_entries').select('*').eq('user_id', userId),
+      supabase.from('fight_results').select('*').eq('user_id', userId),
+      supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
+    ]);
+
+    const firstErr = [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ]
+      .map(q => q.error?.message).find(Boolean);
+    if (firstErr) return { ok: false, error: firstErr };
+
+    const gamePlans: Record<string, GamePlan> = {};
+    const completedSessions: Record<string, boolean> = {};
+    const dayOverrides: Record<string, boolean> = {};
+
+    const camps: FightCamp[] = (campsQ.data ?? []).map((c: Row<'camps'>) => {
+      const campLocalId = lid(c.id);
+      const cs = c.completed_sessions as Record<string, boolean> | null;
+      if (cs) for (const [rel, v] of Object.entries(cs)) completedSessions[`${campLocalId}-${rel}`] = v;
+      const dov = c.day_overrides as Record<string, boolean> | null;
+      if (dov) for (const [rel, v] of Object.entries(dov)) dayOverrides[`${campLocalId}-${rel}`] = v;
+      const gp = c.game_plan as GamePlan | null;
+      if (gp) gamePlans[campLocalId] = { ...gp, campId: campLocalId };
+      return {
+        id: campLocalId,
+        fightDate: c.fight_date ?? undefined,
+        opponent: c.opponent ?? undefined,
+        weightClass: c.weight_class as WeightClass,
+        currentWeight: c.current_weight,
+        targetWeight: c.target_weight,
+        rounds: c.rounds,
+        roundDuration: c.round_duration,
+        sport: c.sport as Sport,
+        experienceLevel: c.experience as ExperienceLevel,
+        campWeeks: c.camp_weeks,
+        startDate: c.start_date,
+        createdAt: c.created_at,
+        isOffSeason: c.is_off_season ?? undefined,
+        offSeasonGoal: (c.off_season_goal ?? undefined) as OffSeasonGoal | undefined,
+      };
+    });
+
+    const p = profileQ.data as Row<'profiles'> | null;
+    const profile: FighterProfile | null = p ? {
+      id: userId,
+      name: p.name,
+      age: p.age,
+      sport: p.sport as Sport,
+      weightClass: p.weight_class as WeightClass,
+      experienceLevel: p.experience as ExperienceLevel,
+      role: p.role as UserRole,
+      gym: p.gym ?? undefined,
+      record: p.record ?? undefined,
+      avatar: p.avatar_url ?? undefined,
+      createdAt: p.created_at,
+      macroTargets: (p.macro_targets ?? undefined) as MacroEntry | undefined,
+      maxHR: p.max_hr ?? undefined,
+      mepTarget: p.mep_target ?? undefined,
+      factorWeights: (p.factor_weights ?? undefined) as CampFactorWeights | undefined,
+    } : null;
+
+    const st = stateQ.data as Row<'user_state'> | null;
+
+    const snapshot: CloudSnapshot = {
+      profile,
+      camps,
+      workoutLogs: (workoutsQ.data ?? []).map((w: Row<'workout_logs'>) => ({
+        id: lid(w.id), campId: lid(w.camp_id), date: w.date, weekNumber: w.week_number,
+        dayLabel: w.day_label, sessionType: w.session_type as SessionType, title: w.title,
+        duration: w.duration, rpe: w.rpe, notes: w.notes ?? '', completed: w.completed,
+        createdAt: w.created_at, mep: w.mep ?? undefined,
+      })),
+      sparringLogs: (sparringQ.data ?? []).map((s: Row<'sparring_logs'>) => ({
+        id: lid(s.id), campId: lid(s.camp_id), date: s.date, weekNumber: s.week_number,
+        rounds: s.rounds, roundDuration: s.round_duration, partnerName: s.partner_name,
+        partnerLevel: s.partner_level, focus: s.focus, performance: s.performance as 1 | 2 | 3 | 4 | 5,
+        notes: s.notes ?? '', createdAt: s.created_at,
+      })),
+      conditioningTests: (condQ.data ?? []).map((t: Row<'conditioning_tests'>) => ({
+        id: lid(t.id), campId: lid(t.camp_id), date: t.date, weekNumber: t.week_number,
+        testType: t.test_type, value: t.value, unit: t.unit, notes: t.notes ?? '', createdAt: t.created_at,
+      })),
+      weightEntries: (weightQ.data ?? []).map((e: Row<'weight_entries'>) => ({
+        id: lid(e.id), campId: lid(e.camp_id), date: e.date, weight: e.weight,
+        notes: e.notes ?? '', createdAt: e.created_at,
+      })),
+      nutritionLogs: (nutritionQ.data ?? []).map((n: Row<'nutrition_logs'>) => ({
+        id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
+        mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
+        macros: (n.macros ?? undefined) as MacroEntry | undefined,
+        notes: n.notes ?? '', createdAt: n.created_at,
+      })),
+      hrvEntries: (hrvQ.data ?? []).map((h: Row<'hrv_entries'>) => ({
+        id: lid(h.id), campId: lid(h.camp_id), date: h.date, rmssd: h.rmssd,
+        restingHR: h.resting_hr ?? undefined, source: h.source as HRVSource,
+        notes: h.notes ?? undefined, createdAt: h.created_at,
+      })),
+      fightResults: (fightQ.data ?? []).map((r: Row<'fight_results'>) => ({
+        id: lid(r.id), campId: lid(r.camp_id), fighterId: userId, fightDate: r.fight_date,
+        opponent: r.opponent, outcome: r.outcome as FightResult['outcome'],
+        method: r.method as FightResult['method'], roundStopped: r.round_stopped ?? undefined,
+        totalRounds: r.total_rounds, rounds: (r.rounds ?? []) as unknown as FightRound[],
+        weighInWeight: r.weigh_in_weight ?? undefined, fightNightWeight: r.fight_night_weight ?? undefined,
+        stylePlanFollowed: (r.style_plan_followed ?? 3) as 1 | 2 | 3 | 4 | 5,
+        overallNotes: r.overall_notes ?? '', lessons: r.lessons ?? '',
+        readinessAtFight: r.readiness_at_fight ?? undefined, createdAt: r.created_at,
+      })),
+      gamePlans,
+      completedSessions,
+      dayOverrides,
+      gamification: (st?.gamification ?? null) as GamificationState | null,
+      dashboardPrefs: (st?.dashboard_prefs ?? null) as DashboardPrefs | null,
+      fitbitConfig: (st?.fitbit_config ?? null) as FitbitConfig | null,
+    };
+
+    saveIdMap(map);
+    return { ok: true, snapshot };
+  } catch (e) {
+    saveIdMap(map);
+    return { ok: false, error: e instanceof Error ? e.message : 'Pull failed.' };
+  }
+}
+
+/**
+ * Conservative union merge: cloud records fill in anything missing locally, but
+ * a record present on both sides keeps the LOCAL copy (the active device wins).
+ * After logout/reset the local store is empty, so this restores everything.
+ * Subscription is intentionally never pulled — it's owned by RevenueCat/Stripe.
+ */
+export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
+  const union = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
+    const ids = new Set(local.map(x => x.id));
+    return [...local, ...cloud.filter(x => !ids.has(x.id))];
+  };
+
+  const camps = union(state.camps, c.camps);
+  return {
+    ...state,
+    currentUser: state.currentUser ?? c.profile,
+    fighters: c.profile && !state.fighters.some(f => f.id === c.profile!.id)
+      ? [...state.fighters, c.profile]
+      : state.fighters,
+    camps,
+    activeCamp: state.activeCamp ?? (camps[camps.length - 1] ?? null),
+    workoutLogs: union(state.workoutLogs, c.workoutLogs),
+    sparringLogs: union(state.sparringLogs, c.sparringLogs),
+    conditioningTests: union(state.conditioningTests, c.conditioningTests),
+    weightEntries: union(state.weightEntries, c.weightEntries),
+    nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
+    hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
+    fightResults: union(state.fightResults ?? [], c.fightResults),
+    // Cloud first so local keys win on conflict.
+    completedSessions: { ...c.completedSessions, ...state.completedSessions },
+    dayOverrides: { ...c.dayOverrides, ...state.dayOverrides },
+    gamePlans: { ...c.gamePlans, ...state.gamePlans },
+    gamification: state.gamification ?? c.gamification ?? undefined,
+    dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
+    fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
+  };
 }
