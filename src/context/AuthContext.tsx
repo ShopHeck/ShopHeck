@@ -1,6 +1,20 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+const APPLE_BUNDLE_ID = 'app.fightcamptraining';
+
+function randomNonce(length = 32): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._';
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, b => chars[b % chars.length]).join('');
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
 
 interface AuthValue {
   /** True when Supabase env is present — i.e. accounts are available at all. */
@@ -51,6 +65,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInApple() {
     if (!supabase) return { error: 'Accounts are not available right now.' };
+
+    // Native iOS: use the real "Sign in with Apple" sheet and exchange the
+    // identity token with Supabase. A nonce (hashed for Apple, raw for Supabase)
+    // guards against replay.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+        const rawNonce = randomNonce();
+        const hashedNonce = await sha256Hex(rawNonce);
+        const result = await SignInWithApple.authorize({
+          clientId: APPLE_BUNDLE_ID,
+          redirectURI: `${supabase ? new URL(import.meta.env.VITE_SUPABASE_URL as string).origin : ''}/auth/v1/callback`,
+          scopes: 'email name',
+          nonce: hashedNonce,
+        });
+        const idToken = result.response?.identityToken;
+        if (!idToken) return { error: 'Apple sign-in was cancelled.' };
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: idToken,
+          nonce: rawNonce,
+        });
+        return error ? { error: error.message } : {};
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Apple sign-in failed.';
+        // User cancelling the native sheet shouldn't read as an error.
+        if (/cancel/i.test(msg)) return {};
+        return { error: msg };
+      }
+    }
+
+    // Web: standard OAuth redirect flow.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: { redirectTo: window.location.origin },
