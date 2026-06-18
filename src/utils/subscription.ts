@@ -25,6 +25,32 @@ export function saveSubscription(s: SubscriptionState): void {
   try { localStorage.setItem(SUB_KEY, JSON.stringify(s)); } catch { /* noop */ }
 }
 
+/**
+ * Comp ("complimentary") access — founder / internal-test accounts that get the
+ * full Coach Pro tier for free, tied to their signed-in account email. The owner
+ * account is built in; add more testers via VITE_COMP_PRO_EMAILS (comma-separated)
+ * with no code change. Safe even though entitlement checks are client-side: a
+ * person must actually authenticate as one of these emails (via Supabase) for it
+ * to apply, and it grants nothing to anyone else.
+ */
+const COMP_PRO_EMAILS: ReadonlySet<string> = new Set(
+  ['michaelheckert@heckholdings.com', ...(import.meta.env.VITE_COMP_PRO_EMAILS ?? '').split(',')]
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+/** Lifetime Coach Pro granted to comp accounts (no expiry = perpetual). */
+export const COMP_SUBSCRIPTION: SubscriptionState = {
+  tier: 'coach_pro',
+  expiresAt: null,
+  source: 'comp',
+};
+
+/** True when this account email is on the comp list and entitled to Coach Pro. */
+export function isCompEmail(email: string | null | undefined): boolean {
+  return !!email && COMP_PRO_EMAILS.has(email.trim().toLowerCase());
+}
+
 export function isPro(s: SubscriptionState): boolean {
   if (s.tier === 'free') return false;
   if (!s.expiresAt) return true; // no expiry = perpetual
