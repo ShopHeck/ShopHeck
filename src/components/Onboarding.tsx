@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell, Apple, Cloud } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import AuthScreen from './AuthScreen';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
@@ -34,8 +36,13 @@ interface Props {
 
 export default function Onboarding({ campOnly = false, offSeasonOnly = false, onClose }: Props) {
   const { state, dispatch } = useApp();
+  const { configured: authConfigured, user: authUser } = useAuth();
   const [step, setStep] = useState(campOnly ? 1 : 0);
   const [role, setRole] = useState<UserRole>('fighter');
+
+  // First-run account gate: offer cloud account vs. guest before the profile form.
+  const [continueAsGuest, setContinueAsGuest] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   // Profile
   const [name, setName] = useState('');
@@ -306,6 +313,50 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             )}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ─── Account gate (first run, before the profile form) ──────────────────────
+  // Shown only when cloud accounts are available and nobody is signed in. Signing
+  // in restores an existing user's data; guests skip straight to profile setup.
+  if (!campOnly && authConfigured && !authUser && !continueAsGuest) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex flex-col">
+        <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
+          <div className="relative">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-900/50">
+              <Flame size={32} className="text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">FIGHT CAMP</h1>
+            <p className="text-brand-400 font-semibold text-sm uppercase tracking-widest">Training Platform</p>
+            <p className="text-gray-400 text-sm mt-3 max-w-xs mx-auto">
+              Plan your camp. Track your progress. Win on fight night.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full px-5 gap-4">
+          <div className="flex items-start gap-3 text-left bg-dark-800/60 border border-dark-600 rounded-xl p-3.5">
+            <Cloud size={18} className="text-brand-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Create an account to back up your camps and sync across devices — or jump
+              straight in as a guest. You can always create one later in Settings.
+            </p>
+          </div>
+
+          <button onClick={() => setShowAuth(true)} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Apple size={18} /> Create account or sign in
+          </button>
+          <button
+            onClick={() => setContinueAsGuest(true)}
+            className="btn-secondary w-full"
+          >
+            Continue as guest
+          </button>
+        </div>
+
+        {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
       </div>
     );
   }
