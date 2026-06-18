@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
-import { processStripeReturn, saveSubscription, checkNativeSubscription } from '../utils/subscription';
+import { processStripeReturn, saveSubscription, checkNativeSubscription, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
   saveState,
@@ -35,6 +35,7 @@ import {
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
+import { useAuth } from './AuthContext';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
@@ -258,6 +259,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return loaded;
   });
 
+  const { user, loading: authLoading } = useAuth();
+
   // Process Stripe Payment Link return on web mount
   useEffect(() => {
     const sub = processStripeReturn();
@@ -282,8 +285,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       } else if (currentSource === 'revenuecat' || currentSource === 'none') {
         // RevenueCat confirmed no active entitlement. Only reset if the stored
-        // subscription was from RevenueCat (not a Stripe web purchase) so we don't
-        // accidentally revoke web subscribers opening the app on iOS.
+        // subscription was from RevenueCat (not a Stripe web purchase or a comp
+        // grant) so we don't accidentally revoke those opening the app on iOS.
         dispatch({
           type: 'SET_SUBSCRIPTION',
           payload: { tier: 'free', expiresAt: null, source: 'none' },
@@ -292,6 +295,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Comp ("complimentary") access: founder / internal-test accounts (see
+  // isCompEmail) get lifetime Coach Pro tied to the signed-in email. This follows
+  // the account across devices/reinstalls and outranks the RevenueCat sync above,
+  // so testers reach every Pro feature without a real purchase. Reverts to free
+  // when a comp account signs out. Wait for the initial session restore
+  // (authLoading) before reconciling so we don't transiently revoke on reload.
+  useEffect(() => {
+    if (authLoading) return;
+    const { source, tier } = state.subscription;
+    if (isCompEmail(user?.email)) {
+      if (source !== 'comp' || tier !== 'coach_pro') {
+        dispatch({ type: 'SET_SUBSCRIPTION', payload: COMP_SUBSCRIPTION });
+      }
+    } else if (source === 'comp') {
+      dispatch({ type: 'SET_SUBSCRIPTION', payload: DEFAULT_SUBSCRIPTION });
+    }
+  }, [authLoading, user?.email, state.subscription]);
 
   useEffect(() => {
     saveState(state);
