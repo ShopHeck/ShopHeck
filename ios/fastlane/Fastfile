@@ -89,28 +89,79 @@ platform :ios do
     rc_key = ENV["REVENUECAT_API_KEY"].to_s
     UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
 
-    # Pass the App Store Connect API key to xcodebuild so -allowProvisioningUpdates
-    # can create/download the distribution cert + App Store profile headlessly.
-    signing_args = [
-      "-allowProvisioningUpdates",
-      "-authenticationKeyPath #{ASC_KEY_PATH}",
-      "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
-      "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
-    ].join(" ")
+    match_git_url = ENV["MATCH_GIT_URL"].to_s
 
-    build_app(
-      scheme: "App",
-      workspace: "App/App.xcworkspace",
-      configuration: "Release",
-      export_method: "app-store",
-      clean: true,
-      output_directory: "./build",
-      output_name: "FightCampTraining.ipa",
-      xcargs: "#{signing_args} REVENUECAT_API_KEY='#{rc_key}'",
-      export_options: {
-        signingStyle: "automatic",
-        teamID: TEAM_ID
-      }
+    if match_git_url.empty?
+      # ── Automatic ("cloud") signing ──────────────────────────────────────
+      # Xcode mints/downloads the distribution cert + App Store profile on
+      # demand via -allowProvisioningUpdates, authenticated by the API key.
+      # Simple, but it creates a NEW certificate on each fresh machine, so a
+      # busy CI can eventually hit Apple's certificate cap. Set the MATCH_*
+      # secrets (see docs/ios-signing.md) to switch to the shared cert below.
+      signing_args = [
+        "-allowProvisioningUpdates",
+        "-authenticationKeyPath #{ASC_KEY_PATH}",
+        "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+        "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
+      ].join(" ")
+
+      build_app(
+        scheme: "App",
+        workspace: "App/App.xcworkspace",
+        configuration: "Release",
+        export_method: "app-store",
+        clean: true,
+        output_directory: "./build",
+        output_name: "FightCampTraining.ipa",
+        xcargs: "#{signing_args} REVENUECAT_API_KEY='#{rc_key}'",
+        export_options: {
+          signingStyle: "automatic",
+          teamID: TEAM_ID
+        }
+      )
+    else
+      # ── Shared signing via fastlane match ────────────────────────────────
+      # One distribution cert + profile, stored encrypted in MATCH_GIT_URL and
+      # reused by every build — no per-run certificate churn. Read-only here;
+      # run the `certs` lane once to create/refresh what's in storage.
+      match(
+        type: "appstore",
+        app_identifier: APP_IDENTIFIER,
+        git_url: match_git_url,
+        readonly: true
+      )
+
+      build_app(
+        scheme: "App",
+        workspace: "App/App.xcworkspace",
+        configuration: "Release",
+        export_method: "app-store",
+        clean: true,
+        output_directory: "./build",
+        output_name: "FightCampTraining.ipa",
+        xcargs: "REVENUECAT_API_KEY='#{rc_key}'",
+        export_options: {
+          signingStyle: "manual",
+          teamID: TEAM_ID,
+          provisioningProfiles: {
+            APP_IDENTIFIER => "match AppStore #{APP_IDENTIFIER}"
+          }
+        }
+      )
+    end
+  end
+
+  # Create or refresh the shared signing cert + profile in match storage.
+  # Run ONCE after setting the MATCH_* secrets: Actions → iOS Build → Run
+  # workflow → lane: certs.
+  desc "Bootstrap/refresh the shared match signing certificate"
+  lane :certs do
+    UI.user_error!("MATCH_GIT_URL must be set to use match") if ENV["MATCH_GIT_URL"].to_s.empty?
+    match(
+      type: "appstore",
+      app_identifier: APP_IDENTIFIER,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      readonly: false
     )
   end
 end

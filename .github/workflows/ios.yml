@@ -24,6 +24,14 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      lane:
+        description: 'Fastlane lane to run'
+        default: 'beta'
+        type: choice
+        options:
+          - beta
+          - certs   # one-time: create/refresh the shared match signing cert
 
 # Only one TestFlight build at a time. A newer push cancels an in-flight run so
 # we always ship the latest commit and never race on the auto-incremented build
@@ -81,7 +89,7 @@ jobs:
         working-directory: ios/App
 
       - name: Upload to TestFlight via Fastlane
-        run: bundle exec fastlane beta
+        run: bundle exec fastlane ${{ github.event.inputs.lane || 'beta' }}
         working-directory: ios
         env:
           # App Store Connect API key — drives both automatic signing and upload.
@@ -90,3 +98,9 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           # Production RevenueCat key injected into the Release build.
           REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+          # Shared signing via fastlane match. When these are unset the Fastfile
+          # falls back to automatic signing, so the pipeline keeps working until
+          # they're configured (see docs/ios-signing.md).
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
