@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
+import { SyncProvider } from './context/SyncContext';
 import { TimerProvider, useTimerContext } from './context/TimerContext';
 import ViewSkeleton from './components/shared/ViewSkeleton';
 import type { SessionType } from './types';
@@ -291,7 +292,9 @@ export default function App() {
   return (
     <TimerProvider>
       <AppProvider>
-        <AppShell />
+        <SyncProvider>
+          <AppShell />
+        </SyncProvider>
       </AppProvider>
     </TimerProvider>
   );
