@@ -9,3 +9,8 @@
 
 #include "../Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"
 #include? "Secrets.xcconfig"
+
+// Sign in with Apple capability (native iOS). Path is relative to the project
+// dir (ios/App). The App ID must also have "Sign In with Apple" enabled in the
+// Apple Developer portal, or automatic signing can't build a matching profile.
+CODE_SIGN_ENTITLEMENTS = App/App.entitlements
