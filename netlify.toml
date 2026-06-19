@@ -6,6 +6,7 @@
 # is served at /.netlify/functions/stripe-webhook — a reserved path that is not
 # affected by the SPA catch-all rewrite below.
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
 [[redirects]]

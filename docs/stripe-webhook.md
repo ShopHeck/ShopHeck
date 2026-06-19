@@ -11,7 +11,7 @@ this is the web path only.)
    `prefilled_email`) to the Stripe Payment Link.
 2. **Stripe → webhook.** On `checkout.session.completed` /
    `customer.subscription.updated` / `customer.subscription.deleted`, Stripe
-   calls [`netlify/functions/stripe-webhook.mts`](../netlify/functions/stripe-webhook.mts).
+   calls [`netlify/functions/stripe-webhook.ts`](../netlify/functions/stripe-webhook.ts).
    It verifies the signature, then upserts the verified entitlement into
    `public.stripe_subscriptions` using the **service-role key**.
 3. **Client reads the truth.** `fetchServerSubscription()` (in
