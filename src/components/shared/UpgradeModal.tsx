@@ -236,8 +236,16 @@ export default function UpgradeModal({ onClose }: Props) {
             <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
           )}
 
-          <p className="text-center text-xs text-gray-600">
-            Cancel anytime. No commitment required.
+          <p className="text-center text-[11px] leading-relaxed text-gray-600">
+            {Capacitor.isNativePlatform()
+              ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
+              : 'Cancel anytime. No commitment required.'}
+          </p>
+
+          <p className="text-center text-[11px] text-gray-500">
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use</a>
+            <span className="mx-1.5">·</span>
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
           </p>
 
           {Capacitor.isNativePlatform() && (
