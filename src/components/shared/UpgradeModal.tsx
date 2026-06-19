@@ -28,16 +28,19 @@ const COACH_PRO_FEATURES = [
   'Team analytics overview',
 ];
 
-// Stripe Payment Link URLs — set via .env (see .env.example)
-// Each link's success URL must include: ?tier=fighter_pro&stripe_session={CHECKOUT_SESSION_ID}
+// Stripe Payment Link URLs. Env vars (set in the host, e.g. Netlify) take
+// precedence; the literals are the production fallback so the buttons work even
+// when env vars aren't configured. Payment Link URLs are public, not secrets.
+// Each link's success URL is configured in Stripe to redirect back with
+// ?tier=<fighter_pro|coach_pro>&stripe_session={CHECKOUT_SESSION_ID}.
 const LINKS = {
   fighter: {
-    monthly: import.meta.env.VITE_STRIPE_FIGHTER_PRO_MONTHLY as string | undefined,
-    annual:  import.meta.env.VITE_STRIPE_FIGHTER_PRO_ANNUAL  as string | undefined,
+    monthly: (import.meta.env.VITE_STRIPE_FIGHTER_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/aFa28r7BY2t13JafKwgYU00',
+    annual:  (import.meta.env.VITE_STRIPE_FIGHTER_PRO_ANNUAL  as string | undefined) || 'https://buy.stripe.com/4gMfZh7BYaZx1B20PCgYU03',
   },
   coach: {
-    monthly: import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined,
-    annual:  import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL  as string | undefined,
+    monthly: (import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/cNi3cvf4q2t1cfG41OgYU01',
+    annual:  (import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL  as string | undefined) || 'https://buy.stripe.com/28EcN57BY2t13Ja55SgYU02',
   },
 };
 
