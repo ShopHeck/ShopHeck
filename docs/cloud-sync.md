@@ -5,11 +5,11 @@ in is optional and adds cloud backup, cross-device sync, and coach access.
 
 ## Project
 
-- **Supabase project:** `Fight Camp` (`edxadcgotbdipyndtoph`, region `us-east-1`)
+- **Supabase project:** `Fight Camp` (`<project-ref>`, region `us-east-1`)
 - **Schema:** see [`../supabase/schema.sql`](../supabase/schema.sql) — profiles,
   camps, all logs/entries, coach-linking, RLS, and the signup trigger.
 - **Generated types:** [`../src/lib/database.types.ts`](../src/lib/database.types.ts)
-  (regenerate with `npx supabase gen types typescript --project-id=edxadcgotbdipyndtoph --schema=public`).
+  (regenerate with `npx supabase gen types typescript --project-id=<project-ref> --schema=public`).
 
 ## Required environment variables
 
@@ -17,7 +17,7 @@ These activate accounts/sync. The anon key is a **publishable** client key and i
 safe to expose. The app stays fully local-first when they're absent.
 
 ```
-VITE_SUPABASE_URL=https://edxadcgotbdipyndtoph.supabase.co
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<publishable anon key from Supabase → Settings → API>
 ```
 
