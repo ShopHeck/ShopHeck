@@ -36,6 +36,7 @@ import {
 import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 import { useAuth } from './AuthContext';
+import { fetchServerSubscription } from '../lib/sync';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
@@ -313,6 +314,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_SUBSCRIPTION', payload: DEFAULT_SUBSCRIPTION });
     }
   }, [authLoading, user?.email, state.subscription]);
+
+  // Server-verified Stripe entitlement (web). Once the Stripe webhook records a
+  // subscription in Supabase, that row — not the client-side soft unlock — is the
+  // source of truth. After sign-in we fetch it and apply it. We only *downgrade*
+  // a subscription that was itself server-verified, so we never clobber the
+  // optimistic soft unlock from a checkout return before the webhook lands, nor a
+  // comp / RevenueCat grant. Comp accounts are skipped entirely (comp wins).
+  useEffect(() => {
+    if (authLoading || !user?.id || isCompEmail(user.email)) return;
+    let cancelled = false;
+    fetchServerSubscription(user.id).then(server => {
+      if (cancelled || !server) return; // null = no row / offline — leave as-is
+      const cur = state.subscription;
+      if (server.tier !== 'free') {
+        if (cur.source !== 'stripe_server' || cur.tier !== server.tier || cur.expiresAt !== server.expiresAt) {
+          dispatch({ type: 'SET_SUBSCRIPTION', payload: server });
+        }
+      } else if (cur.source === 'stripe_server') {
+        dispatch({ type: 'SET_SUBSCRIPTION', payload: DEFAULT_SUBSCRIPTION });
+      }
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, user?.email]);
 
   useEffect(() => {
     saveState(state);
