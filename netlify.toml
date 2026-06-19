@@ -2,6 +2,14 @@
   command = "npm run build"
   publish = "dist"
 
+# The Supabase URL is public — it ships in the client bundle as VITE_SUPABASE_URL
+# and is protected by RLS, not secrecy. Without this, Netlify's secrets scanner
+# flags the plain SUPABASE_URL env var's value where it legitimately appears (the
+# client bundle / docs) and aborts the build. Real secrets (SUPABASE_SERVICE_ROLE_KEY,
+# STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) are intentionally NOT omitted.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
+
 # Serverless functions (netlify/functions/*). The Stripe webhook lives here and
 # is served at /.netlify/functions/stripe-webhook — a reserved path that is not
 # affected by the SPA catch-all rewrite below.
