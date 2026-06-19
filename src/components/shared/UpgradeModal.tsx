@@ -3,6 +3,7 @@ import { X, Check, Zap, Trophy } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../../plugins/RevenueCat';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface Props {
   onClose: () => void;
@@ -51,6 +52,7 @@ const PRICES = {
 
 export default function UpgradeModal({ onClose }: Props) {
   const { dispatch } = useApp();
+  const { user } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,9 +83,15 @@ export default function UpgradeModal({ onClose }: Props) {
         setLoading(false);
       }
     } else {
-      const url = LINKS[tier][billing];
-      if (url) {
-        window.location.href = url;
+      const base = LINKS[tier][billing];
+      if (base) {
+        // Tie the checkout to the signed-in account so the Stripe webhook can
+        // grant the entitlement server-side: Stripe echoes client_reference_id
+        // back on checkout.session.completed. prefilled_email saves a keystroke.
+        const url = new URL(base);
+        if (user?.id) url.searchParams.set('client_reference_id', user.id);
+        if (user?.email) url.searchParams.set('prefilled_email', user.email);
+        window.location.href = url.toString();
       } else {
         setNotice('Payment links not yet configured — check back soon!');
       }

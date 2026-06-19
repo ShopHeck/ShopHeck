@@ -515,3 +515,35 @@ revoke execute on function public.is_coach_of(uuid) from public;
 grant  execute on function public.is_coach_of(uuid) to authenticated;
 revoke execute on function public.redeem_coach_invite(text) from public;
 grant  execute on function public.redeem_coach_invite(text) to authenticated;
+
+------------------------------------------------------------
+-- stripe_subscriptions — server-authoritative web entitlements.
+-- Written ONLY by the Stripe webhook (netlify/functions/stripe-webhook) using
+-- the service-role key, which bypasses RLS. Clients may READ their own row but
+-- can never write it, so a tampered client cannot grant itself Pro. This is the
+-- source of truth for web subscriptions; iOS uses RevenueCat, and
+-- user_state.subscription stays a non-authoritative client mirror.
+------------------------------------------------------------
+create table if not exists public.stripe_subscriptions (
+  user_id                uuid primary key references auth.users(id) on delete cascade,
+  stripe_customer_id     text,
+  stripe_subscription_id text,
+  tier                   text not null check (tier in ('fighter_pro','coach_pro')),
+  status                 text not null,        -- Stripe sub status: trialing|active|past_due|canceled|...
+  current_period_end     timestamptz,          -- access valid through here
+  cancel_at_period_end   boolean not null default false,
+  updated_at             timestamptz not null default now()
+);
+create index if not exists stripe_subscriptions_customer_idx
+  on public.stripe_subscriptions(stripe_customer_id);
+drop trigger if exists stripe_subscriptions_touch on public.stripe_subscriptions;
+create trigger stripe_subscriptions_touch before update on public.stripe_subscriptions
+  for each row execute function public.touch_updated_at();
+
+alter table public.stripe_subscriptions enable row level security;
+-- Owner may READ their entitlement; nobody (except the service role, which
+-- bypasses RLS) may write. The absence of insert/update/delete policies is
+-- intentional — it's what makes this server-authoritative.
+drop policy if exists "stripe_subscriptions_own_select" on public.stripe_subscriptions;
+create policy "stripe_subscriptions_own_select" on public.stripe_subscriptions
+  for select using (user_id = auth.uid());

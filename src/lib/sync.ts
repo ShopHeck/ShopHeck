@@ -6,6 +6,7 @@ import type {
   WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
   DashboardPrefs, FitbitConfig, MacroEntry, CampFactorWeights, FightRound,
   Sport, WeightClass, ExperienceLevel, UserRole, SessionType, OffSeasonGoal, HRVSource,
+  SubscriptionState,
 } from '../types';
 
 type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
@@ -447,4 +448,44 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
   };
+}
+
+// ─── Server-verified Stripe entitlement (read-only) ─────────────────────────
+
+/**
+ * Reads the signed-in user's server-authoritative subscription from the
+ * `stripe_subscriptions` table the Stripe webhook maintains. RLS lets a user
+ * read only their own row, and nothing client-side can write it.
+ *
+ * Returns:
+ *   - `null` when Supabase is unconfigured, offline/errored, or there is no row
+ *     (the caller should leave the current subscription unchanged).
+ *   - an ACTIVE entitlement `{ tier, expiresAt, source: 'stripe_server' }` when
+ *     the subscription is live (trialing / active / in grace) and unexpired.
+ *   - a free sentinel `{ tier: 'free', ... }` when a row exists but is no longer
+ *     active, so the caller can downgrade a previously server-verified user.
+ */
+export async function fetchServerSubscription(userId: string): Promise<SubscriptionState | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('stripe_subscriptions')
+      .select('tier,status,current_period_end')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    // Keep access through past_due (Stripe's dunning/retry grace) so a transient
+    // failed charge doesn't instantly lock a paying user out. The tier check is
+    // inline so TS narrows data.tier (typed `string`) to SubscriptionTier.
+    const activeStatus = data.status === 'active' || data.status === 'trialing' || data.status === 'past_due';
+    const unexpired = !data.current_period_end || new Date(data.current_period_end) > new Date();
+
+    if (activeStatus && unexpired && (data.tier === 'fighter_pro' || data.tier === 'coach_pro')) {
+      return { tier: data.tier, expiresAt: data.current_period_end, source: 'stripe_server' };
+    }
+    return { tier: 'free', expiresAt: null, source: 'stripe_server' };
+  } catch {
+    return null;
+  }
 }

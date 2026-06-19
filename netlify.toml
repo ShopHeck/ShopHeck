@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+# Serverless functions (netlify/functions/*). The Stripe webhook lives here and
+# is served at /.netlify/functions/stripe-webhook — a reserved path that is not
+# affected by the SPA catch-all rewrite below.
+[functions]
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
