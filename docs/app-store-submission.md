@@ -22,7 +22,7 @@ For CI / Fastlane: instead of editing the file, export `REVENUECAT_API_KEY` and 
 
 1. Sign in at https://appstoreconnect.apple.com.
 2. **Users and Access → Integrations → App Store Connect API**: create an API key with Admin role. Save the `.p8`, Issuer ID, and Key ID for Fastlane.
-3. **Certificates, Identifiers & Profiles** → register App ID `app.fightcamptraining` with capabilities: In-App Purchase, Push Notifications (if used), Associated Domains (if deep linking).
+3. **Certificates, Identifiers & Profiles** → register App ID `app.fightcamptraining` with capabilities: In-App Purchase, Sign in with Apple, HealthKit, Push Notifications (if used), Associated Domains (if deep linking). HealthKit is required by the "Sync to Apple Health" write-back (Settings); the app already declares `NSHealthUpdateUsageDescription`/`NSHealthShareUsageDescription` in Info.plist.
 4. **My Apps → +** → New App:
    - Platform: iOS
    - Name: `Fight Camp Training`

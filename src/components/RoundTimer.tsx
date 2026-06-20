@@ -7,6 +7,7 @@ import {
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
 import { loadCustomPresets, saveCustomPresets, generateId } from '../utils/storage';
 import { useApp } from '../context/AppContext';
+import { writeWorkoutToHealth } from '../utils/healthSync';
 import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import GymDisplay from './GymDisplay';
@@ -162,6 +163,11 @@ export default function RoundTimer() {
         completed: true,
         ...(hr.connected && mep > 0 ? { mep } : {}),
       },
+    });
+    void writeWorkoutToHealth({
+      sessionType: 'conditioning',
+      date: new Date().toISOString().slice(0, 10),
+      duration: Math.round(totalSec / 60),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
