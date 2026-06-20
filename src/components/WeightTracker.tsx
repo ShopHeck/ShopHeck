@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
+import { writeWeightToHealth } from '../utils/healthSync';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import {
   LineChart,
@@ -112,6 +113,7 @@ export default function WeightTracker() {
         notes,
       },
     });
+    void writeWeightToHealth({ date, weight: parseFloat(weight) });
     setWeight('');
     setNotes('');
     setShowModal(false);

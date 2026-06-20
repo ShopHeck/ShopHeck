@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -9,6 +9,7 @@ import { useApp } from '../context/AppContext';
 import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
+import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
@@ -132,6 +133,13 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     setReminders(true);
     const weighIn = !!(activeCamp && !activeCamp.isOffSeason && activeCamp.fightDate);
     await syncReminders({ weighIn });
+  }
+
+  // Apple Health write-back (native iOS only)
+  const [healthSync, setHealthSync] = useState(isHealthWriteEnabled());
+  async function toggleHealthSync() {
+    const result = await setHealthWriteEnabled(!healthSync);
+    setHealthSync(result);
   }
 
   async function handleSaveBell() {
@@ -824,6 +832,25 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
               <div className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${reminders ? 'bg-brand-600' : 'bg-dark-500'}`}>
                 <div className={`w-5 h-5 rounded-full bg-white transition-transform ${reminders ? 'translate-x-4' : ''}`} />
+              </div>
+            </button>
+          )}
+          {Capacitor.isNativePlatform() && (
+            <button
+              onClick={toggleHealthSync}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+            >
+              <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <HeartPulse size={15} className={healthSync ? 'text-brand-400' : 'text-gray-500'} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">Sync to Apple Health</p>
+                <p className="text-xs text-gray-600">
+                  {healthSync ? 'On — new workouts & weigh-ins saved to Health' : 'Off — tap to enable'}
+                </p>
+              </div>
+              <div className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${healthSync ? 'bg-brand-600' : 'bg-dark-500'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white transition-transform ${healthSync ? 'translate-x-4' : ''}`} />
               </div>
             </button>
           )}

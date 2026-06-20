@@ -6,6 +6,7 @@ import { format, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
 import ShareCard from './ShareCard';
 import type { SessionType, WorkoutLog } from '../types';
+import { writeWorkoutToHealth } from '../utils/healthSync';
 import type { LogPrefill } from '../App';
 
 const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
@@ -117,6 +118,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       completed: true,
     };
     dispatch({ type: 'LOG_WORKOUT', payload });
+    void writeWorkoutToHealth(payload);
     // Build a temp log object for the share card (id/createdAt not needed for display)
     const tempLog: WorkoutLog = { ...payload, id: 'temp', createdAt: new Date().toISOString() };
     setWTitle(''); setWNotes(''); setShowModal(false);
