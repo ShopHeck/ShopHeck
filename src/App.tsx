@@ -85,6 +85,15 @@ function FlashOverlay() {
 function AppShell() {
   const { state } = useApp();
   const [view, setView] = useState<View>('dashboard');
+
+  // Screenshot harness (?shot): expose the view setter so the Playwright capture
+  // script can navigate deterministically. No-op in normal use.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot')) {
+      (window as unknown as { __setView?: (v: string) => void }).__setView = (v) => setView(v as View);
+    }
+  }, []);
+
   const [showNewCamp, setShowNewCamp] = useState(false);
   const [showNewOffSeason, setShowNewOffSeason] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);

@@ -105,6 +105,21 @@ Notes:
 
 ## Screenshots — shot list
 
+### Automated capture (recommended)
+
+A Playwright script renders the real app at every App Store size and saves correctly-sized PNGs — no Mac or device needed:
+
+```bash
+npm i -D playwright && npx playwright install chromium   # one-time
+npm run build
+npm run preview &                                        # serves http://localhost:4173
+npm run screenshots                                      # -> ios/fastlane/screenshots/en-US/
+```
+
+`?shot=1` seeds a demo camp + Pro (`src/utils/demoSeed.ts`); the script navigates each screen via `window.__setView` and captures 6.9", 6.7", and iPad 13". Re-run any release; upload in App Store Connect (or `fastlane deliver`). Edit the screen list/captions in `scripts/screenshots.mjs`. The **Coach Dashboard** shot needs a coach account — capture that one manually if you want it.
+
+### Manual capture (alternative)
+
 Apple now accepts a single iPhone size that scales: capture at **6.9" (1320×2868)** or **6.7" (1290×2796)**. Add **iPad 13" (2064×2752)** only if you ship iPad. Easiest capture path: run the app in the iOS Simulator (iPhone 16 Pro Max = 6.9", or 15 Pro Max = 6.7") via `npm run cap:ios`, then File → Save Screen (⌘S) on each screen.
 
 Capture 5–7, in this order, with a short caption banner on each:
