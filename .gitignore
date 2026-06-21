@@ -12,6 +12,9 @@ dist
 dist-ssr
 .netlify
 *.local
+
+# Generated App Store screenshots (npm run screenshots)
+ios/fastlane/screenshots/
 .env
 .env.*
 !.env.example

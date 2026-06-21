@@ -37,6 +37,7 @@ import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 import { useAuth } from './AuthContext';
 import { fetchServerSubscription } from '../lib/sync';
+import { seedDemoState } from '../utils/demoSeed';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
@@ -253,7 +254,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => {
     // Always regenerate trainingSchedule from activeCamp so cached stale week
     // dates (from before generator fixes) are never used.
-    const loaded = loadState();
+    // `?shot` loads a demo state for App Store screenshot capture (see demoSeed).
+    const loaded = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot')
+      ? seedDemoState()
+      : loadState();
     if (loaded.activeCamp) {
       return setSchedule(loaded, generateTrainingCamp(loaded.activeCamp, loaded.currentUser?.factorWeights));
     }
