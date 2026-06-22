@@ -10,7 +10,7 @@ Paste-ready copy + assets for the App Store Connect listing. Character limits no
 | **Support URL** (required) | `https://fightcamp.netlify.app/support.html` |
 | **Marketing URL** (optional) | `https://fightcamp.netlify.app` |
 
-> The support page lists `support@fightcamptraining.app` — make sure that inbox is monitored before you go live (Apple and users may use it).
+> The support page lists `heck@kingkillers.co` — make sure that inbox is monitored before you go live (Apple and users may use it).
 
 ## Name & subtitle
 
@@ -137,7 +137,7 @@ Tips: use a fully-populated demo camp (not empty states), enable Pro (comp accou
 ## Final pre-submit checklist
 
 - [ ] Privacy + Support URLs resolve (they're live on `fightcamp.netlify.app` once this merges)
-- [ ] `support@fightcamptraining.app` inbox monitored
+- [ ] `heck@kingkillers.co` inbox monitored
 - [ ] Reviewer demo email added to `VITE_COMP_PRO_EMAILS`
 - [ ] Screenshots uploaded for the required size(s)
 - [ ] App Privacy answers match this doc
