@@ -243,9 +243,9 @@ export default function UpgradeModal({ onClose }: Props) {
           </p>
 
           <p className="text-center text-[11px] text-gray-500">
-            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use</a>
+            <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use (EULA)</a>
             <span className="mx-1.5">·</span>
-            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
+            <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
           </p>
 
           {Capacitor.isNativePlatform() && (

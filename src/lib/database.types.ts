@@ -792,6 +792,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_account: { Args: Record<string, never>; Returns: undefined }
       is_coach_of: { Args: { fighter: string }; Returns: boolean }
       redeem_coach_invite: { Args: { invite_code: string }; Returns: string }
     }

@@ -547,3 +547,26 @@ alter table public.stripe_subscriptions enable row level security;
 drop policy if exists "stripe_subscriptions_own_select" on public.stripe_subscriptions;
 create policy "stripe_subscriptions_own_select" on public.stripe_subscriptions
   for select using (user_id = auth.uid());
+
+------------------------------------------------------------
+-- Account deletion (App Store Guideline 5.1.1(v))
+-- A signed-in user can permanently delete their own account. Deleting the
+-- auth.users row cascades through every public table via the on-delete-cascade
+-- FKs (profiles, camps, logs, user_state, stripe_subscriptions, coach links…),
+-- so no data is left behind. SECURITY DEFINER so the function (owned by the
+-- privileged schema owner) can remove the auth row; it only ever targets the
+-- caller's own id via auth.uid(), so a user can never delete anyone else.
+------------------------------------------------------------
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+revoke execute on function public.delete_account() from public;
+grant  execute on function public.delete_account() to authenticated;

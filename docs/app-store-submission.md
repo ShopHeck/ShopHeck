@@ -165,6 +165,26 @@ bundle exec fastlane release
 - On approval, click **Release This Version**. Live on the store within ~1 hour.
 - Tag the release in git: `git tag v1.0.0 && git push origin v1.0.0`.
 
+## 9a. Resubmission — addressing the v1.0 (build 17) rejection
+
+The first submission (Submission ID `6755c0c6-…`, reviewed June 25 2026 on an iPad Air M3) was rejected for five issues. Status of each:
+
+| # | Guideline | Issue | Fix | Where |
+| --- | --- | --- | --- | --- |
+| 1 | 2.1(a) crash | App crashed when taking a photo | Added `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSPhotoLibraryUsageDescription` to `Info.plist`. The WKWebView file picker ("Take Photo or Video") was terminating the app because the camera usage strings were missing. | **Code — done** (`ios/App/App/Info.plist`) |
+| 2 | 2.1(a) bug | "Apple HealthKit redirects to a blank pro screen" | Page-level Pro gates now render a full upgrade screen (icon, copy, CTA) instead of a dimmed/empty component. | **Code — done** (`ProGate.tsx`, `App.tsx`) |
+| 3 | 5.1.1(v) | No in-app account deletion | Added a **Delete account** action in Settings → Account that calls the `delete_account()` Supabase RPC (cascades through every table) and resets the app. | **Code — done** (`schema.sql`, `AuthContext.tsx`, `Settings.tsx`) — ⚠️ **must run the new SQL in Supabase** (see below) |
+| 4 | 3.1.2(c) | Missing functional Terms of Use (EULA) link | In-app Terms/Privacy links now point to absolute `https://fightcamp.netlify.app/...` URLs so they open in the system browser on iOS. EULA link added to the App Description (see `app-store-listing.md`). | **Code — done**, **+ metadata step** |
+| 5 | 2.1(b) | In-App Purchase products not submitted for review | **Cannot be fixed in code** — must be done in App Store Connect. | **App Store Connect — action required** |
+
+### Action required before resubmitting (not code)
+
+1. **Apply the schema change** so account deletion works: Supabase Dashboard → SQL Editor → run `supabase/schema.sql` (it's idempotent; only the new `delete_account()` function at the bottom is added). Verify with a test account that **Settings → Delete account** removes the row from `auth.users`.
+2. **Submit the In-App Purchases for review (Guideline 2.1(b)).** In App Store Connect → your app → **Subscriptions**: for each product (Fighter Pro / Coach Pro, monthly + annual) make sure status is **Ready to Submit**, upload the required **App Review screenshot** on each, then attach them to the version (the "In-App Purchases and Subscriptions" section of the version page) so they're submitted **with** the build. A subscription that isn't attached + submitted is the exact cause of this rejection.
+3. **Metadata for Guideline 3.1.2(c):** Description includes the Terms of Use (EULA) and Privacy links; set the **Privacy Policy URL** field too.
+4. **Fill in a working reviewer demo account** in App Review Information (the notes in `app-store-listing.md` still have `<placeholder>` values), and add that email to `VITE_COMP_PRO_EMAILS` in Netlify so the reviewer gets Coach Pro and can reach the gated screens.
+5. **Bump the build:** increment `MARKETING_VERSION`/build, archive, upload, then resubmit. In Resolution Center, reply summarizing the fixes and attach a screen recording of the account-deletion flow (Apple asks for this on 5.1.1(v)).
+
 ## 10. Common rejection causes to pre-empt
 
 - Missing privacy policy URL or mismatched App Privacy declarations.

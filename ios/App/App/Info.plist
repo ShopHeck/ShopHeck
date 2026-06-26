@@ -53,6 +53,12 @@
 	<string>Fight Camp Training reads your health data to track training performance and recovery.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Fight Camp Training saves workout data to Apple Health.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Fight Camp Training uses the camera only when you choose Take Photo or Video while attaching a file.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Fight Camp Training uses the microphone only when you record a video to attach a file.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fight Camp Training accesses your photo library only when you choose a photo or video to attach a file.</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_API_KEY)</string>
 </dict>
