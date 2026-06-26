@@ -27,6 +27,8 @@ interface AuthValue {
   signUpEmail: (email: string, password: string, name?: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signInApple: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the signed-in user's account and all their data, then signs out. */
+  deleteAccount: () => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -109,6 +111,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  async function deleteAccount() {
+    if (!supabase) return { error: 'Accounts are not available right now.' };
+    // Server-side cascade delete via SECURITY DEFINER RPC (see supabase/schema.sql).
+    const { error } = await supabase.rpc('delete_account');
+    if (error) return { error: error.message };
+    // The auth row is gone; clear the local session so the app returns to signed-out.
+    await supabase.auth.signOut();
+    return {};
+  }
+
   const value: AuthValue = {
     configured: isSupabaseConfigured,
     loading,
@@ -118,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUpEmail,
     signInApple,
     signOut,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -65,7 +65,12 @@ FREE TO START
 Fight Camp Training is free to use. Fighter Pro and Coach Pro subscriptions unlock advanced features (gym display, AI insights, game plans, nutrition, unlimited camps, and the coach tools) with a 7-day free trial. Subscriptions renew automatically through your Apple ID; manage or cancel anytime in Settings.
 
 Fight Camp Training is a training and planning tool for informational purposes only and is not a substitute for professional medical or fitness advice. Train smart and consult a professional before starting any new program.
+
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://fightcamp.netlify.app/privacy.html
 ```
+
+> **Required (Guideline 3.1.2(c)).** The two links above must stay in the Description because the app sells auto-renewable subscriptions. If you use Apple's standard EULA, the `apple.com/.../stdeula/` link satisfies the Terms of Use requirement; if you use a custom EULA, paste it into the **App Store Connect → App Information → License Agreement** field instead. Also confirm the **Privacy Policy URL** field in App Store Connect is set to `https://fightcamp.netlify.app/privacy.html`.
 
 ## Category & rating
 

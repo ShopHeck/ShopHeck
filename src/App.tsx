@@ -231,11 +231,11 @@ function AppShell() {
             )}
             {view === 'timer'           && <RoundTimer />}
             {view === 'weight'          && <WeightTracker />}
-            {view === 'nutrition'       && <ProGate required="fighter_pro"><NutritionTracker /></ProGate>}
+            {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut."><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
-            {view === 'gameplan'        && <ProGate required="fighter_pro"><GamePlanBuilder /></ProGate>}
-            {view === 'aiinsights'      && <ProGate required="fighter_pro"><AIInsights /></ProGate>}
-            {view === 'health'          && <ProGate required="fighter_pro"><AppleHealthSync /></ProGate>}
+            {view === 'gameplan'        && <ProGate required="fighter_pro" page feature="Game Plan Builder" featureDescription="Build a round-by-round strategy for your opponent and keep it with your camp."><GamePlanBuilder /></ProGate>}
+            {view === 'aiinsights'      && <ProGate required="fighter_pro" page feature="AI Insights" featureDescription="Get a coach-style analysis of your training load, weight cut and readiness."><AIInsights /></ProGate>}
+            {view === 'health'          && <ProGate required="fighter_pro" page feature="Apple Health Sync" featureDescription="Import workouts and weight from Apple Health, and export your camp data."><AppleHealthSync /></ProGate>}
             {view === 'readiness'       && <FightReadiness />}
             {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
             {view === 'workout-library' && <WorkoutLibrary />}

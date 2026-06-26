@@ -110,9 +110,12 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const [hasBell, setHasBell] = useState(hasCustomBell());
 
   // Account (cloud sync — optional)
-  const { configured: authConfigured, user: authUser, signOut: authSignOut } = useAuth();
+  const { configured: authConfigured, user: authUser, signOut: authSignOut, deleteAccount } = useAuth();
   const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSync();
   const [showAuth, setShowAuth] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const syncLabel = syncStatus === 'syncing' ? 'Syncing…'
     : syncStatus === 'error' ? (syncError ?? 'Sync failed')
@@ -233,6 +236,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   }
 
   function handleReset() {
+    dispatch({ type: 'RESET' });
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    const { error } = await deleteAccount();
+    setDeleting(false);
+    if (error) {
+      setDeleteError(error);
+      return;
+    }
+    // Account is gone server-side and the session is cleared — wipe all local
+    // data and return to onboarding.
+    setConfirmDelete(false);
     dispatch({ type: 'RESET' });
   }
 
@@ -771,7 +789,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Account</p>
           <div className="card">
-            {authUser ? (
+            {authUser && (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-brand-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
                   <UserCheck size={18} className="text-brand-400" />
@@ -793,7 +811,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                   </button>
                 </div>
               </div>
-            ) : (
+            )}
+            {authUser && (
+              <button
+                onClick={() => { setDeleteError(''); setConfirmDelete(true); }}
+                className="mt-3 pt-3 border-t border-dark-600 w-full flex items-center gap-2 text-left"
+              >
+                <Trash2 size={14} className="text-red-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-400">Delete account</p>
+                  <p className="text-xs text-gray-600">Permanently remove your account and all synced data</p>
+                </div>
+                <ChevronRight size={15} className="text-gray-600" />
+              </button>
+            )}
+            {!authUser && (
               <button onClick={() => setShowAuth(true)} className="w-full flex items-center gap-3 text-left">
                 <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <UserCheck size={18} className="text-gray-400" />
@@ -893,7 +925,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       <div className="mx-4 text-center space-y-2">
         <div className="flex items-center justify-center gap-4">
           <a
-            href="/privacy.html"
+            href="https://fightcamp.netlify.app/privacy.html"
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
@@ -902,12 +934,12 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </a>
           <span className="text-gray-700">·</span>
           <a
-            href="/terms.html"
+            href="https://fightcamp.netlify.app/terms.html"
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
           >
-            Terms of Service
+            Terms of Use (EULA)
           </a>
         </div>
         <p className="text-xs text-gray-700">Fight Camp v1.0 · Built for fighters</p>
@@ -1073,6 +1105,24 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           danger
           onConfirm={handleReset}
           onCancel={() => setConfirmReset(false)}
+        />
+      )}
+
+      {/* Delete Account Confirm */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete Account?"
+          message={
+            deleteError
+              ? `Couldn't delete your account: ${deleteError}. Please try again.`
+              : deleting
+                ? 'Deleting your account and all of your data…'
+                : 'This permanently deletes your account and every camp, log, and weigh-in synced to it. This cannot be undone. If you have an active subscription, cancel it in your device Settings — deleting your account does not cancel App Store billing.'
+          }
+          confirmLabel={deleting ? 'Deleting…' : 'Delete Account'}
+          danger
+          onConfirm={() => { if (!deleting) void handleDeleteAccount(); }}
+          onCancel={() => { if (!deleting) setConfirmDelete(false); }}
         />
       )}
 
