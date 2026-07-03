@@ -177,6 +177,16 @@ The first submission (Submission ID `6755c0c6-…`, reviewed June 25 2026 on an 
 | 4 | 3.1.2(c) | Missing functional Terms of Use (EULA) link | In-app Terms/Privacy links now point to absolute `https://fightcamp.netlify.app/...` URLs so they open in the system browser on iOS. EULA link added to the App Description (see `app-store-listing.md`). | **Code — done**, **+ metadata step** |
 | 5 | 2.1(b) | In-App Purchase products not submitted for review | **Cannot be fixed in code** — must be done in App Store Connect. | **App Store Connect — action required** |
 
+### Follow-up audit fixes (July 2026)
+
+A second pass over the repo (after the build 17 rejection fixes) addressed:
+
+- **CI archive failure** ("maximum number of certificates" / "No profiles for 'app.fightcamptraining'"): the Xcode project's Release configuration signed archives with the per-machine `iPhone Developer` identity, so every ephemeral CI runner minted a new development certificate until the account hit Apple's cap. Release now uses `Apple Distribution` (cloud-managed via the App Store Connect API key), so CI stops creating certificates. **You must still revoke the surplus development certificates once** — see `docs/ios-signing.md`.
+- **Guideline 3.1.2(c) leftover**: the Onboarding consent line still linked to relative `/terms.html` / `/privacy.html`; now absolute `https://fightcamp.netlify.app/...` like Settings and the paywall.
+- **Terms accuracy**: `public/terms.html` claimed data is never transmitted to our servers (contradicting Supabase cloud sync — a 5.1.1 accuracy risk) and advertised a non-existent "lifetime purchase" IAP. Both corrected.
+- **Display name**: `INFOPLIST_KEY_CFBundleDisplayName` said "FightCamp App" while Info.plist/App Store say "Fight Camp Training"; aligned.
+- **Export compliance**: added `ITSAppUsesNonExemptEncryption = false` to Info.plist (HTTPS-only, exempt) so TestFlight builds don't stall on the compliance questionnaire.
+
 ### Action required before resubmitting (not code)
 
 1. **Apply the schema change** so account deletion works: Supabase Dashboard → SQL Editor → run `supabase/schema.sql` (it's idempotent; only the new `delete_account()` function at the bottom is added). Verify with a test account that **Settings → Delete account** removes the row from `auth.users`.
