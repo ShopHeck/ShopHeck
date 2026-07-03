@@ -5,12 +5,16 @@ supports two signing strategies and **picks automatically based on env**:
 
 | Mode | When | Behaviour |
 |------|------|-----------|
-| **Automatic** (default) | no `MATCH_*` secrets | Xcode creates/downloads the cert + profile per run via `-allowProvisioningUpdates`. Zero setup, but mints a **new certificate on each fresh CI machine** — a busy CI eventually hits Apple's certificate cap (`"Your account has reached the maximum number of certificates"`). |
+| **Automatic** (default) | no `MATCH_*` secrets | Xcode creates/downloads the cert + profile per run via `-allowProvisioningUpdates`. Zero setup, but historically minted a **new development certificate on each fresh CI machine** — a busy CI eventually hits Apple's certificate cap (`"Your account has reached the maximum number of certificates"`). The Release configuration now sets `CODE_SIGN_IDENTITY = "Apple Distribution"` so CI archives sign with the (cloud-managed, account-wide) distribution certificate instead of a per-machine development one, which stops the churn. |
 | **Shared (fastlane match)** | `MATCH_*` secrets set | One distribution cert + profile, stored encrypted in a private repo and **reused by every build**. No certificate churn. |
 
-If you ever hit the cert cap on automatic signing: revoke the surplus
-**Apple Development / Distribution** certs at
-<https://developer.apple.com/account/resources/certificates/list>, then re-run.
+**If the CI build currently fails with `"Choose a certificate to revoke. Your
+account has reached the maximum number of certificates"` / `"No profiles for
+'app.fightcamptraining' were found"`**: the Apple Developer account is at the
+certificate cap, and no code change can clear that. Revoke the surplus
+**Apple Development** certs (one was created per past CI run) at
+<https://developer.apple.com/account/resources/certificates/list>, then re-run
+the workflow. Revoking a development cert does not affect the shipped app.
 
 ## Switching to fastlane match (recommended, one-time setup)
 

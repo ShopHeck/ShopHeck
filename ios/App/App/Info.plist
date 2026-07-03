@@ -61,5 +61,7 @@
 	<string>Fight Camp Training accesses your photo library only when you choose a photo or video to attach a file.</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_API_KEY)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

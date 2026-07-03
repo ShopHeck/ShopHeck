@@ -831,9 +831,9 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
 
             <p className="text-xs text-gray-600 -mt-2">
               By continuing you agree to our{' '}
-              <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Terms of Service</a>
+              <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Terms of Service</a>
               {' '}and{' '}
-              <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Privacy Policy</a>.
+              <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Privacy Policy</a>.
             </p>
 
             {/* Subtle review ask */}
