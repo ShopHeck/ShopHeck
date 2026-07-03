@@ -73,6 +73,11 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Comp-account allowlist is baked into the bundle at build time
+          # (src/utils/subscription.ts), so the App Review demo account must be
+          # in THIS build's env — setting it only in Netlify covers the web app,
+          # not the iOS binary the reviewer installs.
+          VITE_COMP_PRO_EMAILS: ${{ secrets.VITE_COMP_PRO_EMAILS }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios

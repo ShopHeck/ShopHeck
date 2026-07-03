@@ -106,7 +106,7 @@ Notes:
 - Subscriptions are auto-renewable with a 7-day free trial; Restore Purchases is on the upgrade screen.
 ```
 
-> To enable the reviewer account: add its email to `VITE_COMP_PRO_EMAILS` in Netlify (or it's the built-in owner email), and it gets Coach Pro on sign-in — which also works on iOS (the comp grant outranks RevenueCat).
+> To enable the reviewer account: the allowlist is baked into the JS bundle **at build time**, so the email must be present in the environment of whichever build the reviewer uses. For the **iOS binary** that means the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret** (used by `.github/workflows/ios.yml`) — set it, then ship a new TestFlight build and attach *that* build to the version. Netlify's `VITE_COMP_PRO_EMAILS` env var only covers the web app. Once baked in, the account gets Coach Pro on sign-in (the comp grant outranks RevenueCat).
 
 ## Screenshots — shot list
 
@@ -143,7 +143,7 @@ Tips: use a fully-populated demo camp (not empty states), enable Pro (comp accou
 
 - [ ] Privacy + Support URLs resolve (they're live on `fightcamp.netlify.app` once this merges)
 - [ ] `heck@kingkillers.co` inbox monitored
-- [ ] Reviewer demo email added to `VITE_COMP_PRO_EMAILS`
+- [ ] Reviewer demo email added to the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret**, and the build attached to the version was produced *after* that (Netlify env only covers web)
 - [ ] Screenshots uploaded for the required size(s)
 - [ ] App Privacy answers match this doc
 - [ ] Build selected, Export Compliance = exempt, IDFA = No, Manual release
