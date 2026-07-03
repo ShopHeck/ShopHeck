@@ -5,8 +5,8 @@ supports two signing strategies and **picks automatically based on env**:
 
 | Mode | When | Behaviour |
 |------|------|-----------|
-| **Automatic** (default) | no `MATCH_*` secrets | Xcode creates/downloads the cert + profile per run via `-allowProvisioningUpdates`. Zero setup, but historically minted a **new development certificate on each fresh CI machine** — a busy CI eventually hits Apple's certificate cap (`"Your account has reached the maximum number of certificates"`). The Release configuration now sets `CODE_SIGN_IDENTITY = "Apple Distribution"` so CI archives sign with the (cloud-managed, account-wide) distribution certificate instead of a per-machine development one, which stops the churn. |
-| **Shared (fastlane match)** | `MATCH_*` secrets set | One distribution cert + profile, stored encrypted in a private repo and **reused by every build**. No certificate churn. |
+| **Automatic** (default) | no `MATCH_*` secrets | Xcode creates/downloads the cert + profile per run via `-allowProvisioningUpdates`. Zero setup, but archives under automatic signing **must** sign with a development identity, so each fresh CI machine mints a **new development certificate** — a busy CI eventually hits Apple's certificate cap (`"Your account has reached the maximum number of certificates"`). This is inherent to automatic signing on ephemeral runners (forcing `Apple Distribution` under automatic signing is rejected as "conflicting provisioning settings") — the only cure is periodic cert cleanup, or switching to match. |
+| **Shared (fastlane match)** | `MATCH_*` secrets set | One distribution cert + profile, stored encrypted in a private repo and **reused by every build**. The lane flips the Release config to manual signing with that cert, so no development certs are created at all. No certificate churn. |
 
 **If the CI build currently fails with `"Choose a certificate to revoke. Your
 account has reached the maximum number of certificates"` / `"No profiles for
