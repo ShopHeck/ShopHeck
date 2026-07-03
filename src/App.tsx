@@ -86,11 +86,15 @@ function AppShell() {
   const { state } = useApp();
   const [view, setView] = useState<View>('dashboard');
 
-  // Screenshot harness (?shot): expose the view setter so the Playwright capture
-  // script can navigate deterministically. No-op in normal use.
+  // Screenshot harness (?shot): expose the view setter and the upgrade paywall
+  // so the Playwright capture scripts can navigate deterministically (the
+  // paywall shot is required by App Store Connect for each in-app purchase).
+  // No-op in normal use.
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot')) {
-      (window as unknown as { __setView?: (v: string) => void }).__setView = (v) => setView(v as View);
+      const w = window as unknown as { __setView?: (v: string) => void; __openUpgrade?: () => void };
+      w.__setView = (v) => setView(v as View);
+      w.__openUpgrade = () => setShowUpgrade(true);
     }
   }, []);
 
