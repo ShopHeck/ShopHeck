@@ -57,6 +57,13 @@ export default function UpgradeModal({ onClose }: Props) {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Screenshot harness (?shot): render the iOS footer (auto-renew disclosure +
+  // Restore Purchases) so App Store review screenshots match the native app.
+  // Purchase/restore behavior still keys off the real platform.
+  const showNativeFooter =
+    Capacitor.isNativePlatform() ||
+    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot'));
+
   function applyRevenueCatResult(isPro: boolean, tier: string) {
     if (!isPro) return false;
     dispatch({
@@ -237,7 +244,7 @@ export default function UpgradeModal({ onClose }: Props) {
           )}
 
           <p className="text-center text-[11px] leading-relaxed text-gray-600">
-            {Capacitor.isNativePlatform()
+            {showNativeFooter
               ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
               : 'Cancel anytime. No commitment required.'}
           </p>
@@ -248,7 +255,7 @@ export default function UpgradeModal({ onClose }: Props) {
             <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
           </p>
 
-          {Capacitor.isNativePlatform() && (
+          {showNativeFooter && (
             <button
               onClick={handleRestore}
               disabled={loading}
