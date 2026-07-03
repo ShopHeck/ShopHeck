@@ -131,6 +131,21 @@ platform :ios do
         readonly: true
       )
 
+      # Flip the Release config to manual signing with the match cert/profile.
+      # Without this the archive step still runs Xcode automatic signing, which
+      # insists on a per-machine development cert (the exact churn match avoids)
+      # and rejects any manually specified distribution identity.
+      update_code_signing_settings(
+        path: "App/App.xcodeproj",
+        targets: ["App"],
+        build_configurations: ["Release"],
+        use_automatic_signing: false,
+        team_id: TEAM_ID,
+        bundle_identifier: APP_IDENTIFIER,
+        code_sign_identity: "Apple Distribution",
+        profile_name: "match AppStore #{APP_IDENTIFIER}"
+      )
+
       build_app(
         scheme: "App",
         workspace: "App/App.xcworkspace",
