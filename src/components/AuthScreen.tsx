@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Mail, Lock, Apple, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AppleSignInButton from './shared/AppleSignInButton';
 
 interface Props {
   onClose: () => void;
@@ -66,13 +67,7 @@ export default function AuthScreen({ onClose }: Props) {
             Sync your camps across devices{mode === 'signin' ? '' : ' and connect with your coach'}. Optional — the app works fine without an account.
           </p>
 
-          <button
-            onClick={apple}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-white text-black font-semibold py-2.5 rounded-xl disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            <Apple size={16} /> Continue with Apple
-          </button>
+          <AppleSignInButton onClick={apple} disabled={loading} />
 
           <div className="flex items-center gap-3 py-1">
             <div className="flex-1 h-px bg-dark-500" />

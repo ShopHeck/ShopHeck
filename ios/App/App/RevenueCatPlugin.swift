@@ -23,10 +23,12 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// Returns whether the user has an active entitlement and which tier they hold.
+    /// Serves the SDK's cache when the network is flaky — entitlement checks must
+    /// not fail (and must never look like a purchase failure) on a transient error.
     @objc func getCustomerInfo(_ call: CAPPluginCall) {
-        Purchases.shared.getCustomerInfo { [weak self] customerInfo, error in
+        Purchases.shared.getCustomerInfo(fetchPolicy: .cachedOrFetched) { [weak self] customerInfo, error in
             guard let self else { return }
-            if let error {
+            if let error, customerInfo == nil {
                 call.reject(error.localizedDescription)
                 return
             }
@@ -60,11 +62,12 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
             paywallVC.onDismiss = {
                 guard !didResolve else { return }
                 didResolve = true
-                Purchases.shared.getCustomerInfo { customerInfo, error in
-                    if let error {
-                        call.reject(error.localizedDescription)
-                        return
-                    }
+                // Never reject once the paywall session is over: any purchase already
+                // completed (or didn't happen) inside the sheet, so a transient error
+                // fetching customer info here must not surface as "purchase failed".
+                // A completed purchase updates the SDK's cache, so .cachedOrFetched
+                // returns the correct entitlements even if the network then flakes.
+                Purchases.shared.getCustomerInfo(fetchPolicy: .cachedOrFetched) { customerInfo, _ in
                     guard let info = customerInfo else {
                         call.resolve(["isPro": false, "tier": "free"])
                         return
@@ -79,7 +82,12 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
                 sheet.prefersGrabberVisible = true
             }
 
-            rootVC.present(paywallVC, animated: true)
+            // Present from the top-most controller: if something else (e.g. the
+            // customer center) is already on screen, presenting from the root
+            // silently fails and the JS promise would never settle.
+            var topVC: UIViewController = rootVC
+            while let presented = topVC.presentedViewController { topVC = presented }
+            topVC.present(paywallVC, animated: true)
         }
     }
 
@@ -93,7 +101,9 @@ public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
 
             let centerVC = UIHostingController(rootView: CustomerCenterView())
             centerVC.modalPresentationStyle = .pageSheet
-            rootVC.present(centerVC, animated: true) {
+            var topVC: UIViewController = rootVC
+            while let presented = topVC.presentedViewController { topVC = presented }
+            topVC.present(centerVC, animated: true) {
                 call.resolve()
             }
         }
