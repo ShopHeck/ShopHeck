@@ -195,6 +195,77 @@ A second pass over the repo (after the build 17 rejection fixes) addressed:
 4. **Fill in a working reviewer demo account** in App Review Information (the notes in `app-store-listing.md` still have `<placeholder>` values), and add that email to the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret** (not just Netlify — the allowlist is baked into the iOS bundle at CI build time), then ship a new TestFlight build and attach that build to the version so the reviewer gets Coach Pro on the gated screens.
 5. **Bump the build:** increment `MARKETING_VERSION`/build, archive, upload, then resubmit. In Resolution Center, reply summarizing the fixes and attach a screen recording of the account-deletion flow (Apple asks for this on 5.1.1(v)).
 
+## 9b. Resubmission — addressing the v1.0 (build 19) rejection
+
+The second review (July 6 2026, iPad Air 11-inch M3, iPadOS 26.5.2) raised two new issues.
+
+### Guideline 4 — Sign in with Apple button design (code — done)
+
+The "Continue with Apple" button used lucide-react's `Apple` icon — a generic
+apple-fruit glyph, not Apple's logo — which violates the requirement that the
+button use artwork from Apple Design Resources. Fixed in code:
+
+- New `src/components/shared/AppleSignInButton.tsx` renders the official Apple
+  logo glyph with HIG-compliant styling: approved title ("Continue with
+  Apple"), system SF font (not the app's Inter), white button style for
+  contrast on the dark background, 44 pt height, logo scaled to the title.
+- `AuthScreen.tsx` uses the new component; the Onboarding account-gate button
+  no longer shows an apple icon at all (it isn't an Apple-specific button).
+
+Do not replace this artwork with an icon-library glyph again — that is the
+exact thing App Review flagged.
+
+### Guideline 2.1(b) — subscription purchase showed an error (code + console)
+
+**Code hardening (done).** The app could paint "Purchase failed. Please try
+again." over a purchase that succeeded (or was simply cancelled): the paywall
+plugin re-fetched customer info over the network after the sheet closed and
+rejected the JS promise on any transient error. Now:
+
+- `RevenueCatPlugin.presentPaywall` never rejects after a paywall session; it
+  resolves with entitlements using the SDK's cached-or-fetched policy (a
+  completed purchase updates the cache synchronously, so the result is correct
+  even offline).
+- `UpgradeModal` uses the paywall's resolved result directly (no second
+  network round-trip) and shows no notice when the user closes the sheet
+  without buying.
+- Paywall and Customer Center present from the top-most view controller, so
+  the sheet can't silently fail to appear.
+
+**App Store Connect / RevenueCat configuration (action required — the likely
+root cause; none of this is fixable in code):**
+
+1. **Paid Apps Agreement**: App Store Connect → Business (Agreements) — the
+   Paid Applications agreement must show **Active** (Apple's rejection asks to
+   confirm exactly this). Banking and tax forms complete.
+2. **RevenueCat In-App Purchase Key (critical for StoreKit 2)**: App Store
+   Connect → Users and Access → Integrations → **In-App Purchase** → generate
+   the .p8 key, then upload it in RevenueCat → Project → your iOS app →
+   **In-App Purchase Key Configuration**. Without this key, every purchase
+   fails with an error in sandbox/review even though products load. Add the
+   App-Specific Shared Secret in the same screen as fallback.
+3. **Product state**: each subscription referenced by the RevenueCat offering
+   (Fighter Pro / Coach Pro, monthly + annual) must have complete metadata —
+   localized display name, description, and a **review screenshot** on every
+   product (`node scripts/iap-screenshots.mjs` generates them) — so status
+   reads **Ready to Submit**, and all four must be attached to the version's
+   "In-App Purchases and Subscriptions" section before resubmitting.
+4. **Identifier match**: RevenueCat product IDs must exactly match the App
+   Store Connect product IDs and the app's bundle ID
+   (`app.fightcamptraining`); the entitlements in RevenueCat must be named
+   exactly `Fight Camp Pro` and `Coach Pro` (the iOS bridge maps those strings
+   — `ios/App/App/RevenueCatPlugin.swift`).
+5. **Sandbox test before resubmitting**: on a physical device signed into a
+   **Sandbox Apple Account** (Settings → Developer → Sandbox Apple Account, or
+   a TestFlight build), run the full flow: open the paywall, purchase Fighter
+   Pro monthly, verify the pro features unlock, then Restore Purchases. If the
+   sandbox purchase errors, fix the configuration above first — resubmitting
+   without a clean sandbox purchase will fail review again.
+
+When replying in Resolution Center, mention both fixes: the Sign in with Apple
+button now uses Apple's official logo artwork per the HIG, and the subscription
+purchase flow was fixed and verified end-to-end in sandbox.
+
 ## 10. Common rejection causes to pre-empt
 
 - Missing privacy policy URL or mismatched App Privacy declarations.

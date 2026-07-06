@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell, Apple, Cloud } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell, Cloud } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import AuthScreen from './AuthScreen';
@@ -346,7 +346,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           </div>
 
           <button onClick={() => setShowAuth(true)} className="btn-primary w-full flex items-center justify-center gap-2">
-            <Apple size={18} /> Create account or sign in
+            <User size={18} /> Create account or sign in
           </button>
           <button
             onClick={() => setContinueAsGuest(true)}

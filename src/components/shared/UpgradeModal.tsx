@@ -81,11 +81,13 @@ export default function UpgradeModal({ onClose }: Props) {
     if (Capacitor.isNativePlatform()) {
       setLoading(true);
       try {
-        await RevenueCat.presentPaywall();
-        const result = await RevenueCat.getCustomerInfo();
+        // Resolves after the paywall sheet is dismissed — with the resulting
+        // entitlements. Closing the sheet without buying is not an error, so
+        // no notice is shown for it.
+        const result = await RevenueCat.presentPaywall();
         if (applyRevenueCatResult(result.isPro, result.tier)) onClose();
       } catch {
-        setNotice('Purchase failed. Please try again.');
+        setNotice('The purchase screen couldn’t be opened. Please try again in a moment.');
       } finally {
         setLoading(false);
       }
