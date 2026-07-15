@@ -215,16 +215,15 @@ button use artwork from Apple Design Resources. Fixed in code:
 Do not replace this artwork with an icon-library glyph again — that is the
 exact thing App Review flagged.
 
-Optional hardening (not required to resubmit): the glyph is embedded inline
-with the official artwork's geometry, and App Review judges the rendered
-button, not the file's origin. If you want literal file provenance anyway,
-download `Logo-Sign-in-with-Apple.dmg` from
-https://developer.apple.com/design/resources/ on a Mac, commit the white
-logo SVG under `src/assets/`, and point `AppleSignInButton` at it — the
-rendered pixels are identical. The maximal option is a native
-`ASAuthorizationAppleIDButton` overlaid on the WebView, but that adds
-keyboard-resize/z-order positioning complexity over the auth modal; don't
-attempt it mid-rejection-turnaround.
+Artwork provenance: the official file from `Logo-Sign-in-with-Apple.dmg`
+(Apple Design Resources) is checked in verbatim at
+`src/assets/sign-in-with-apple-logo-square.svg`, and `AppleSignInButton`'s
+glyph path is copied byte-for-byte from it (only the viewBox is cropped to
+the glyph bounds so the logo scales with the title). If the artwork ever
+needs updating, re-download the kit and refresh both in the same commit.
+A native `ASAuthorizationAppleIDButton` overlaid on the WebView remains
+the theoretical maximum, but it adds keyboard-resize/z-order positioning
+complexity over the auth modal and isn't needed for compliance.
 
 ### Guideline 2.1(b) — subscription purchase showed an error (code + console)
 
