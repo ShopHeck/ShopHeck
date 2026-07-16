@@ -8,10 +8,13 @@ import HealthKit
 /// write-only ("share"), so a user can opt in to mirroring newly logged workouts
 /// and weigh-ins into Apple Health without granting read access.
 ///
-/// Registered automatically by Capacitor 6 via `CAPBridgedPlugin` (same pattern
-/// as `RevenueCatPlugin`) — no Objective-C registration file required.
+/// CAPInstancePlugin: registered by instance from MainViewController's
+/// capacitorDidLoad (see AppDelegate.swift). Capacitor does NOT discover
+/// app-target plugins automatically — conforming to CAPBridgedPlugin alone is
+/// not enough, because only classes in the generated packageClassList (built
+/// from npm plugin packages) are auto-registered.
 @objc(HealthKitPlugin)
-public class HealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
+public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
     public let identifier = "HealthKitPlugin"
     public let jsName = "HealthKit"
     public let pluginMethods: [CAPPluginMethod] = [

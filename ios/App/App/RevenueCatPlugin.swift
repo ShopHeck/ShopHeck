@@ -3,8 +3,11 @@ import RevenueCat
 import RevenueCatUI
 import SwiftUI
 
+// CAPInstancePlugin: registered by instance from MainViewController's
+// capacitorDidLoad (see AppDelegate.swift) — app-target plugins are not in the
+// generated packageClassList, so Capacitor never discovers them by class name.
 @objc(RevenueCatPlugin)
-public class RevenueCatPlugin: CAPPlugin, CAPBridgedPlugin {
+public class RevenueCatPlugin: CAPInstancePlugin, CAPBridgedPlugin {
     public let identifier = "RevenueCatPlugin"
     public let jsName = "RevenueCat"
     public let pluginMethods: [CAPPluginMethod] = [
