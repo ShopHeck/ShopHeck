@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Heart, Upload, Download, CheckCircle, AlertCircle, ChevronDown, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { format, parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import type { WeightEntry, WorkoutLog, SessionType } from '../types';
 
 // Map Apple Health workout types to app session types
@@ -127,7 +127,9 @@ export default function AppleHealthSync() {
 
         const { id: campId, startDate, campWeeks, fightDate } = activeCamp;
         const campStart = startDate;
-        const campEnd = fightDate ?? startDate;
+        // Off-season camps have no fight date — the import window runs to the
+        // scheduled end of the block, not a single-day window at startDate.
+        const campEnd = fightDate ?? format(addDays(parseISO(startDate), campWeeks * 7), 'yyyy-MM-dd');
 
         // Filter to camp date range
         const campWeights = weights
@@ -330,7 +332,12 @@ export default function AppleHealthSync() {
               <div className="card space-y-3">
                 <p className="text-sm font-bold text-white">Import Preview</p>
                 <p className="text-xs text-gray-500">
-                  Filtered to your camp: {format(parseISO(activeCamp.startDate), 'MMM d')} – {format(parseISO(activeCamp.fightDate ?? ''), 'MMM d, yyyy')}
+                  Filtered to your camp: {format(parseISO(activeCamp.startDate), 'MMM d')} – {format(
+                    activeCamp.fightDate
+                      ? parseISO(activeCamp.fightDate)
+                      : addDays(parseISO(activeCamp.startDate), activeCamp.campWeeks * 7),
+                    'MMM d, yyyy',
+                  )}
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">

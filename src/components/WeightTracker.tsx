@@ -59,7 +59,11 @@ export default function WeightTracker() {
   const totalCut = startW - targetW;
   const cutProgress = totalCut > 0 ? Math.min(100, Math.max(0, ((startW - currentW) / totalCut) * 100)) : 100;
 
-  const daysUntilFight = differenceInDays(parseISO(activeCamp.fightDate ?? ''), new Date());
+  // null when the camp has no fight date (off-season) — parseISO('') is an
+  // Invalid Date and would turn every downstream stat into NaN.
+  const daysUntilFight = activeCamp.fightDate
+    ? differenceInDays(parseISO(activeCamp.fightDate), new Date())
+    : null;
 
   // Cut pace projection — on pace / ahead / behind + projected weigh-in.
   const proj = computeCutProjection(activeCamp, weightEntries);
@@ -119,8 +123,8 @@ export default function WeightTracker() {
     setShowModal(false);
   }
 
-  const isOnTrack = toGo <= (daysUntilFight * 0.3);
-  const isCritical = toGo > 10 && daysUntilFight < 14;
+  const isOnTrack = daysUntilFight === null || toGo <= (daysUntilFight * 0.3);
+  const isCritical = daysUntilFight !== null && toGo > 10 && daysUntilFight < 14;
 
   return (
     <div className="space-y-4 pb-4">
@@ -154,7 +158,7 @@ export default function WeightTracker() {
           <div>
             <p className="text-sm font-semibold text-red-300">Weight Cut Concern</p>
             <p className="text-xs text-red-400/80 mt-0.5">
-              You have {toGo.toFixed(1)} lbs to cut with only {daysUntilFight} days until fight. Consult your coach.
+              You have {toGo.toFixed(1)} lbs to cut with only {daysUntilFight ?? 0} days until fight. Consult your coach.
             </p>
           </div>
         </div>
@@ -174,7 +178,7 @@ export default function WeightTracker() {
                   {weightTrend > 0 ? '↑' : '↓'} {Math.abs(weightTrend).toFixed(1)} lbs
                 </span>
               )}
-              <p className="text-xs text-gray-500 mt-1">{daysUntilFight} days out</p>
+              {daysUntilFight !== null && <p className="text-xs text-gray-500 mt-1">{daysUntilFight} days out</p>}
             </div>
           </div>
           <div className="h-3 bg-dark-500 rounded-full overflow-hidden">
@@ -202,7 +206,9 @@ export default function WeightTracker() {
               <div className="text-right">
                 <p className="text-xs text-gray-500">Projected weigh-in</p>
                 <p className="text-lg font-black text-white">
-                  {proj.projectedWeighIn}<span className="text-xs text-gray-500"> lbs</span>
+                  {proj.trendEstablished
+                    ? <>{proj.projectedWeighIn}<span className="text-xs text-gray-500"> lbs</span></>
+                    : '—'}
                 </p>
               </div>
             </div>
@@ -213,11 +219,13 @@ export default function WeightTracker() {
               </div>
               <div className="bg-dark-600 rounded-lg px-3 py-2">
                 <p className="text-xs text-gray-500">Avg so far / day</p>
-                <p className="text-sm text-white font-semibold">{proj.lbsPerDayActual} lbs</p>
+                <p className="text-sm text-white font-semibold">{proj.trendEstablished ? `${proj.lbsPerDayActual} lbs` : '—'}</p>
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2.5">
-              {proj.projectedMiss > 0
+              {!proj.trendEstablished
+                ? 'Log weigh-ins on a few different days and your projected weigh-in weight will appear here.'
+                : proj.projectedMiss > 0
                 ? `At your current rate you'll be ~${proj.projectedMiss} lbs over on fight day (${proj.daysRemaining} days out).`
                 : `At your current rate you'll make weight with ~${Math.abs(proj.projectedMiss)} lbs to spare.`}
             </p>

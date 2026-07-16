@@ -29,8 +29,10 @@ function buildCutPrompt(camp: FightCamp, user: FighterProfile | null, proj: CutP
 - Current ${proj.currentWeight} lbs (${proj.toGo} lbs to go)
 - Fight ${camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d') : 'n/a'} · ${proj.daysRemaining} days out
 - Pace: ${proj.status} (${proj.paceDelta > 0 ? `${proj.paceDelta} lbs behind` : `${Math.abs(proj.paceDelta)} lbs ahead of`} a steady cut)
-- Need ~${proj.lbsPerDayNeeded} lbs/day; averaging ${proj.lbsPerDayActual} lbs/day
-- Projected weigh-in at current rate: ${proj.projectedWeighIn} lbs (${proj.projectedMiss > 0 ? `${proj.projectedMiss} lbs OVER` : 'on/under target'})
+- Need ~${proj.lbsPerDayNeeded} lbs/day${proj.trendEstablished
+    ? `; averaging ${proj.lbsPerDayActual} lbs/day
+- Projected weigh-in at current rate: ${proj.projectedWeighIn} lbs (${proj.projectedMiss > 0 ? `${proj.projectedMiss} lbs OVER` : 'on/under target'})`
+    : `; no observed rate yet (weigh-ins don't span multiple days)`}
 
 ## Recent weigh-ins
 ${recent.length ? recent.map(e => `${format(parseISO(e.date), 'M/d')}: ${e.weight}lbs`).join(' · ') : 'none logged'}

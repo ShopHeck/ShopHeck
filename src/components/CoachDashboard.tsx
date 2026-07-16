@@ -287,8 +287,8 @@ export default function CoachDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs text-brand-400 font-semibold uppercase tracking-wider">Active Camp</p>
-                <p className="text-2xl font-black text-white mt-1">{daysUntil} days out</p>
-                <p className="text-xs text-gray-500">{format(parseISO(activeCamp.fightDate ?? ''), 'MMM d, yyyy')}</p>
+                <p className="text-2xl font-black text-white mt-1">{activeCamp.fightDate ? `${daysUntil} days out` : 'Off-season'}</p>
+                <p className="text-xs text-gray-500">{activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMM d, yyyy') : 'No fight scheduled'}</p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-bold text-white">{activeCamp.rounds}R</p>
