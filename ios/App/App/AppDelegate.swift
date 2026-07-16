@@ -3,6 +3,22 @@ import Capacitor
 import AVFoundation
 import RevenueCat
 
+/// The storyboard instantiates this controller instead of the stock
+/// CAPBridgeViewController. Capacitor only auto-registers plugins listed in the
+/// generated capacitor.config.json packageClassList, which `cap sync` builds
+/// from npm-installed plugin packages — plugins living in the app target itself
+/// (RevenueCat, HealthKit) are never included, so they must be registered here.
+/// Without this, every JS call to them rejects with "not implemented": the
+/// paywall never opens, which is exactly the v1.0 build 19 2.1(b) rejection.
+/// (Lives in this file rather than its own so the Xcode project file needs no
+/// hand-edited source entry.)
+class MainViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(RevenueCatPlugin())
+        bridge?.registerPluginInstance(HealthKitPlugin())
+    }
+}
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 

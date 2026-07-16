@@ -227,6 +227,20 @@ complexity over the auth modal and isn't needed for compliance.
 
 ### Guideline 2.1(b) — subscription purchase showed an error (code + console)
 
+**Root cause (found July 15 2026 via on-device sandbox test, fixed).** The
+custom app-target Capacitor plugins (`RevenueCatPlugin`, `HealthKitPlugin`)
+were never registered with the bridge: Capacitor only auto-registers classes
+in the generated `capacitor.config.json` `packageClassList`, which `cap sync`
+builds from npm-installed plugin packages — app-target classes are never
+included, and conforming to `CAPBridgedPlugin` alone does nothing. Every
+`RevenueCat.*` JS call therefore rejected instantly with "not implemented":
+the paywall sheet never opened in any build, which is precisely the error the
+reviewer hit. Fixed by `MainViewController` (in `AppDelegate.swift`)
+overriding `capacitorDidLoad()` to `registerPluginInstance` both plugins,
+with the storyboard instantiating it instead of the stock
+`CAPBridgeViewController`. This also un-breaks the Apple Health write-back,
+which had been failing silently for the same reason.
+
 **Code hardening (done).** The app could paint "Purchase failed. Please try
 again." over a purchase that succeeded (or was simply cancelled): the paywall
 plugin re-fetched customer info over the network after the sheet closed and
