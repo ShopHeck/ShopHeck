@@ -84,7 +84,9 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   const logDate = parseISO(log.date);
   const dayNum = Math.max(1, differenceInDays(logDate, campStart) + 1);
   const totalDays = camp.campWeeks * 7;
-  const daysToFight = Math.max(0, differenceInDays(parseISO(camp.fightDate ?? ''), new Date()));
+  const daysToFight = camp.fightDate
+    ? Math.max(0, differenceInDays(parseISO(camp.fightDate), new Date()))
+    : 0;
 
   // Big day number
   ctx.fillStyle = '#ffffff';
@@ -145,11 +147,12 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   ctx.font = '36px system-ui, sans-serif';
   ctx.fillText(format(logDate, 'MMMM d, yyyy').toUpperCase(), cx, cardY + 390);
 
-  // Opponent / fight info
-  const fightDate = format(parseISO(camp.fightDate ?? ''), 'MMM d, yyyy');
-  const fightLabel = camp.opponent
-    ? `vs. ${camp.opponent}  ·  ${fightDate}`
-    : `Fight Date: ${fightDate}`;
+  // Opponent / fight info — off-season blocks have no fight date, and
+  // format(Invalid Date) throws, which killed the share card entirely.
+  const fightDate = camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d, yyyy') : null;
+  const fightLabel = fightDate
+    ? (camp.opponent ? `vs. ${camp.opponent}  ·  ${fightDate}` : `Fight Date: ${fightDate}`)
+    : 'Off-Season Training Block';
 
   ctx.fillStyle = '#6b7280';
   ctx.font = '42px system-ui, sans-serif';

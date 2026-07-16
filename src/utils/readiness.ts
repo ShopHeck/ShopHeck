@@ -1,4 +1,4 @@
-import { differenceInDays, parseISO, subDays } from 'date-fns';
+import { addDays, differenceInDays, parseISO, subDays } from 'date-fns';
 import type { AppState, CampFactorWeights } from '../types';
 import { DEFAULT_FACTOR_WEIGHTS } from '../types';
 
@@ -42,8 +42,13 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   };
 
   const now = new Date();
-  const fightDate = parseISO(activeCamp.fightDate ?? '');
   const campStart = parseISO(activeCamp.startDate);
+  // Off-season camps have no fight date — anchor on the scheduled end of the
+  // block (start + campWeeks) so every day-count below stays finite instead of
+  // NaN-ing the whole readiness score (parseISO('') is an Invalid Date).
+  const fightDate = activeCamp.fightDate
+    ? parseISO(activeCamp.fightDate)
+    : addDays(campStart, activeCamp.campWeeks * 7);
   const daysUntilFight = Math.max(1, differenceInDays(fightDate, now));
   const daysIntoCamp = Math.max(0, differenceInDays(now, campStart));
   const totalCampDays = Math.max(1, differenceInDays(fightDate, campStart));

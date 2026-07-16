@@ -91,7 +91,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                 <span className="text-gray-400 font-medium">days out</span>
               </div>
               <p className="text-gray-400 text-sm mt-1">
-                {format(parseISO(activeCamp.fightDate ?? ''), 'MMMM d, yyyy')}
+                {activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMMM d, yyyy') : 'Fight date TBD'}
                 {activeCamp.opponent && <span className="text-gray-500"> · vs {activeCamp.opponent}</span>}
               </p>
             </div>
@@ -426,7 +426,12 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
                 {(() => {
                   const current = latestWeight ? latestWeight.weight : activeCamp.currentWeight;
-                  const pct = Math.max(0, Math.min(100, ((activeCamp.currentWeight - current) / (activeCamp.currentWeight - activeCamp.targetWeight)) * 100));
+                  const totalCut = activeCamp.currentWeight - activeCamp.targetWeight;
+                  // No cut configured (start == target) → the bar is trivially full,
+                  // not NaN% wide from a 0/0 division.
+                  const pct = totalCut > 0
+                    ? Math.max(0, Math.min(100, ((activeCamp.currentWeight - current) / totalCut) * 100))
+                    : 100;
                   return (
                     <div className="h-full bg-gradient-to-r from-blue-700 to-blue-500 rounded-full" style={{ width: `${pct}%` }} />
                   );

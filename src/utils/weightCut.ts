@@ -27,6 +27,13 @@ export interface CutProjection {
   projectedWeighIn: number;
   /** projectedWeighIn − target. Positive = projected to miss weight. */
   projectedMiss: number;
+  /**
+   * True once the weigh-in history spans at least one day, i.e. there is a
+   * real observed rate. While false, lbsPerDayActual is 0 and projectedWeighIn
+   * just echoes the current weight — display a "log more weigh-ins" hint
+   * instead of presenting those as a prediction.
+   */
+  trendEstablished: boolean;
 }
 
 /** Weight on a straight-line cut from start→target between the given dates. */
@@ -75,6 +82,7 @@ export function computeCutProjection(
     lbsPerDayActual: 0,
     projectedWeighIn: currentWeight,
     projectedMiss: toGo,
+    trendEstablished: false,
   };
 
   // Off-season / no scheduled weigh-in → nothing to project against.
@@ -94,8 +102,29 @@ export function computeCutProjection(
   const paceDelta = +(currentWeight - idealToday).toFixed(1);
 
   const lbsPerDayNeeded = daysRemaining > 0 ? +(toGo / daysRemaining).toFixed(2) : toGo;
-  const lbsPerDayActual = daysElapsed > 0 ? +((startWeight - currentWeight) / daysElapsed).toFixed(2) : 0;
-  const projectedWeighIn = +(currentWeight - lbsPerDayActual * daysRemaining).toFixed(1);
+
+  // The achieved rate comes from the weigh-in series itself — never from
+  // calendar-days-since-camp-start. Anchoring on camp.startDate made a camp
+  // created today read "0 lbs/day" (and project the current weight straight
+  // onto fight day) no matter how much weight was actually lost, and diluted
+  // the rate whenever the first weigh-in came days into camp.
+  const observed = campEntries.map(e => ({ date: parseISO(e.date), weight: e.weight }));
+  // The starting weight anchors the series only when camp start genuinely
+  // predates the first weigh-in (it describes that gap); a same-day or later
+  // start date adds no information.
+  if (observed.length > 0 && differenceInCalendarDays(observed[0].date, start) > 0) {
+    observed.unshift({ date: start, weight: startWeight });
+  }
+  const spanDays = observed.length >= 2
+    ? differenceInCalendarDays(observed[observed.length - 1].date, observed[0].date)
+    : 0;
+  const trendEstablished = spanDays >= 1;
+  const lbsPerDayActual = trendEstablished
+    ? +((observed[0].weight - observed[observed.length - 1].weight) / spanDays).toFixed(2)
+    : 0;
+  const projectedWeighIn = trendEstablished
+    ? +(currentWeight - lbsPerDayActual * daysRemaining).toFixed(1)
+    : currentWeight;
   const projectedMiss = +(projectedWeighIn - targetWeight).toFixed(1);
 
   // Tolerance scales a little with the size of the cut, min 1 lb.
@@ -118,5 +147,6 @@ export function computeCutProjection(
     lbsPerDayActual,
     projectedWeighIn,
     projectedMiss,
+    trendEstablished,
   };
 }

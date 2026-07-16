@@ -60,7 +60,7 @@ function MacroBar({ label, actual, target, color }: {
 
 export default function NutritionTracker() {
   const { state, dispatch } = useApp();
-  const { activeCamp, nutritionLogs, currentUser } = state;
+  const { activeCamp, nutritionLogs, currentUser, weightEntries } = state;
 
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [notes, setNotes] = useState('');
@@ -149,8 +149,17 @@ export default function NutritionTracker() {
 
   function autoSuggestTargets() {
     if (!activeCamp || !currentUser) return;
-    const daysToFight = differenceInDays(parseISO(activeCamp.fightDate ?? ''), new Date());
-    const bodyWeightLbs = activeCamp.currentWeight;
+    // No fight date (off-season) → Invalid Date → NaN; treat as far out (no deficit).
+    const daysToFight = activeCamp.fightDate
+      ? differenceInDays(parseISO(activeCamp.fightDate), new Date())
+      : Infinity;
+    // Macros key off what the fighter weighs NOW — latest weigh-in when one
+    // exists, not the weight the camp started at.
+    const latestWeighIn = weightEntries
+      .filter(e => e.campId === activeCamp.id)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .at(-1);
+    const bodyWeightLbs = latestWeighIn?.weight ?? activeCamp.currentWeight;
     // Calorie deficit based on proximity to fight
     const deficit = daysToFight < 14 ? 500 : daysToFight < 28 ? 200 : 0;
     const maintenanceCals = Math.round(bodyWeightLbs * 15); // rough maintenance
