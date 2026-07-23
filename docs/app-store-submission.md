@@ -290,6 +290,135 @@ When replying in Resolution Center, mention both fixes: the Sign in with Apple
 button now uses Apple's official logo artwork per the HIG, and the subscription
 purchase flow was fixed and verified end-to-end in sandbox.
 
+## 9c. Resubmission — addressing the v1.0 (build 24) rejection ("Account Not In This Store")
+
+Third review (July 17 2026, same submission `6755c0c6-…`, same iPad Air 11-inch
+M3 / iPadOS 26.5.2), again 2.1(b): "when we tried to purchase a subscription the
+app showed an error message", with a screenshot of the alert **"Account Not In
+This Store — Your account is not valid for use in the Singapore store. You must
+switch to the U.S. store before purchasing."** over the paywall.
+
+### What the screenshot actually proves
+
+Read the screenshot as evidence — it shows the app working:
+
+1. The paywall sheet **opened** (the build 19 plugin-registration bug is truly
+   fixed — that failure mode was "paywall never appears").
+2. All **four subscriptions loaded from App Store Connect with correct localized
+   USD prices** — so the products exist, are attached to the version, and the
+   Paid Apps Agreement was at least functional enough to vend products.
+3. The purchase was **initiated** and reached Apple's own purchase confirmation
+   flow.
+
+The alert itself is a **system alert rendered by the App Store, not by the
+app**. The giveaway is the **"Change Store" button** — only Apple's storefront
+UI offers to switch stores; there is no StoreKit API that can trigger, word, or
+suppress that dialog. It means: at purchase time, the App Store session on the
+review device resolved to the **Singapore** storefront while the signed-in
+(sandbox) Apple Account belongs to the **U.S.** storefront. That state lives
+entirely in the review device's App Store sign-in/region settings. **Client
+code cannot cause it and cannot fix it** — which is why this rejection, unlike
+builds 17 and 19, has no code change attached.
+
+This is a recurring, documented failure mode of Apple's review/sandbox
+environment: reviewers failing purchases that work in sandbox/TestFlight
+([forums 807262](https://developer.apple.com/forums/thread/807262),
+[forums 809881](https://developer.apple.com/forums/thread/809881)), the
+long-known sandbox "account not in this store" storefront mismatch
+([forums 84811](https://developer.apple.com/forums/thread/84811)), and sandbox
+storefront-resolution bugs where the purchase flow uses the wrong region
+([forums 778844](https://developer.apple.com/forums/thread/778844)). The common
+outcome in those threads: the developer replies with evidence and the next
+review pass succeeds with no binary change.
+
+### Step 1 — 15 minutes of App Store Connect checks (de-risk non-U.S. storefronts)
+
+None of these, if wrong, produces this *exact* alert — but they are the only
+merchant-side switches that interact with storefronts at all, and fixing them
+removes the whole class of "reviewer on a non-U.S. storefront" failures:
+
+1. **Paid Applications Agreement**: Business → Agreements — status **Active**,
+   banking **Active**, all tax forms **Complete**, no pending-action banner.
+   (Apple's boilerplate reply asks to confirm exactly this.)
+2. **App availability**: app → Pricing and Availability — available in **all
+   countries and regions** (must include Singapore and the U.S.).
+3. **Subscription availability**: each of the four subscriptions → Availability
+   — **all countries and regions**. Subscriptions have per-territory
+   availability *independent* of the app's; a U.S.-only selection here is easy
+   to have made without noticing. Confirm every territory also has a price
+   (auto-derived from the base price — just check nothing is missing).
+
+### Step 2 — record sandbox proof on an iPad
+
+1. App Store Connect → Users and Access → **Sandbox Testers** → create a tester
+   with **Country: United States** (matches the reviewer's account storefront).
+2. On a physical iPad, sign that tester into the sandbox account slot
+   (Settings → App Store → Sandbox Account, or Settings → Developer → Sandbox
+   Apple Account) using the **TestFlight build** of build 24.
+3. Screen-record (Control Center) the full flow: open the paywall → select
+   **Fighter Pro Annual $59.99** (the exact product the reviewer chose) →
+   purchase sheet shows **[Environment: Sandbox]** → confirm → pro features
+   unlock → Settings → Restore Purchases also succeeds.
+
+### Step 3 — reply in Resolution Center (do NOT silently resubmit a new build)
+
+The submission is still open; the reviewer retests the same build after a
+reply. A new binary is *not* the fix — nothing in the binary is wrong. Reply,
+attach the recording, and ask for a retest. Template:
+
+> Hello, and thank you for the detailed screenshot.
+>
+> The alert shown — "Account Not In This Store. Your account is not valid for
+> use in the Singapore store. You must switch to the U.S. store before
+> purchasing." — is a system alert generated by the App Store purchase sheet
+> itself, not an error produced by our app. It appears when the device's App
+> Store session is on one storefront (here: Singapore) while the signed-in
+> Apple Account belongs to another (here: a U.S. account). Nothing in an app's
+> StoreKit integration can trigger, prevent, or modify this alert.
+>
+> The screenshot also shows the app's In-App Purchase integration behaving
+> correctly up to that point: the paywall opened, and all four auto-renewable
+> subscriptions were fetched from App Store Connect with correct localized
+> prices. The purchase failed only inside the App Store's own confirmation
+> flow, due to the storefront/account mismatch on the review device.
+>
+> We have re-verified on our side that:
+> 1. The Paid Applications Agreement is Active, with banking and tax
+>    information complete.
+> 2. All four subscriptions are attached to this version and available in all
+>    countries and regions, including Singapore and the United States.
+> 3. The app is available in all countries and regions.
+> 4. The complete purchase flow (paywall → purchase → entitlement unlock →
+>    restore) succeeds in the sandbox on an iPad using a U.S. sandbox Apple
+>    Account — please see the attached screen recording.
+>
+> Could you please try again after aligning the review device's App Store
+> storefront with the sandbox Apple Account being used (both U.S., or both
+> Singapore)? We believe the previous attempt failed because of this
+> environment mismatch in the review setup rather than an issue in the app.
+>
+> Thank you very much — we're happy to provide any additional information.
+
+### Step 4 — if it is rejected a fourth time with the same screenshot
+
+1. File an **appeal with the App Review Board** (App Store Connect → Resolution
+   Center → "appeal"), citing the storefront mismatch and the sandbox
+   recording.
+2. File a **Feedback Assistant** report about the sandbox storefront mismatch
+   and quote the FB number in the appeal — it signals the issue is on the
+   platform side and gives App Review something to route internally.
+3. In the appeal, request a **phone call with App Review** — storefront
+   environment issues are much easier to resolve interactively.
+
+### Repo status for this rejection
+
+Verified in-repo (no changes needed): RevenueCat SDK 5.72.0 (StoreKit 2 by
+default), `Purchases.configure` at launch (`AppDelegate.swift`), native
+`PaywallView` presented from the top-most controller
+(`RevenueCatPlugin.swift`), iOS purchases never route to Stripe
+(`UpgradeModal.tsx` gates on `Capacitor.isNativePlatform()`). Build 24's
+binary is fine to keep using.
+
 ## 10. Common rejection causes to pre-empt
 
 - Missing privacy policy URL or mismatched App Privacy declarations.
