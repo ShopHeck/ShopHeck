@@ -32,6 +32,10 @@ on:
         options:
           - beta
           - certs   # one-time: create/refresh the shared match signing cert
+      version:
+        description: 'Marketing version (e.g. 1.0.2). Blank = use the committed MARKETING_VERSION.'
+        type: string
+        required: false
 
 # Only one TestFlight build at a time. A newer push cancels an in-flight run so
 # we always ship the latest commit and never race on the auto-incremented build
@@ -93,8 +97,10 @@ jobs:
         run: pod install
         working-directory: ios/App
 
+      # `version:` is only appended when supplied, so scheduled/push builds keep
+      # using the MARKETING_VERSION committed in the project.
       - name: Upload to TestFlight via Fastlane
-        run: bundle exec fastlane ${{ github.event.inputs.lane || 'beta' }}
+        run: bundle exec fastlane ${{ github.event.inputs.lane || 'beta' }} ${{ inputs.version && format('version:{0}', inputs.version) || '' }}
         working-directory: ios
         env:
           # App Store Connect API key — drives both automatic signing and upload.

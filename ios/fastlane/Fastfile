@@ -38,8 +38,11 @@ platform :ios do
     File.write(ASC_KEY_PATH, pem)
   end
 
+  # Optionally pass a marketing version:  fastlane beta version:1.0.2
+  # Omit it to build whatever MARKETING_VERSION is committed in the project.
   desc "Build and upload to TestFlight"
-  lane :beta do
+  lane :beta do |options|
+    set_marketing_version(options)
     bump_build_number
     archive_app
     upload_to_testflight(
@@ -140,6 +143,38 @@ platform :ios do
   end
 
   # --- helpers -------------------------------------------------------------
+
+  # Override CFBundleShortVersionString for this build when `version:` is passed.
+  #
+  # The build NUMBER is derived from TestFlight automatically (below), but the
+  # marketing VERSION is a product decision, so it stays committed in the project
+  # and is only overridden on request. Getting it wrong is expensive: Apple
+  # rejects the upload only after the archive completes, several minutes in, with
+  #
+  #   90062  CFBundleShortVersionString [1.0] ... must contain a higher version
+  #          than that of the previously approved version [1.0]
+  #   90186  Invalid Pre-Release Train. The train version '1.0' is closed for
+  #          new build submissions
+  #
+  # Once a version is approved, its train closes: every later build needs a
+  # higher marketing version, and that number must match the version you created
+  # in App Store Connect. Note the value lives in project.pbxproj as
+  # MARKETING_VERSION — Info.plist only holds the $(MARKETING_VERSION)
+  # placeholder, so editing the plist directly does nothing.
+  private_lane :set_marketing_version do |options|
+    version = options[:version].to_s.strip
+    next if version.empty?
+
+    unless version.match?(/\A\d+(\.\d+){1,2}\z/)
+      UI.user_error!("version must look like 1.0.2 (got '#{version}')")
+    end
+
+    increment_version_number(
+      xcodeproj: "App/App.xcodeproj",
+      version_number: version
+    )
+    UI.important("Marketing version set to #{version} for this build (not committed).")
+  end
 
   # Set the build number to one above the highest build already on TestFlight
   # for this app, so every upload is strictly increasing. Falls back to 1 on the
