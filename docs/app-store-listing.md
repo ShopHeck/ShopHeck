@@ -156,9 +156,7 @@ The **Coach Dashboard** shot needs a coach account — capture that one by hand 
 
 > **First: make sure there's an editable version.** Screenshots and app previews belong to a specific app version, and a version that's already **Ready for Sale** has its media locked. If the live version is the only one, every upload path below fails — `fastlane` with `Could not find a version to edit`, and the App Store Connect UI by simply showing the fields greyed out.
 >
-> Create the next version in App Store Connect → your app → the **＋** beside "iOS App" in the sidebar → enter a version number (e.g. `1.0.1`). It opens in **Prepare for Submission**, which is editable.
->
-> That version needs a build attached and has to clear review before the new screenshots appear publicly — run **iOS Build → TestFlight** for the build. There is no way to swap screenshots on a live version without a review cycle; only *promotional text* can be edited in place.
+> There is no way to swap screenshots on a live version without a review cycle; only *promotional text* can be edited in place. The full sequence is in [Shipping a new version](#shipping-a-new-version) below — do that first, then come back here.
 
 **Option A — one click (recommended).** Actions → **App Store Media** → Run workflow. Leave `publish` unchecked to just get a downloadable `appstore-media` artifact to inspect or drag in by hand; tick it to also run `fastlane media`, which replaces the screenshots on the editable version.
 
@@ -186,12 +184,44 @@ Run the app in the iOS Simulator (iPhone 16 Pro Max = 6.9") via `npm run cap:ios
 
 Use a fully-populated demo camp (not empty states), enable Pro so gated screens render, and keep captions short and benefit-led. Drop the results into `ios/fastlane/screenshots/en-US/` with an `iphone69-` / `ipad13-` prefix and run `npm run verify:appstore` before uploading.
 
+## Shipping a new version
+
+Changing screenshots, previews, the description, or keywords all require a new version — the live one is frozen. The version number has to match in **two** places, and they're easy to get out of sync:
+
+| Where | What |
+|---|---|
+| App Store Connect | the version you create (**＋** beside "iOS App" in the sidebar) |
+| `MARKETING_VERSION` in `ios/App/App.xcodeproj/project.pbxproj` | what the uploaded build reports as `CFBundleShortVersionString` |
+
+> `ios/App/App/Info.plist` holds the placeholder `$(MARKETING_VERSION)`, not a number. **Editing the plist does nothing** — change the build setting, or pass `version:` as below.
+
+Order of operations:
+
+1. **App Store Connect** → **＋** beside "iOS App" → enter the version (e.g. `1.0.2`). It opens in *Prepare for Submission*.
+2. **Actions → iOS Build → TestFlight** → Run workflow, and put the same number in the **version** field. (Leave it blank only if `MARKETING_VERSION` is already correct in the project.) The build number is derived from TestFlight automatically and needs no input.
+3. **Actions → App Store Media** with `publish` ticked — the screenshots now have an editable version to land on.
+4. In App Store Connect: attach the build, drag in the preview videos if the lane didn't take them, choose poster frames, and submit for review.
+
+If you skip step 1 or get the number wrong, the upload fails *after* the archive — several minutes in — with:
+
+```
+90062  CFBundleShortVersionString [1.0] ... must contain a higher version
+       than that of the previously approved version [1.0]
+90186  Invalid Pre-Release Train. The train version '1.0' is closed
+       for new build submissions
+```
+
+Both mean the same thing: once a version is approved, its train closes and every later build needs a higher marketing version.
+
+Passing `version:` overrides the build only — it deliberately does **not** commit. Once a version ships, bump `MARKETING_VERSION` in the project so the committed baseline matches what's live.
+
 ## Final pre-submit checklist
 
 - [ ] Privacy + Support URLs resolve (they're live on `fightcamp.netlify.app` once this merges)
 - [ ] `heck@kingkillers.co` inbox monitored
 - [ ] Reviewer demo email added to the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret**, and the build attached to the version was produced *after* that (Netlify env only covers web)
 - [ ] An editable version exists in App Store Connect (Prepare for Submission — not the live one)
+- [ ] `MARKETING_VERSION` in `project.pbxproj` matches that version number
 - [ ] `npm run verify:appstore` passes
 - [ ] Screenshots uploaded for **both** required sizes (6.9" iPhone, 13" iPad), at least 3 each
 - [ ] App previews uploaded and finished processing, with a poster frame chosen
