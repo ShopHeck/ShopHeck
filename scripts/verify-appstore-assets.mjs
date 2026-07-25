@@ -17,7 +17,7 @@
 
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, basename } from 'node:path';
-import { existsSync, readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, openSync, readSync, closeSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 import {
@@ -46,12 +46,58 @@ function pngSize(file) {
   const fd = openSync(file, 'r');
   try {
     const buf = Buffer.alloc(24);
-    readSync(fd, buf, 0, 24, 0);
+    if (readSync(fd, buf, 0, 24, 0) < 24) return null;
     if (buf.toString('ascii', 1, 4) !== 'PNG') return null;
     return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
   } finally {
     closeSync(fd);
   }
+}
+
+/**
+ * Read a JPEG's dimensions by walking the segment markers to the frame header.
+ *
+ * Apple accepts JPEG screenshots, so hand-made assets legitimately turn up with
+ * a .jpg extension — and they need exactly the same dimension check as a PNG.
+ * Dimensions live in the SOFn segment (any marker in 0xC0-0xCF except DHT
+ * 0xC4, JPG 0xC8, and DAC 0xCC, which share the range but aren't frame
+ * headers) as: length(2) precision(1) height(2) width(2).
+ */
+function jpegSize(file) {
+  const buf = readFileSync(file);
+  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+
+  let pos = 2;
+  while (pos + 1 < buf.length) {
+    if (buf[pos] !== 0xff) return null; // desynced — not a well-formed stream
+    let marker = buf[pos + 1];
+    pos += 2;
+    // 0xFF is a legal fill byte before the real marker.
+    while (marker === 0xff && pos < buf.length) marker = buf[pos++];
+
+    // Standalone markers carry no payload.
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
+    // Start-of-scan or end-of-image: entropy-coded data from here, no SOF ahead.
+    if (marker === 0xda || marker === 0xd9) return null;
+
+    if (pos + 2 > buf.length) return null;
+    const length = buf.readUInt16BE(pos);
+    if (length < 2) return null;
+
+    const isFrameHeader =
+      marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isFrameHeader) {
+      if (pos + 7 > buf.length) return null;
+      return { height: buf.readUInt16BE(pos + 3), width: buf.readUInt16BE(pos + 5) };
+    }
+    pos += length;
+  }
+  return null;
+}
+
+/** Dimensions of any screenshot format Apple accepts, or null if unreadable. */
+function imageSize(file) {
+  return extname(file).toLowerCase() === '.png' ? pngSize(file) : jpegSize(file);
 }
 
 /** Probe a video for the fields ASC cares about. */
@@ -65,7 +111,9 @@ function probeVideo(file) {
       '-of', 'json',
       file,
     ],
-    { encoding: 'utf8' },
+    // Capture stderr rather than letting it through, so a bad file reports via
+    // the problem list instead of printing ffprobe noise above it.
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   const data = JSON.parse(out);
   const video = (data.streams ?? []).find((s) => s.codec_type === 'video');
@@ -115,13 +163,14 @@ for (const file of shots) {
   const [key, target] = match;
   byTarget.get(key).push(file);
 
+  // JPEG is a valid App Store format, so it gets a nudge rather than a pass —
+  // it still has to clear the same dimension check as a PNG.
   if (extname(file).toLowerCase() !== '.png') {
     notes.push(`${file}: JPEG is accepted, but PNG avoids recompression artifacts`);
-    continue;
   }
-  const size = pngSize(join(DIR, file));
+  const size = imageSize(join(DIR, file));
   if (!size) {
-    fail(`${file}: not a readable PNG`);
+    fail(`${file}: could not read image dimensions — the file is corrupt or not a real PNG/JPEG`);
     continue;
   }
   if (!matchesTarget(target, size.width, size.height)) {
@@ -163,12 +212,19 @@ if (videos.length === 0) {
       'search results. Generate one with: npm run preview:video',
   );
 } else {
+  // Not being able to inspect a preview is a verification failure, not a note.
+  // Downgrading it to a warning would let this script print "ready to upload"
+  // over videos nothing has looked at — the precise outcome it exists to stop.
   let probeOk = true;
   try {
     execFileSync(FFPROBE, ['-version'], { stdio: 'ignore' });
   } catch {
     probeOk = false;
-    notes.push(`ffprobe not found (tried "${FFPROBE}") — previews could not be inspected`);
+    fail(
+      `ffprobe not found (tried "${FFPROBE}") — ${videos.length} preview(s) present but none could be ` +
+        'checked for size, codec, duration, or audio. Install ffmpeg (macOS: brew install ffmpeg) or ' +
+        'set FFPROBE_PATH.',
+    );
   }
 
   const previewCounts = new Map();
@@ -182,7 +238,15 @@ if (videos.length === 0) {
     previewCounts.set(key, (previewCounts.get(key) ?? 0) + 1);
     if (!probeOk) continue;
 
-    const p = probeVideo(join(DIR, file));
+    let p;
+    try {
+      p = probeVideo(join(DIR, file));
+    } catch (err) {
+      // A file ffprobe can't parse is unshippable, and it must not fall through
+      // to an unhandled exception either.
+      fail(`${file}: ffprobe could not read this file — it is corrupt or not a video (${err.message.trim().split('\n').pop()})`);
+      continue;
+    }
     if (!p.video) {
       fail(`${file}: no video stream`);
       continue;
