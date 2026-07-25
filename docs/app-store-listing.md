@@ -154,7 +154,13 @@ The **Coach Dashboard** shot needs a coach account — capture that one by hand 
 
 ### Upload
 
-**Option A — one click (recommended).** Actions → **App Store Media** → Run workflow. Leave `publish` unchecked to just get a downloadable `appstore-media` artifact to inspect or drag in by hand; tick it to also run `fastlane media`, which replaces the screenshots on the current editable version.
+> **First: make sure there's an editable version.** Screenshots and app previews belong to a specific app version, and a version that's already **Ready for Sale** has its media locked. If the live version is the only one, every upload path below fails — `fastlane` with `Could not find a version to edit`, and the App Store Connect UI by simply showing the fields greyed out.
+>
+> Create the next version in App Store Connect → your app → the **＋** beside "iOS App" in the sidebar → enter a version number (e.g. `1.0.1`). It opens in **Prepare for Submission**, which is editable.
+>
+> That version needs a build attached and has to clear review before the new screenshots appear publicly — run **iOS Build → TestFlight** for the build. There is no way to swap screenshots on a live version without a review cycle; only *promotional text* can be edited in place.
+
+**Option A — one click (recommended).** Actions → **App Store Media** → Run workflow. Leave `publish` unchecked to just get a downloadable `appstore-media` artifact to inspect or drag in by hand; tick it to also run `fastlane media`, which replaces the screenshots on the editable version.
 
 **Option B — from your machine.**
 
@@ -185,6 +191,7 @@ Use a fully-populated demo camp (not empty states), enable Pro so gated screens 
 - [ ] Privacy + Support URLs resolve (they're live on `fightcamp.netlify.app` once this merges)
 - [ ] `heck@kingkillers.co` inbox monitored
 - [ ] Reviewer demo email added to the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret**, and the build attached to the version was produced *after* that (Netlify env only covers web)
+- [ ] An editable version exists in App Store Connect (Prepare for Submission — not the live one)
 - [ ] `npm run verify:appstore` passes
 - [ ] Screenshots uploaded for **both** required sizes (6.9" iPhone, 13" iPad), at least 3 each
 - [ ] App previews uploaded and finished processing, with a poster frame chosen
