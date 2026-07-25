@@ -79,6 +79,12 @@ platform :ios do
   # `overwrite_screenshots` is required, not optional: without it deliver
   # appends to whatever is already on the version, so the existing wrong-sized
   # images would stay on the listing alongside the new ones.
+  #
+  # REQUIRES AN EDITABLE VERSION. Screenshots and app previews are version-scoped
+  # metadata — once a version is Ready for Sale its media is frozen. If the only
+  # version in App Store Connect is the live one, deliver has nothing to write to
+  # and fails with "Could not find a version to edit"; the rescue below turns
+  # that into instructions.
   desc "Upload App Store screenshots + previews from ios/fastlane/screenshots"
   lane :media do
     screenshots_path = File.expand_path("screenshots", __dir__)
@@ -86,21 +92,44 @@ platform :ios do
       UI.user_error!("No assets at #{screenshots_path}/en-US — run `npm run appstore:assets` from the repo root first")
     end
 
-    upload_to_app_store(
-      app_identifier: APP_IDENTIFIER,
-      screenshots_path: screenshots_path,
-      # Media only: leave the description, keywords, build, and the App Privacy
-      # answers exactly as they are in App Store Connect.
-      skip_binary_upload: true,
-      skip_metadata: true,
-      skip_app_version_update: true,
-      submit_for_review: false,
-      overwrite_screenshots: true,
-      # deliver's own size check duplicates scripts/verify-appstore-assets.mjs;
-      # leaving it on gives a second opinion before anything is transmitted.
-      run_precheck_before_submit: false,
-      force: true
-    )
+    begin
+      upload_to_app_store(
+        app_identifier: APP_IDENTIFIER,
+        screenshots_path: screenshots_path,
+        # Media only: leave the description, keywords, build, and the App Privacy
+        # answers exactly as they are in App Store Connect.
+        skip_binary_upload: true,
+        skip_metadata: true,
+        skip_app_version_update: true,
+        submit_for_review: false,
+        overwrite_screenshots: true,
+        # deliver's own size check duplicates scripts/verify-appstore-assets.mjs;
+        # leaving it on gives a second opinion before anything is transmitted.
+        run_precheck_before_submit: false,
+        force: true
+      )
+    rescue => e
+      raise unless e.message.include?("Could not find a version to edit")
+
+      UI.user_error!(<<~MSG)
+        App Store Connect has no editable version to upload screenshots to.
+
+        Screenshots and app previews belong to a specific app version, and a version
+        that is already Ready for Sale has its media locked — so there is nothing for
+        this lane to write to. Nothing was uploaded and nothing was changed.
+
+        Create the next version first:
+          App Store Connect → #{APP_IDENTIFIER} → the "+" beside iOS App in the
+          sidebar → enter a version number (e.g. 1.0.1)
+
+        That version opens in "Prepare for Submission", which is editable. Re-run this
+        workflow and the screenshots will land on it.
+
+        Note that the new version needs a build attached and has to clear review before
+        the screenshots show on the public listing — run the "iOS Build → TestFlight"
+        workflow for the build. See docs/app-store-listing.md.
+      MSG
+    end
 
     UI.success("Screenshots uploaded.")
     UI.important(
