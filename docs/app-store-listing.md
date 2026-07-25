@@ -108,26 +108,67 @@ Notes:
 
 > To enable the reviewer account: the allowlist is baked into the JS bundle **at build time**, so the email must be present in the environment of whichever build the reviewer uses. For the **iOS binary** that means the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret** (used by `.github/workflows/ios.yml`) — set it, then ship a new TestFlight build and attach *that* build to the version. Netlify's `VITE_COMP_PRO_EMAILS` env var only covers the web app. Once baked in, the account gets Coach Pro on sign-in (the comp grant outranks RevenueCat).
 
-## Screenshots — shot list
+## Screenshots & app previews
 
-### Automated capture (recommended)
+### Required sizes
 
-A Playwright script renders the real app at every App Store size and saves correctly-sized PNGs — no Mac or device needed:
+Since April 2025 Apple takes **one iPhone set and one iPad set** and derives every other device from them. This app ships an iPad build (`TARGETED_DEVICE_FAMILY = "1,2"`), so both are required.
+
+| Asset | Display size | Exact pixels | Count |
+|---|---|---|---|
+| Screenshot | iPhone 6.9" | **1320 × 2868** (or 1290 × 2796) | 3–10 |
+| Screenshot | iPad 13" | **2064 × 2752** (or 2048 × 2732) | 3–10 |
+| App preview | iPhone 6.9" | **886 × 1920** (or 1080 × 1920) | up to 3 |
+| App preview | iPad 13" | **1200 × 1600** | up to 3 |
+
+App previews must also be **15–30 s, 30 fps, H.264 in .mp4/.mov, yuv420p, with an audio track** (App Store Connect rejects video-only files — the generator muxes a silent AAC stream).
+
+These numbers live in one place — `scripts/lib/appstore-spec.mjs` — and both the generators and the verifier read them from there.
+
+> **Two things go wrong if the sizes are off, and both are silent.** A screenshot whose dimensions don't exactly match its slot gets letterboxed inside a white card on the product page instead of filling it. And an iPhone set with fewer than **three** images means the App Store renders no screenshot strip under the app in search results at all — the listing shows just an icon, name, and Get button while competitors show three. Run the verifier before every upload.
+
+### Generate everything
 
 ```bash
 npm i -D playwright && npx playwright install chromium   # one-time
+brew install ffmpeg                                      # one-time (previews)
+
 npm run build
-npm run preview &                                        # serves http://localhost:4173
-npm run screenshots                                      # -> ios/fastlane/screenshots/en-US/
+npm run preview &            # serves http://localhost:4173
+npm run appstore:assets      # screenshots + previews + verification
 ```
 
-`?shot=1` seeds a demo camp + Pro (`src/utils/demoSeed.ts`); the script navigates each screen via `window.__setView` and captures 6.9", 6.7", and iPad 13". Re-run any release; upload in App Store Connect (or `fastlane deliver`). Edit the screen list/captions in `scripts/screenshots.mjs`. The **Coach Dashboard** shot needs a coach account — capture that one manually if you want it.
+`appstore:assets` runs three steps you can also run alone:
+
+| Command | What it does |
+|---|---|
+| `npm run screenshots` | 7 framed store images per display size → `ios/fastlane/screenshots/en-US/` |
+| `npm run preview:video` | one ~28 s app preview per display size, same folder |
+| `npm run verify:appstore` | checks every file against the spec; **exits non-zero** if anything would be rejected or degraded |
+
+`?shot=1` seeds a fully-populated demo camp with Pro unlocked (`src/utils/demoSeed.ts`) and exposes `window.__setView` / `window.__timerStartPause`, so the scripts drive the real app deterministically — no Mac, simulator, or device needed. The screenshots are composed with a marketing frame (brand lockup, headline, feature chips, device mockup) drawn entirely in CSS; edit the shot list and copy at the top of `scripts/screenshots.mjs`, and the preview scenes at the top of `scripts/app-preview.mjs`.
+
+> Rendering on a Mac is a touch more faithful — the app asks for `Inter`, never loads it, and falls back to `system-ui`, which resolves to SF Pro on macOS/iOS and to a Liberation/DejaVu face on a Linux CI runner. Both read as the same neutral grotesque at store size, so either is fine to ship. The marketing frame's own text embeds Inter, so headlines are identical everywhere.
+
+The **Coach Dashboard** shot needs a coach account — capture that one by hand if you want it in the set.
+
+### Upload
+
+**Option A — one click (recommended).** Actions → **App Store Media** → Run workflow. Leave `publish` unchecked to just get a downloadable `appstore-media` artifact to inspect or drag in by hand; tick it to also run `fastlane media`, which replaces the screenshots on the current editable version.
+
+**Option B — from your machine.**
+
+```bash
+cd ios && bundle exec fastlane media
+```
+
+**Option C — by hand.** App Store Connect → your version → **Previews and Screenshots**, pick the **iPhone 6.9"** tab, drag in `iphone69-*.png` (and `iphone69-preview.mp4`), then repeat on the **iPad 13"** tab with the `ipad13-*` files. Order matters: the first three iPhone screenshots are what search results show.
+
+Previews need a poster frame — App Store Connect asks you to pick one after the video finishes processing, and processing can take a few minutes before the video appears on the listing.
 
 ### Manual capture (alternative)
 
-Apple now accepts a single iPhone size that scales: capture at **6.9" (1320×2868)** or **6.7" (1290×2796)**. Add **iPad 13" (2064×2752)** only if you ship iPad. Easiest capture path: run the app in the iOS Simulator (iPhone 16 Pro Max = 6.9", or 15 Pro Max = 6.7") via `npm run cap:ios`, then File → Save Screen (⌘S) on each screen.
-
-Capture 5–7, in this order, with a short caption banner on each:
+Run the app in the iOS Simulator (iPhone 16 Pro Max = 6.9") via `npm run cap:ios`, then File → Save Screen (⌘S) on each screen. Capture 5–7, in this order:
 
 1. **Dashboard** — "Your entire fight camp, one screen"
 2. **Round Timer (HR zones visible)** — "Pro round timer + live heart-rate zones"
@@ -137,13 +178,16 @@ Capture 5–7, in this order, with a short caption banner on each:
 6. **Coach Dashboard** — "Coaches: your whole team at a glance" *(Coach Pro)*
 7. *(optional)* **Game Plan or Nutrition** — "Build a game plan. Dial in nutrition."
 
-Tips: use a fully-populated demo camp (not empty states), enable Pro (comp account) so gated screens render, and keep captions short and benefit-led.
+Use a fully-populated demo camp (not empty states), enable Pro so gated screens render, and keep captions short and benefit-led. Drop the results into `ios/fastlane/screenshots/en-US/` with an `iphone69-` / `ipad13-` prefix and run `npm run verify:appstore` before uploading.
 
 ## Final pre-submit checklist
 
 - [ ] Privacy + Support URLs resolve (they're live on `fightcamp.netlify.app` once this merges)
 - [ ] `heck@kingkillers.co` inbox monitored
 - [ ] Reviewer demo email added to the `VITE_COMP_PRO_EMAILS` **GitHub Actions secret**, and the build attached to the version was produced *after* that (Netlify env only covers web)
-- [ ] Screenshots uploaded for the required size(s)
+- [ ] `npm run verify:appstore` passes
+- [ ] Screenshots uploaded for **both** required sizes (6.9" iPhone, 13" iPad), at least 3 each
+- [ ] App previews uploaded and finished processing, with a poster frame chosen
+- [ ] Product page checked on a device: screenshots fill their cards (no white letterbox bars), and the app shows a 3-up screenshot strip in search results
 - [ ] App Privacy answers match this doc
 - [ ] Build selected, Export Compliance = exempt, IDFA = No, Manual release

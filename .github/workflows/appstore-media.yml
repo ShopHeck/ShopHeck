@@ -1,0 +1,105 @@
+name: App Store Media
+
+# Regenerates the App Store screenshots and app previews at the exact pixel
+# sizes Apple requires, and (optionally) uploads them to App Store Connect.
+#
+# Run it from Actions → App Store Media → Run workflow:
+#   publish = false  → just builds the assets and attaches them as a downloadable
+#                      artifact, so you can drag them into App Store Connect
+#                      yourself and see exactly what you're shipping.
+#   publish = true   → additionally runs `fastlane media`, which replaces the
+#                      screenshots on the current editable version.
+#
+# Generation runs on Linux (fast, and all it needs is Chromium + ffmpeg); the
+# upload runs on macOS, where fastlane's App Store Connect tooling is best
+# supported.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload to App Store Connect (otherwise artifact only)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: appstore-media
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      # The capture scripts drive the real app, so they need a real build. No
+      # secrets are required: `?shot=1` seeds a local demo camp and never signs
+      # in or talks to Supabase/RevenueCat.
+      - name: Build web app
+        run: npm run build
+
+      - name: Serve the build
+        run: |
+          npm run preview &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173/ -o /dev/null && echo "preview up" && exit 0
+            sleep 1
+          done
+          echo "preview server never came up" >&2
+          exit 1
+
+      - name: Generate screenshots and app previews
+        run: npm run appstore:assets
+
+      - name: Upload assets artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appstore-media
+          path: ios/fastlane/screenshots/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: generate
+    if: inputs.publish
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download assets
+        uses: actions/download-artifact@v4
+        with:
+          name: appstore-media
+          path: ios/fastlane/screenshots/
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Upload media to App Store Connect
+        run: bundle exec fastlane media
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}

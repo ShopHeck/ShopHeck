@@ -66,6 +66,50 @@ platform :ios do
     )
   end
 
+  # Upload the generated App Store screenshots (and previews, on fastlane
+  # versions that support them) without touching the build or any other
+  # metadata.
+  #
+  # Generate the assets first — from the repo root:
+  #   npm run build
+  #   npm run preview &
+  #   npm run appstore:assets     # screenshots + previews + size verification
+  # then: bundle exec fastlane media
+  #
+  # `overwrite_screenshots` is required, not optional: without it deliver
+  # appends to whatever is already on the version, so the existing wrong-sized
+  # images would stay on the listing alongside the new ones.
+  desc "Upload App Store screenshots + previews from ios/fastlane/screenshots"
+  lane :media do
+    screenshots_path = File.expand_path("screenshots", __dir__)
+    unless Dir.exist?(File.join(screenshots_path, "en-US"))
+      UI.user_error!("No assets at #{screenshots_path}/en-US — run `npm run appstore:assets` from the repo root first")
+    end
+
+    upload_to_app_store(
+      app_identifier: APP_IDENTIFIER,
+      screenshots_path: screenshots_path,
+      # Media only: leave the description, keywords, build, and the App Privacy
+      # answers exactly as they are in App Store Connect.
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_app_version_update: true,
+      submit_for_review: false,
+      overwrite_screenshots: true,
+      # deliver's own size check duplicates scripts/verify-appstore-assets.mjs;
+      # leaving it on gives a second opinion before anything is transmitted.
+      run_precheck_before_submit: false,
+      force: true
+    )
+
+    UI.success("Screenshots uploaded.")
+    UI.important(
+      "App previews: if the videos in screenshots/en-US were not picked up, add them by hand in " \
+      "App Store Connect → your version → Previews and Screenshots (drag the .mp4 onto the 6.9\" " \
+      "iPhone and 13\" iPad tabs). See docs/app-store-listing.md."
+    )
+  end
+
   # --- helpers -------------------------------------------------------------
 
   # Set the build number to one above the highest build already on TestFlight
