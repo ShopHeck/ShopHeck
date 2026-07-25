@@ -93,6 +93,19 @@ export const PREVIEW_TARGETS = {
     layoutWidth: 443,
     prefix: 'iphone69',
   },
+  // Apple takes the same 886x1920 canvas for the 6.5" slot, but the phones in
+  // that class are logically 414pt wide (iPhone 11 Pro Max / XS Max) rather
+  // than 443pt — so this renders its own capture at that layout width instead
+  // of reusing the 6.9" file, and the app is laid out the way a 6.5" owner
+  // actually sees it.
+  'iphone-6.5': {
+    label: 'iPhone 6.5"',
+    width: 886,
+    height: 1920,
+    alt: [[1080, 1920]],
+    layoutWidth: 414,
+    prefix: 'iphone65',
+  },
   'ipad-13': {
     label: 'iPad 13"',
     width: 1200,
