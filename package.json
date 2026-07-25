@@ -9,6 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "screenshots": "node scripts/screenshots.mjs",
+    "screenshots:iap": "node scripts/iap-screenshots.mjs",
+    "preview:video": "node scripts/app-preview.mjs",
+    "verify:appstore": "node scripts/verify-appstore-assets.mjs",
+    "appstore:assets": "npm run screenshots && npm run preview:video && npm run verify:appstore",
     "cap:sync": "npm run build && npx cap sync",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios"
   },
@@ -36,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@fontsource/inter": "^5.3.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -45,6 +50,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "playwright": "^1.62.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",

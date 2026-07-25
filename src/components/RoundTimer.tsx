@@ -120,6 +120,16 @@ export default function RoundTimer() {
     handleStartPause();
   }, [handleStartPause]);
 
+  // Screenshot/preview harness (?shot): expose the start-pause control the same
+  // way AppShell exposes __setView, so scripts/app-preview.mjs can run the
+  // clock during an App Store preview recording instead of filming a static
+  // 3:00. No-op in normal use.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!new URLSearchParams(window.location.search).has('shot')) return;
+    (window as unknown as { __timerStartPause?: () => void }).__timerStartPause = onStartPause;
+  }, [onStartPause]);
+
   // Simple absolute-value adjuster for settings rows
   const adj = (setter: (v: number) => void, current: number, delta: number, min: number, max: number) => {
     setter(Math.max(min, Math.min(max, current + delta)));
