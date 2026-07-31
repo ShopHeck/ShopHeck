@@ -4,10 +4,12 @@ import {
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
   Plus, X, Bluetooth, BluetoothOff
 } from 'lucide-react';
+import { format } from 'date-fns';
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
 import { loadCustomPresets, saveCustomPresets, generateId } from '../utils/storage';
 import { useApp } from '../context/AppContext';
 import { writeWorkoutToHealth } from '../utils/healthSync';
+import { getCurrentWeekNumber } from '../utils/campGenerator';
 import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import GymDisplay from './GymDisplay';
@@ -158,12 +160,16 @@ export default function RoundTimer() {
       ? PRESETS[selectedPreset].label
       : customPresets[selectedPreset - PRESETS.length]?.label ?? 'Custom';
     const totalSec = rounds * (workSec + restSec);
+    // Local calendar date (not UTC) so streak/adherence day-bucketing matches
+    // WorkoutLogger; toISOString() is UTC and splits an evening session onto the
+    // next day for UTC-negative users, inflating uniqueDays.
+    const todayLocal = format(new Date(), 'yyyy-MM-dd');
     dispatch({
       type: 'LOG_WORKOUT',
       payload: {
         campId: camp.id,
-        date: new Date().toISOString().slice(0, 10),
-        weekNumber: 1,
+        date: todayLocal,
+        weekNumber: getCurrentWeekNumber(camp),
         dayLabel: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
         sessionType: 'conditioning',
         title: `Round Timer — ${preset} ${rounds}×${fmt(workSec)}`,
@@ -176,7 +182,7 @@ export default function RoundTimer() {
     });
     void writeWorkoutToHealth({
       sessionType: 'conditioning',
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocal,
       duration: Math.round(totalSec / 60),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -79,7 +79,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
   }
 
   // Adherence for the selected week: completed non-rest sessions / total non-rest sessions
-  const weekSessions = week.days.flatMap((d, _di) =>
+  const weekSessions = week.days.flatMap((d) =>
     d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${selectedWeek}-${d.dayOfWeek}-${si}`)
   );
   const completedCount = weekSessions.filter(k => completedSessions[k]).length;
@@ -339,7 +339,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Week at a Glance</p>
         <div className="card">
           <div className="space-y-2">
-            {week.days.sort((a, b) => {
+            {[...week.days].sort((a, b) => {
               const order = [1, 2, 3, 4, 5, 6, 0];
               return order.indexOf(a.dayOfWeek) - order.indexOf(b.dayOfWeek);
             }).map(day => {

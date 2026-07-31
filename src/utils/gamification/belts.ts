@@ -1,3 +1,4 @@
+import { parseISO } from 'date-fns';
 import type { BeltProgress, BeltTier, FightCamp, FightResult, WorkoutLog } from '../../types';
 
 export const BELT_ORDER: BeltTier[] = ['white', 'blue', 'purple', 'brown', 'black'];
@@ -36,7 +37,10 @@ export function computeBelt(
   // Camps with a past fight date and no win logged → half-credit toward wins.
   const campsCompletedNoWin = camps.filter(c => {
     if (!c.fightDate) return false;
-    const fightDate = new Date(c.fightDate);
+    // parseISO keeps the date in LOCAL time. `new Date('YYYY-MM-DD')` parses as
+    // UTC midnight, so for UTC-negative users a fight scheduled for *today* reads
+    // as already past and grants win credit on the morning of the fight.
+    const fightDate = parseISO(c.fightDate);
     if (fightDate >= now) return false;
     const hasWin = fightResults.some(r => r.campId === c.id && r.outcome === 'win');
     return !hasWin;

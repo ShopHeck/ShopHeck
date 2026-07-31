@@ -282,6 +282,13 @@ export function useBluetoothHR(maxHR: number): HRState & {
     }));
   }, [handleWebNotification]);
 
+  // Keep the latest notification handler reachable from the unmount-only cleanup
+  // below without making that cleanup depend on it — otherwise the effect re-runs
+  // (tearing down the live HR connection) every time `maxHR` changes, e.g. when
+  // the user edits their profile mid-session.
+  const webNotifyRef = useRef(handleWebNotification);
+  webNotifyRef.current = handleWebNotification;
+
   // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -292,7 +299,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
         }
       } else {
         if (webCharacteristicRef.current) {
-          webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', handleWebNotification);
+          webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', webNotifyRef.current);
           webCharacteristicRef.current.stopNotifications().catch(() => {});
         }
         if (webDeviceRef.current?.gatt?.connected) {
@@ -300,7 +307,8 @@ export function useBluetoothHR(maxHR: number): HRState & {
         }
       }
     };
-  }, [handleWebNotification]);
+    // Unmount only — device refs are stable; the handler is read via webNotifyRef.
+  }, []);
 
   return { ...state, connect, disconnect };
 }

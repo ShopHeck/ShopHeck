@@ -76,7 +76,8 @@ function loadTimer(): TimerSave | null {
 }
 
 function fastForward(s: TimerSave): TimerSave {
-  let { phase, currentRound, phaseDeadline, rounds, workSec, restSec, prepSec } = s;
+  const { rounds, workSec, restSec, prepSec } = s;
+  let { phase, currentRound, phaseDeadline } = s;
 
   while (phase !== 'done' && Date.now() >= phaseDeadline) {
     if (phase === 'prep') {
@@ -439,20 +440,26 @@ export function useRoundTimer() {
 
     if (saved.isRunning) {
       const fwd = fastForward(saved);
+      if (fwd.phase === 'done') {
+        // The session finished while the app was closed. Do NOT restore into
+        // 'done': the completion effect is keyed on phase==='done' and would
+        // re-log the workout (and re-write HealthKit) on every launch. Keep the
+        // restored preferences, clear the saved run, and stay idle.
+        try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
+        return;
+      }
       phaseRef.current = fwd.phase;
       roundRef.current = fwd.currentRound;
       setPhase(fwd.phase);
       setCurrentRound(fwd.currentRound);
-
-      if (fwd.phase === 'done') {
-        setIsRunning(false); isRunningRef.current = false;
-        setTimeLeft(0);
-      } else {
-        deadlineRef.current = fwd.phaseDeadline;
-        const tl = Math.max(1, Math.ceil((fwd.phaseDeadline - Date.now()) / 1000));
-        setTimeLeft(tl); timeLeftRef.current = tl;
-        setIsRunning(true); isRunningRef.current = true;
-      }
+      deadlineRef.current = fwd.phaseDeadline;
+      const tl = Math.max(1, Math.ceil((fwd.phaseDeadline - Date.now()) / 1000));
+      setTimeLeft(tl); timeLeftRef.current = tl;
+      setIsRunning(true); isRunningRef.current = true;
+    } else if (saved.phase === 'done') {
+      // A completed-but-paused session: same reasoning — don't re-enter 'done'.
+      try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
+      return;
     } else {
       phaseRef.current = saved.phase;
       roundRef.current = saved.currentRound;
@@ -585,8 +592,11 @@ export function useRoundTimer() {
 
       const ctx = getAudioCtx();
 
-      // Configurable warning (only fires once per phase)
+      // Configurable warning (only fires once per phase). Guard warningSec <
+      // workSec: otherwise a warning >= the work length would fire on the very
+      // first tick of the round (remaining === workSec) or never fire at all.
       if (
+        warningSecRef.current < workSecRef.current &&
         remaining === warningSecRef.current &&
         phaseRef.current === 'work' &&
         !warningFiredRef.current
@@ -621,14 +631,22 @@ export function useRoundTimer() {
   }, []);
 
   const selectPreset = useCallback((idx: number) => {
-    const p = PRESETS[idx];
+    // Built-in presets carry their own numbers; custom presets live at indices
+    // beyond the built-in list and are applied by the caller (it owns the
+    // customPresets list). Guard the lookup so a custom index doesn't
+    // dereference undefined and crash the whole timer view.
+    const p = idx < PRESETS.length ? PRESETS[idx] : null;
     setSelectedPreset(idx);
-    setRounds(p.rounds);    roundsRef.current  = p.rounds;
-    setWorkSec(p.workSec);  workSecRef.current = p.workSec;
-    setRestSec(p.restSec);  restSecRef.current = p.restSec;
+    if (p) {
+      setRounds(p.rounds);    roundsRef.current  = p.rounds;
+      setWorkSec(p.workSec);  workSecRef.current = p.workSec;
+      setRestSec(p.restSec);  restSecRef.current = p.restSec;
+      setTimeLeft(p.workSec);
+    }
+    // For a custom preset the idle-display timeLeft is corrected by the
+    // workSec→timeLeft sync effect once the caller's setWorkSec lands.
     setPhase('idle');       phaseRef.current   = 'idle';
     setCurrentRound(1);     roundRef.current   = 1;
-    setTimeLeft(p.workSec);
     setIsRunning(false);    isRunningRef.current = false;
     deadlineRef.current = 0;
     warningFiredRef.current = false;
