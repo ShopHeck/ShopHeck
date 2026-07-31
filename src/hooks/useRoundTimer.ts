@@ -51,6 +51,10 @@ interface TimerSave {
   isRunning: boolean;
   phaseDeadline: number;
   pausedTimeLeft: number;
+  /** Unique id minted when a session starts, so the completion log fires exactly
+   *  once even if the session finishes while the app is closed and is restored on
+   *  a later launch (idempotency marker — see RoundTimer's completion effect). */
+  sessionId: string;
 }
 
 const DEFAULTS: Partial<TimerSave> = {
@@ -76,7 +80,8 @@ function loadTimer(): TimerSave | null {
 }
 
 function fastForward(s: TimerSave): TimerSave {
-  let { phase, currentRound, phaseDeadline, rounds, workSec, restSec, prepSec } = s;
+  const { rounds, workSec, restSec, prepSec } = s;
+  let { phase, currentRound, phaseDeadline } = s;
 
   while (phase !== 'done' && Date.now() >= phaseDeadline) {
     if (phase === 'prep') {
@@ -279,6 +284,8 @@ export function useRoundTimer() {
   const [currentRound, setCurrentRound] = useState(1);
   const [timeLeft,     setTimeLeft]     = useState(PRESETS[0].workSec);
   const [isRunning,    setIsRunning]    = useState(false);
+  // Identifies the current session for once-only completion logging.
+  const [sessionId,    setSessionId]    = useState('');
 
   // Refs for stale-closure-safe reads
   const phaseRef      = useRef<Phase>('idle');
@@ -412,11 +419,11 @@ export function useRoundTimer() {
     saveTimer({
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor,
-      phase, currentRound, isRunning,
+      phase, currentRound, isRunning, sessionId,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
     });
-  }, [phase, currentRound, isRunning, timeLeft,
+  }, [phase, currentRound, isRunning, timeLeft, sessionId,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
@@ -434,9 +441,14 @@ export function useRoundTimer() {
     setVoiceEnabled(saved.voiceEnabled);
     setHapticEnabled(saved.hapticEnabled);
     setReactionMode(saved.reactionMode);
+    setSessionId(saved.sessionId ?? '');
     if (saved.workColor) setWorkColor(saved.workColor);
     if (saved.restColor) setRestColor(saved.restColor);
 
+    // A finished session IS restored into 'done' so its completion is logged if
+    // it wasn't already (e.g. the app was killed before the live log ran). The
+    // completion effect dedupes on sessionId, so repeated launches never
+    // duplicate the workout or the HealthKit sample.
     if (saved.isRunning) {
       const fwd = fastForward(saved);
       phaseRef.current = fwd.phase;
@@ -585,8 +597,11 @@ export function useRoundTimer() {
 
       const ctx = getAudioCtx();
 
-      // Configurable warning (only fires once per phase)
+      // Configurable warning (only fires once per phase). Guard warningSec <
+      // workSec: otherwise a warning >= the work length would fire on the very
+      // first tick of the round (remaining === workSec) or never fire at all.
       if (
+        warningSecRef.current < workSecRef.current &&
         remaining === warningSecRef.current &&
         phaseRef.current === 'work' &&
         !warningFiredRef.current
@@ -621,14 +636,22 @@ export function useRoundTimer() {
   }, []);
 
   const selectPreset = useCallback((idx: number) => {
-    const p = PRESETS[idx];
+    // Built-in presets carry their own numbers; custom presets live at indices
+    // beyond the built-in list and are applied by the caller (it owns the
+    // customPresets list). Guard the lookup so a custom index doesn't
+    // dereference undefined and crash the whole timer view.
+    const p = idx < PRESETS.length ? PRESETS[idx] : null;
     setSelectedPreset(idx);
-    setRounds(p.rounds);    roundsRef.current  = p.rounds;
-    setWorkSec(p.workSec);  workSecRef.current = p.workSec;
-    setRestSec(p.restSec);  restSecRef.current = p.restSec;
+    if (p) {
+      setRounds(p.rounds);    roundsRef.current  = p.rounds;
+      setWorkSec(p.workSec);  workSecRef.current = p.workSec;
+      setRestSec(p.restSec);  restSecRef.current = p.restSec;
+      setTimeLeft(p.workSec);
+    }
+    // For a custom preset the idle-display timeLeft is corrected by the
+    // workSec→timeLeft sync effect once the caller's setWorkSec lands.
     setPhase('idle');       phaseRef.current   = 'idle';
     setCurrentRound(1);     roundRef.current   = 1;
-    setTimeLeft(p.workSec);
     setIsRunning(false);    isRunningRef.current = false;
     deadlineRef.current = 0;
     warningFiredRef.current = false;
@@ -643,6 +666,9 @@ export function useRoundTimer() {
       unlock();
 
       if (phase === 'idle') {
+        // New session — mint an id so the completion effect logs it exactly once,
+        // even across an app relaunch that restores the finished session.
+        setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
         const ctx = getAudioCtx();
         if (prepSecRef.current > 0) {
           // Start with prep countdown
@@ -678,7 +704,7 @@ export function useRoundTimer() {
     voiceEnabled, hapticEnabled, reactionMode,
     workColor, restColor,
     // Timer state
-    phase, currentRound, timeLeft, isRunning,
+    phase, currentRound, timeLeft, isRunning, sessionId,
     // Actions
     handleStartPause, reset, selectPreset,
     // Setters (for settings rows)

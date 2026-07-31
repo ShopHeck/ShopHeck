@@ -48,6 +48,12 @@ export async function syncReminders({ weighIn }: SyncOpts): Promise<void> {
     await LocalNotifications.cancel({ notifications: ALL_IDS });
     if (!remindersEnabled()) return;
 
+    // The pref can be "on" while the OS permission was later revoked. Without
+    // this check schedule() throws, is swallowed below, and nothing fires while
+    // the UI still reads "reminders on". Skip silently instead of pretending.
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') return;
+
     const notifications: LocalNotificationSchema[] = [
       {
         id: ID_CHECKIN,

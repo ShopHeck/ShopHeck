@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import type { BeltProgress, BeltTier, FightCamp, FightResult, WorkoutLog } from '../../types';
 
 export const BELT_ORDER: BeltTier[] = ['white', 'blue', 'purple', 'brown', 'black'];
@@ -36,8 +37,11 @@ export function computeBelt(
   // Camps with a past fight date and no win logged → half-credit toward wins.
   const campsCompletedNoWin = camps.filter(c => {
     if (!c.fightDate) return false;
-    const fightDate = new Date(c.fightDate);
-    if (fightDate >= now) return false;
+    // Count a camp as completed only once its fight date has fully passed, by
+    // calendar day. Comparing YYYY-MM-DD keys is timezone-robust: a UTC parse
+    // (new Date) grants credit a day early west of UTC, and a local-midnight
+    // parse (parseISO) grants it on the morning of the fight east of UTC.
+    if (c.fightDate >= format(now, 'yyyy-MM-dd')) return false;
     const hasWin = fightResults.some(r => r.campId === c.id && r.outcome === 'win');
     return !hasWin;
   }).length;

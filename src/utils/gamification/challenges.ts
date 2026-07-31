@@ -128,6 +128,9 @@ export function recomputeChallengeProgress(
       case 'weekly_mep':        return weekMep;
       case 'workout_minutes':   return weekMinutes;
       case 'high_rpe_sessions': return highRpeCount;
+      // A corrupt/unknown metric (e.g. from a future build's synced data) must
+      // not yield undefined → NaN% in the progress UI.
+      default:                  return 0;
     }
   }
 

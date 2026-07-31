@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import {
   initiateFitbitConnect, handleFitbitCallback, getFitbitCallbackCode,
+  getFitbitCallbackState,
   clearFitbitCallbackParams, fetchFitbitHRV, fetchFitbitRestingHR,
   refreshFitbitToken,
 } from '../utils/fitbitAuth';
@@ -98,10 +99,13 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
   useEffect(() => {
     const code = getFitbitCallbackCode();
     if (!code) return;
+    // Read the state param before we strip it from the URL, so the callback
+    // handler can verify it against the value we stored at connect time.
+    const returnedState = getFitbitCallbackState();
     clearFitbitCallbackParams();
 
     (async () => {
-      const tokens = await handleFitbitCallback(code);
+      const tokens = await handleFitbitCallback(code, returnedState);
       if (!tokens) { setFitbitError('Token exchange failed — please try again.'); return; }
 
       const clientId = sessionStorage.getItem('fitbit_pkce_client_id_backup') ?? fitbitConfig?.clientId ?? '';

@@ -3,7 +3,7 @@ import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { writeWeightToHealth } from '../utils/healthSync';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import {
   LineChart,
   Line,
@@ -61,8 +61,11 @@ export default function WeightTracker() {
 
   // null when the camp has no fight date (off-season) — parseISO('') is an
   // Invalid Date and would turn every downstream stat into NaN.
+  // Calendar days (not rolling 24h periods) so the countdown matches the cut
+  // projection and every other screen — otherwise it under-reports by ~1 day
+  // for most of the day.
   const daysUntilFight = activeCamp.fightDate
-    ? differenceInDays(parseISO(activeCamp.fightDate), new Date())
+    ? differenceInCalendarDays(parseISO(activeCamp.fightDate), new Date())
     : null;
 
   // Cut pace projection — on pace / ahead / behind + projected weigh-in.
@@ -124,7 +127,16 @@ export default function WeightTracker() {
   }
 
   const isOnTrack = daysUntilFight === null || toGo <= (daysUntilFight * 0.3);
-  const isCritical = daysUntilFight !== null && toGo > 10 && daysUntilFight < 14;
+  // Flag the hard "concern" on the RATE required, not just absolute lbs — an 8-lb
+  // cut in 4 days (2 lb/day) is dangerous even though it's under 10 lbs. proj
+  // .lbsPerDayNeeded is calendar-day based and collapses to the raw remaining lbs
+  // on weigh-in day, which is correctly treated as urgent. The old absolute-lbs
+  // trigger is kept as a fallback so nothing that used to warn stops warning.
+  const cutRatePerDay = proj.trackable && proj.status !== 'made' ? proj.lbsPerDayNeeded : null;
+  const isDangerousRate = cutRatePerDay !== null && cutRatePerDay >= 1.5;
+  const isCritical =
+    (cutRatePerDay !== null && cutRatePerDay >= 1) ||
+    (daysUntilFight !== null && toGo > 10 && daysUntilFight < 14);
 
   return (
     <div className="space-y-4 pb-4">
@@ -158,7 +170,9 @@ export default function WeightTracker() {
           <div>
             <p className="text-sm font-semibold text-red-300">Weight Cut Concern</p>
             <p className="text-xs text-red-400/80 mt-0.5">
-              You have {toGo.toFixed(1)} lbs to cut with only {daysUntilFight ?? 0} days until fight. Consult your coach.
+              {isDangerousRate
+                ? `Making weight would take about ${cutRatePerDay!.toFixed(1)} lbs/day — an unsafe pace. Talk to your coach before cutting further.`
+                : `You have ${toGo.toFixed(1)} lbs to cut with ${daysUntilFight ?? 0} days until fight${cutRatePerDay !== null ? ` (~${cutRatePerDay.toFixed(1)} lbs/day)` : ''}. Consult your coach.`}
             </p>
           </div>
         </div>
