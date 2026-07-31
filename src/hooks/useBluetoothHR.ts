@@ -154,11 +154,18 @@ export function useBluetoothHR(maxHR: number): HRState & {
     setState(s => ({ ...s, hr, zone, hrv }));
   }, [maxHR]);
 
-  // ── Web Bluetooth notification shim ─────────────────────────────────────
-  const handleWebNotification = useCallback((event: Event) => {
+  // The notification listeners are registered once at connect time, so they must
+  // not close over `handleHRData` directly — that captures the maxHR from connect
+  // time and keeps computing zones against it after the user edits their max HR.
+  // Keep the latest handler in a ref and register STABLE listeners that read it,
+  // so live maxHR changes apply without re-registering (which would tear down the
+  // connection) and add/removeEventListener always reference the same function.
+  const hrDataRef = useRef(handleHRData);
+  useEffect(() => { hrDataRef.current = handleHRData; }, [handleHRData]);
+  const webNotifyRef = useRef((event: Event) => {
     const char = event.target as BluetoothRemoteGATTCharacteristic;
-    if (char.value) handleHRData(char.value);
-  }, [handleHRData]);
+    if (char.value) hrDataRef.current(char.value);
+  });
 
   // ── Native connect (CoreBluetooth via Capacitor plugin) ─────────────────
   const connectNative = useCallback(async () => {
@@ -187,7 +194,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
       device.deviceId,
       HR_SERVICE,
       HR_CHARACTERISTIC,
-      (value: DataView) => handleHRData(value),
+      (value: DataView) => hrDataRef.current(value),
     );
 
     setState(s => ({
@@ -196,7 +203,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
       connecting: false,
       deviceName: device.name ?? 'HR Device',
     }));
-  }, [handleHRData]);
+  }, []);
 
   // ── Web Bluetooth connect ────────────────────────────────────────────────
   const connectWeb = useCallback(async () => {
@@ -221,7 +228,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
     const char = await service.getCharacteristic('heart_rate_measurement');
     webCharacteristicRef.current = char;
 
-    char.addEventListener('characteristicvaluechanged', handleWebNotification);
+    char.addEventListener('characteristicvaluechanged', webNotifyRef.current);
     await char.startNotifications();
 
     setState(s => ({
@@ -230,7 +237,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
       connecting: false,
       deviceName: device.name ?? 'HR Device',
     }));
-  }, [handleWebNotification]);
+  }, []);
 
   // ── Public connect ───────────────────────────────────────────────────────
   const connect = useCallback(async () => {
@@ -263,7 +270,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
       }
     } else {
       if (webCharacteristicRef.current) {
-        webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', handleWebNotification);
+        webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', webNotifyRef.current);
         webCharacteristicRef.current.stopNotifications().catch(() => {});
         webCharacteristicRef.current = null;
       }
@@ -280,14 +287,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
       connected: false, connecting: false,
       deviceName: null, connectError: null,
     }));
-  }, [handleWebNotification]);
-
-  // Keep the latest notification handler reachable from the unmount-only cleanup
-  // below without making that cleanup depend on it — otherwise the effect re-runs
-  // (tearing down the live HR connection) every time `maxHR` changes, e.g. when
-  // the user edits their profile mid-session.
-  const webNotifyRef = useRef(handleWebNotification);
-  webNotifyRef.current = handleWebNotification;
+  }, []);
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {

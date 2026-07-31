@@ -17,6 +17,10 @@ import ReactionPrompt from './ReactionPrompt';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 
+// Session id of the last completion we logged — makes the completion effect
+// idempotent across relaunches that restore a finished session.
+const TIMER_LOGGED_KEY = 'fightcamp_timer_logged';
+
 // ─── Custom Preset Modal ───────────────────────────────────────────────────
 
 interface PresetModalProps {
@@ -104,7 +108,7 @@ export default function RoundTimer() {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
     voiceEnabled, hapticEnabled, reactionMode,
     workColor, restColor,
-    phase, currentRound, timeLeft, isRunning,
+    phase, currentRound, timeLeft, isRunning, sessionId,
     handleStartPause, reset, selectPreset,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
     setVoiceEnabled, setHapticEnabled, setReactionMode,
@@ -151,10 +155,16 @@ export default function RoundTimer() {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
-  // Log workout when session completes
+  // Log workout when session completes — exactly once per session. The 'done'
+  // phase can be reached live or restored on a later launch, so dedupe on the
+  // session id (persisted marker) rather than firing on every 'done'.
   useEffect(() => {
     if (phase !== 'done') return;
     if (!state.activeCamp) return;
+    if (!sessionId) return; // legacy/unknown session — don't log ambiguously
+    try {
+      if (localStorage.getItem(TIMER_LOGGED_KEY) === sessionId) return;
+    } catch { /* ignore */ }
     const camp = state.activeCamp;
     const preset = selectedPreset < PRESETS.length
       ? PRESETS[selectedPreset].label
@@ -185,8 +195,9 @@ export default function RoundTimer() {
       date: todayLocal,
       duration: Math.round(totalSec / 60),
     });
+    try { localStorage.setItem(TIMER_LOGGED_KEY, sessionId); } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, sessionId]);
 
   // Reset MEP when a new session starts (phase goes from idle/done to prep/work)
   const prevPhaseRef = React.useRef(phase);

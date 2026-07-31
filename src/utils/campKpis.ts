@@ -53,11 +53,14 @@ export function computeCampKpis(state: AppState, campId: string, fight?: FightRe
     : Math.max(1, totalSessions);
   const adherence = Math.min(1, totalSessions / plannedSessions);
 
-  // Weight cut: start → weigh-in (the low point). Do NOT use fight-night weight:
-  // that's the post-rehydration number, so a real 15-lb cut that rehydrates 13
-  // lbs would read as a 2-lb cut and defeat severe-cut detection downstream.
+  // Weight cut: start → weigh-in (the low point). Prefer weigh-in weight, then a
+  // logged weigh-in-morning entry, over fight-night weight — that's the
+  // post-rehydration number, so a real 15-lb cut that rehydrates 13 lbs would
+  // read as a 2-lb cut and defeat severe-cut detection downstream. Fight-night
+  // weight is still kept as a fallback (a rough end measurement beats reporting
+  // a 0-lb cut off startWeight).
   const startWeight = camp?.currentWeight ?? weights[0]?.weight ?? 0;
-  const endWeight = fight?.weighInWeight ?? weights[weights.length - 1]?.weight ?? startWeight;
+  const endWeight = fight?.weighInWeight ?? weights[weights.length - 1]?.weight ?? fight?.fightNightWeight ?? startWeight;
   const weightCutLbs = Math.max(0, startWeight - endWeight);
   const campWeeksElapsed = camp
     ? Math.max(1, Math.round(camp.campWeeks))

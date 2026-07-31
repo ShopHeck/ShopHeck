@@ -576,7 +576,12 @@ export function getCurrentWeekNumber(camp: FightCamp): number {
 export function getCampProgress(camp: FightCamp): number {
   const total = camp.campWeeks * 7;
   if (total <= 0) return 0; // guard campWeeks === 0 → 0/0 → NaN% width
-  const start = startOfWeek(parseISO(camp.startDate), { weekStartsOn: 1 });
+  // Progress is elapsed camp time (shown on the dashboards, charts, and in AI
+  // context), so anchor on the ACTUAL start date — not the Monday-aligned
+  // planner week used for getCurrentWeekNumber. Aligning here would make the
+  // camp read partially complete before it starts and hit 100% up to 6 days
+  // early.
+  const start = parseISO(camp.startDate);
   const today = new Date();
   const elapsed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));

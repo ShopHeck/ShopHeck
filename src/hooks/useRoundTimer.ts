@@ -51,6 +51,10 @@ interface TimerSave {
   isRunning: boolean;
   phaseDeadline: number;
   pausedTimeLeft: number;
+  /** Unique id minted when a session starts, so the completion log fires exactly
+   *  once even if the session finishes while the app is closed and is restored on
+   *  a later launch (idempotency marker — see RoundTimer's completion effect). */
+  sessionId: string;
 }
 
 const DEFAULTS: Partial<TimerSave> = {
@@ -280,6 +284,8 @@ export function useRoundTimer() {
   const [currentRound, setCurrentRound] = useState(1);
   const [timeLeft,     setTimeLeft]     = useState(PRESETS[0].workSec);
   const [isRunning,    setIsRunning]    = useState(false);
+  // Identifies the current session for once-only completion logging.
+  const [sessionId,    setSessionId]    = useState('');
 
   // Refs for stale-closure-safe reads
   const phaseRef      = useRef<Phase>('idle');
@@ -413,11 +419,11 @@ export function useRoundTimer() {
     saveTimer({
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor,
-      phase, currentRound, isRunning,
+      phase, currentRound, isRunning, sessionId,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
     });
-  }, [phase, currentRound, isRunning, timeLeft,
+  }, [phase, currentRound, isRunning, timeLeft, sessionId,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
@@ -435,31 +441,30 @@ export function useRoundTimer() {
     setVoiceEnabled(saved.voiceEnabled);
     setHapticEnabled(saved.hapticEnabled);
     setReactionMode(saved.reactionMode);
+    setSessionId(saved.sessionId ?? '');
     if (saved.workColor) setWorkColor(saved.workColor);
     if (saved.restColor) setRestColor(saved.restColor);
 
+    // A finished session IS restored into 'done' so its completion is logged if
+    // it wasn't already (e.g. the app was killed before the live log ran). The
+    // completion effect dedupes on sessionId, so repeated launches never
+    // duplicate the workout or the HealthKit sample.
     if (saved.isRunning) {
       const fwd = fastForward(saved);
-      if (fwd.phase === 'done') {
-        // The session finished while the app was closed. Do NOT restore into
-        // 'done': the completion effect is keyed on phase==='done' and would
-        // re-log the workout (and re-write HealthKit) on every launch. Keep the
-        // restored preferences, clear the saved run, and stay idle.
-        try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
-        return;
-      }
       phaseRef.current = fwd.phase;
       roundRef.current = fwd.currentRound;
       setPhase(fwd.phase);
       setCurrentRound(fwd.currentRound);
-      deadlineRef.current = fwd.phaseDeadline;
-      const tl = Math.max(1, Math.ceil((fwd.phaseDeadline - Date.now()) / 1000));
-      setTimeLeft(tl); timeLeftRef.current = tl;
-      setIsRunning(true); isRunningRef.current = true;
-    } else if (saved.phase === 'done') {
-      // A completed-but-paused session: same reasoning — don't re-enter 'done'.
-      try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
-      return;
+
+      if (fwd.phase === 'done') {
+        setIsRunning(false); isRunningRef.current = false;
+        setTimeLeft(0);
+      } else {
+        deadlineRef.current = fwd.phaseDeadline;
+        const tl = Math.max(1, Math.ceil((fwd.phaseDeadline - Date.now()) / 1000));
+        setTimeLeft(tl); timeLeftRef.current = tl;
+        setIsRunning(true); isRunningRef.current = true;
+      }
     } else {
       phaseRef.current = saved.phase;
       roundRef.current = saved.currentRound;
@@ -661,6 +666,9 @@ export function useRoundTimer() {
       unlock();
 
       if (phase === 'idle') {
+        // New session — mint an id so the completion effect logs it exactly once,
+        // even across an app relaunch that restores the finished session.
+        setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
         const ctx = getAudioCtx();
         if (prepSecRef.current > 0) {
           // Start with prep countdown
@@ -696,7 +704,7 @@ export function useRoundTimer() {
     voiceEnabled, hapticEnabled, reactionMode,
     workColor, restColor,
     // Timer state
-    phase, currentRound, timeLeft, isRunning,
+    phase, currentRound, timeLeft, isRunning, sessionId,
     // Actions
     handleStartPause, reset, selectPreset,
     // Setters (for settings rows)
