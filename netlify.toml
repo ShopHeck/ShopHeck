@@ -21,3 +21,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Baseline security headers. These are safe for a standalone SPA and add no
+# runtime cost. A Content-Security-Policy is intentionally NOT set here: it must
+# be validated against the live third-party endpoints (Supabase, Anthropic,
+# Fitbit, Sentry, AdSense) before enabling, or it will break those integrations.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

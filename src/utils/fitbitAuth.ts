@@ -15,6 +15,7 @@
 
 const PKCE_VERIFIER_KEY  = 'fitbit_pkce_verifier';
 const PKCE_CLIENT_ID_KEY = 'fitbit_pkce_client_id';
+const OAUTH_STATE_KEY    = 'fitbit_oauth_state';
 
 // ─── PKCE helpers ─────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ function redirectURI(): string {
   return window.location.origin + window.location.pathname;
 }
 
-export function buildFitbitAuthURL(clientId: string, challenge: string): string {
+export function buildFitbitAuthURL(clientId: string, challenge: string, state: string): string {
   const params = new URLSearchParams({
     response_type:         'code',
     client_id:             clientId,
@@ -52,6 +53,7 @@ export function buildFitbitAuthURL(clientId: string, challenge: string): string 
     scope:                 'heartrate profile',
     code_challenge:        challenge,
     code_challenge_method: 'S256',
+    state,
   });
   return `https://www.fitbit.com/oauth2/authorize?${params}`;
 }
@@ -60,9 +62,13 @@ export function buildFitbitAuthURL(clientId: string, challenge: string): string 
 
 export async function initiateFitbitConnect(clientId: string): Promise<void> {
   const { verifier, challenge } = await generatePKCE();
+  // Opaque CSRF token echoed back on the callback and checked in
+  // handleFitbitCallback — defends the redirect alongside PKCE.
+  const state = base64URLEncode(crypto.getRandomValues(new Uint8Array(16)));
   sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
   sessionStorage.setItem(PKCE_CLIENT_ID_KEY, clientId);
-  window.location.href = buildFitbitAuthURL(clientId, challenge);
+  sessionStorage.setItem(OAUTH_STATE_KEY, state);
+  window.location.href = buildFitbitAuthURL(clientId, challenge, state);
 }
 
 // ─── Handle OAuth callback ────────────────────────────────────────────────
@@ -75,14 +81,22 @@ export interface FitbitTokens {
 }
 
 export async function handleFitbitCallback(
-  code: string
+  code: string,
+  returnedState?: string | null
 ): Promise<FitbitTokens | null> {
   const verifier  = sessionStorage.getItem(PKCE_VERIFIER_KEY);
   const clientId  = sessionStorage.getItem(PKCE_CLIENT_ID_KEY);
+  const savedState = sessionStorage.getItem(OAUTH_STATE_KEY);
   if (!verifier || !clientId) return null;
 
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
   sessionStorage.removeItem(PKCE_CLIENT_ID_KEY);
+  sessionStorage.removeItem(OAUTH_STATE_KEY);
+
+  // Reject a callback whose state doesn't match the one we sent (CSRF / a
+  // mismatched or forged redirect). A missing saved state means we never
+  // initiated this flow.
+  if (!savedState || returnedState !== savedState) return null;
 
   const body = new URLSearchParams({
     grant_type:    'authorization_code',
@@ -210,6 +224,11 @@ export async function fetchFitbitHRVRange(
 export function getFitbitCallbackCode(): string | null {
   const params = new URLSearchParams(window.location.search);
   return params.get('code');
+}
+
+export function getFitbitCallbackState(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('state');
 }
 
 export function clearFitbitCallbackParams(): void {
