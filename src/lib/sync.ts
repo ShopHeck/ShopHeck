@@ -41,6 +41,17 @@ function saveIdMap(map: Record<string, string>): void {
   try { localStorage.setItem(IDMAP_KEY, JSON.stringify(map)); } catch { /* noop */ }
 }
 
+/**
+ * Forget every local↔cloud id mapping. Call this whenever the local store is
+ * wiped (reset, account deletion): the map doubles as this device's "I have
+ * synced this record" ledger, and mergeCloud uses it to tell a locally-deleted
+ * record from one it has simply never seen. Leaving a stale map behind after a
+ * reset would make the next restore skip everything.
+ */
+export function clearIdMap(): void {
+  try { localStorage.removeItem(IDMAP_KEY); } catch { /* noop */ }
+}
+
 /** Stable uuid for a local id, minted once and persisted. */
 function makeUuidFor(map: Record<string, string>) {
   return (localId: string): string => {
@@ -217,11 +228,19 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     if (err7) return { ok: false, pushed, error: err7 };
 
     // 4) Misc per-user state (single row).
+    //
+    // Fitbit's OAuth access/refresh tokens are deliberately stripped before the
+    // push. They are long-lived bearer credentials for a third-party account and
+    // the connect flow is per-device PKCE, so syncing them buys nothing but puts
+    // a re-usable credential in our database. Only the non-secret client id and
+    // the last-sync marker travel; a new device re-runs the (one-tap) connect.
     const errState = await run('user_state', [{
       user_id: userId,
       gamification: (state.gamification ?? null) as Ins<'user_state'>['gamification'],
       dashboard_prefs: (state.dashboardPrefs ?? null) as Ins<'user_state'>['dashboard_prefs'],
-      fitbit_config: (state.fitbitConfig ?? null) as Ins<'user_state'>['fitbit_config'],
+      fitbit_config: (state.fitbitConfig
+        ? { clientId: state.fitbitConfig.clientId, lastSync: state.fitbitConfig.lastSync }
+        : null) as Ins<'user_state'>['fitbit_config'],
       subscription: (state.subscription ?? null) as unknown as Ins<'user_state'>['subscription'],
     }], 'user_id');
     if (errState) return { ok: false, pushed, error: errState };
@@ -253,6 +272,12 @@ export interface CloudSnapshot {
   gamification: GamificationState | null;
   dashboardPrefs: DashboardPrefs | null;
   fitbitConfig: FitbitConfig | null;
+  /**
+   * Local ids this device had already mapped to a cloud row before this pull.
+   * A record in here that is missing from local state was deleted here, so the
+   * merge must not treat the still-present cloud row as "new" and restore it.
+   */
+  previouslySynced: Set<string>;
 }
 
 export interface PullResult {
@@ -280,6 +305,10 @@ export async function pullState(userId: string): Promise<PullResult> {
   if (!supabase) return { ok: false, error: 'Cloud sync is not configured.' };
 
   const map = loadIdMap();
+  // Snapshot the mapping BEFORE resolving — makeLocalIdResolver mints (and
+  // records) ids for rows this device has never seen, and those must not be
+  // mistaken for locally-deleted records.
+  const previouslySynced = new Set(Object.keys(map));
   const lid = makeLocalIdResolver(map);
 
   try {
@@ -402,6 +431,7 @@ export async function pullState(userId: string): Promise<PullResult> {
       gamification: (st?.gamification ?? null) as GamificationState | null,
       dashboardPrefs: (st?.dashboard_prefs ?? null) as DashboardPrefs | null,
       fitbitConfig: (st?.fitbit_config ?? null) as FitbitConfig | null,
+      previouslySynced,
     };
 
     saveIdMap(map);
@@ -419,12 +449,34 @@ export async function pullState(userId: string): Promise<PullResult> {
  * Subscription is intentionally never pulled — it's owned by RevenueCat/Stripe.
  */
 export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
+  // A cloud row whose local id this device already knew about, but which is no
+  // longer in local state, was deleted here — restoring it would undo the
+  // delete on every sign-in. Rows this device has never seen still come down,
+  // which is what makes cross-device restore work.
+  const deletedHere = c.previouslySynced;
   const union = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
     const ids = new Set(local.map(x => x.id));
-    return [...local, ...cloud.filter(x => !ids.has(x.id))];
+    return [...local, ...cloud.filter(x => !ids.has(x.id) && !deletedHere.has(x.id))];
   };
 
   const camps = union(state.camps, c.camps);
+
+  // The camp-keyed metadata maps have to be filtered by the SAME rule as the
+  // camps themselves. `union` drops a deleted camp and its row-based logs, but
+  // these maps are keyed by camp id (`${campId}-…` for the session/day maps,
+  // the bare camp id for game plans), so merging them wholesale re-seeded
+  // completed sessions and a game plan for a camp that no longer exists —
+  // undoing half of deleteCamp's cascade on the next pull.
+  // Prefix matching, the exact inverse of deleteCamp's cascade — generateId()
+  // ids contain a hyphen of their own, so splitting the key on '-' would not be
+  // safe.
+  const liveCampIds = new Set(camps.map(camp => camp.id));
+  const campPrefixes = camps.map(camp => `${camp.id}-`);
+  const forLiveCamps = (map: Record<string, boolean>): Record<string, boolean> =>
+    Object.fromEntries(
+      Object.entries(map).filter(([k]) => campPrefixes.some(prefix => k.startsWith(prefix))),
+    );
+
   return {
     ...state,
     currentUser: state.currentUser ?? c.profile,
@@ -441,9 +493,12 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults: union(state.fightResults ?? [], c.fightResults),
     // Cloud first so local keys win on conflict.
-    completedSessions: { ...c.completedSessions, ...state.completedSessions },
-    dayOverrides: { ...c.dayOverrides, ...state.dayOverrides },
-    gamePlans: { ...c.gamePlans, ...state.gamePlans },
+    completedSessions: { ...forLiveCamps(c.completedSessions), ...state.completedSessions },
+    dayOverrides: { ...forLiveCamps(c.dayOverrides), ...state.dayOverrides },
+    gamePlans: Object.fromEntries([
+      ...Object.entries(c.gamePlans).filter(([campId]) => liveCampIds.has(campId)),
+      ...Object.entries(state.gamePlans),
+    ]),
     gamification: state.gamification ?? c.gamification ?? undefined,
     dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,

@@ -254,7 +254,11 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                   </div>
                 </div>
               </div>
-              <button onClick={() => onNavigate('planner')} className="text-brand-500 hover:text-brand-400 transition-colors">
+              <button
+                onClick={() => onNavigate('planner')}
+                aria-label="Open the weekly planner"
+                className="text-brand-500 hover:text-brand-400 transition-colors -m-2 p-2"
+              >
                 <ChevronRight size={18} />
               </button>
             </div>

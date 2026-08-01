@@ -36,7 +36,7 @@ import {
 import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 import { useAuth } from './AuthContext';
-import { fetchServerSubscription } from '../lib/sync';
+import { fetchServerSubscription, clearIdMap } from '../lib/sync';
 import { seedDemoState } from '../utils/demoSeed';
 
 type Action =
@@ -120,8 +120,16 @@ function baseReducer(state: AppState, action: Action): AppState {
       return setSchedule({ ...state, camps, activeCamp }, schedule);
     }
 
-    case 'DELETE_CAMP':
-      return deleteCamp(state, action.payload);
+    case 'DELETE_CAMP': {
+      // Deleting the active camp promotes another one, so the schedule has to
+      // be rebuilt for it — otherwise the planner kept rendering the deleted
+      // camp's weeks until the next app launch.
+      const next = deleteCamp(state, action.payload);
+      const schedule = next.activeCamp
+        ? generateTrainingCamp(next.activeCamp, next.currentUser?.factorWeights)
+        : [];
+      return setSchedule(next, schedule);
+    }
 
     case 'SET_ACTIVE_CAMP': {
       const camp = state.camps.find(c => c.id === action.payload) || null;
@@ -220,6 +228,10 @@ function baseReducer(state: AppState, action: Action): AppState {
       return setDashboardPrefs(state, action.payload);
 
     case 'RESET':
+      // Drop the local↔cloud id ledger too, so a later sign-in restores the
+      // whole account from the cloud instead of reading the wiped records as
+      // deliberate local deletions.
+      clearIdMap();
       return {
         ...loadState(),
         currentUser: null,

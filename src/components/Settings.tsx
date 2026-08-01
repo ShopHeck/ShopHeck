@@ -10,6 +10,7 @@ import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/ap
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
 import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
+import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
@@ -174,6 +175,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const [cRoundDuration, setCRoundDuration] = useState('3');
   const [cCurrentWeight, setCCurrentWeight] = useState('');
   const [cTargetWeight, setCTargetWeight] = useState('');
+  const [campWeightError, setCampWeightError] = useState('');
 
   // Confirms
   const [confirmDeleteCamp, setConfirmDeleteCamp] = useState<string | null>(null);
@@ -211,7 +213,17 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   }
 
   function saveCamp() {
-    if (!editingCamp || !cFightDate || !cCurrentWeight || !cTargetWeight) return;
+    if (!editingCamp || !cFightDate) return;
+    // These two weights anchor the cut projection and the unsafe-cut alert, so
+    // an out-of-range value has to be rejected here — the input's min/max only
+    // apply to native form submission, which this button doesn't use.
+    const currentWeight = parseWeightLbs(cCurrentWeight);
+    const targetWeight = parseWeightLbs(cTargetWeight);
+    if (currentWeight === null || targetWeight === null) {
+      setCampWeightError(WEIGHT_RANGE_HINT);
+      return;
+    }
+    setCampWeightError('');
     const campWeeks = editingCamp.campWeeks;
     const startDate = format(addDays(parseISO(cFightDate), -(campWeeks * 7)), 'yyyy-MM-dd');
     dispatch({
@@ -222,8 +234,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         opponent: cOpponent.trim() || undefined,
         rounds: parseInt(cRounds),
         roundDuration: parseInt(cRoundDuration),
-        currentWeight: parseFloat(cCurrentWeight),
-        targetWeight: parseFloat(cTargetWeight),
+        currentWeight,
+        targetWeight,
         startDate,
       },
     });
@@ -367,12 +379,14 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openEditCamp(camp)}
+                          aria-label={`Edit camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
                           className="p-2 text-gray-500 hover:text-white transition-colors"
                         >
                           <Edit3 size={15} />
                         </button>
                         <button
                           onClick={() => setConfirmDeleteCamp(camp.id)}
+                          aria-label={`Delete camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
                           className="p-2 text-gray-600 hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={15} />
@@ -1007,16 +1021,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {/* Edit Camp Modal */}
       {editingCamp && (
-        <Modal title="Edit Fight Camp" onClose={() => setEditingCamp(null)} footer={
+        <Modal title="Edit Fight Camp" onClose={() => { setEditingCamp(null); setCampWeightError(''); }} footer={
           <button
             onClick={saveCamp}
-            disabled={!cFightDate || !cCurrentWeight || !cTargetWeight}
+            disabled={!cFightDate || parseWeightLbs(cCurrentWeight) === null || parseWeightLbs(cTargetWeight) === null}
             className="btn-primary w-full disabled:opacity-50"
           >
             Save Changes
           </button>
         }>
           <div className="space-y-4">
+            {campWeightError && (
+              <div className="rounded-xl p-3 border bg-red-900/25 border-red-800">
+                <p className="text-sm font-medium text-red-300">{campWeightError}</p>
+              </div>
+            )}
             <div>
               <label className="label">Fight Date</label>
               <input

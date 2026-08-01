@@ -107,7 +107,19 @@ function fastForward(s: TimerSave): TimerSave {
 
 // ─── Audio synthesis ──────────────────────────────────────────────────────
 
+/**
+ * One limiter per AudioContext, reused for every sound.
+ *
+ * This used to mint a fresh DynamicsCompressorNode on each bell and wire it
+ * straight to ctx.destination without ever disconnecting it. A 12-round session
+ * rings ~40 bells, so the graph accumulated ~40 live compressors — each one
+ * running its own DSP on every audio quantum for the rest of the session.
+ */
+const limiters = new WeakMap<AudioContext, DynamicsCompressorNode>();
+
 function makeLimiter(ctx: AudioContext): DynamicsCompressorNode {
+  const existing = limiters.get(ctx);
+  if (existing) return existing;
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -3;
   comp.knee.value = 0;
@@ -115,6 +127,7 @@ function makeLimiter(ctx: AudioContext): DynamicsCompressorNode {
   comp.attack.value = 0.001;
   comp.release.value = 0.05;
   comp.connect(ctx.destination);
+  limiters.set(ctx, comp);
   return comp;
 }
 

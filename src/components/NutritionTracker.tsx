@@ -263,7 +263,8 @@ export default function NutritionTracker() {
             <button
               onClick={() => addWater(-8)}
               disabled={waterOz < 8}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all flex-shrink-0"
+              aria-label="Remove 8 oz of water"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all flex-shrink-0"
             >
               <Minus size={14} />
             </button>

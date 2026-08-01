@@ -119,7 +119,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
     <div className="pb-24">
       {/* Progress header */}
       <div className="mx-4 mt-4 flex items-center gap-2">
-        <button onClick={onCancel} className="text-gray-400 hover:text-white p-1">
+        <button onClick={onCancel} aria-label="Cancel and go back" className="text-gray-400 hover:text-white p-2 -m-1">
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
