@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Play, Pause, RotateCcw, ChevronUp, ChevronDown,
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
-  Plus, X, Bluetooth, BluetoothOff
+  Plus, X, Bluetooth, BluetoothOff, Bell
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
@@ -110,12 +110,12 @@ export default function RoundTimer() {
   const timer = useRoundTimer();
   const {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-    voiceEnabled, hapticEnabled, reactionMode,
+    voiceEnabled, hapticEnabled, reactionMode, bgAlerts, bgAlertsSupported,
     workColor, restColor,
     phase, currentRound, timeLeft, isRunning, sessionId,
     handleStartPause, reset, selectPreset,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
-    setVoiceEnabled, setHapticEnabled, setReactionMode,
+    setVoiceEnabled, setHapticEnabled, setReactionMode, setBgAlerts,
     setWorkColor, setRestColor,
   } = timer;
 
@@ -707,6 +707,27 @@ export default function RoundTimer() {
               <div className={`w-5 h-5 rounded-full bg-white shadow mx-0.5 transition-transform ${hapticEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
+
+          {bgAlertsSupported && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell size={16} className={bgAlerts ? 'text-brand-400' : 'text-gray-500'} />
+                <div>
+                  <span className="text-sm font-medium text-white">Background Alerts</span>
+                  <p className="text-xs text-gray-500">Ring rounds with the app closed</p>
+                </div>
+              </div>
+              <button
+                onClick={() => void setBgAlerts(!bgAlerts)}
+                role="switch"
+                aria-checked={bgAlerts}
+                aria-label="Background alerts"
+                className={`w-11 h-6 rounded-full transition-colors ${bgAlerts ? 'bg-brand-600' : 'bg-dark-500'}`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow mx-0.5 transition-transform ${bgAlerts ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
