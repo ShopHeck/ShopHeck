@@ -407,12 +407,15 @@ export default function WeightTracker() {
         >
           <div className="space-y-4">
             <div>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+              <label className="block">
+                <span className="label">Date</span>
+                <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+              </label>
             </div>
             <div>
-              <label className="label">Weight (lbs) *</label>
-              <input
+              <label className="block">
+                <span className="label">Weight (lbs) *</span>
+                <input
                 className="input text-2xl font-bold"
                 type="number"
                 step="0.1"
@@ -422,6 +425,7 @@ export default function WeightTracker() {
                 value={weight}
                 onChange={e => setWeight(e.target.value)}
               />
+              </label>
             </div>
             {weight && parsedWeight === null && (
               <div className="rounded-xl p-3 border bg-red-900/25 border-red-800">
@@ -439,14 +443,16 @@ export default function WeightTracker() {
               </div>
             )}
             <div>
-              <label className="label">Notes (optional)</label>
-              <textarea
+              <label className="block">
+                <span className="label">Notes (optional)</span>
+                <textarea
                 className="input resize-none"
                 rows={2}
                 placeholder="Morning weight, after workout, etc."
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
               />
+              </label>
             </div>
           </div>
         </Modal>

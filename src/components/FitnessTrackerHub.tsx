@@ -415,8 +415,9 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           {!fitbitConnected && (
             <div className="space-y-2.5">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Fitbit App Client ID</label>
+                <label className="text-xs text-gray-500 mb-1 block" htmlFor="fitbit-client-id">Fitbit App Client ID</label>
                 <input
+                  id="fitbit-client-id"
                   type="text"
                   value={fitbitClientId}
                   onChange={e => setFitbitClientId(e.target.value)}

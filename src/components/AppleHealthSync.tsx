@@ -299,6 +299,7 @@ export default function AppleHealthSync() {
               <input
                 ref={fileRef}
                 type="file"
+                aria-label="Choose an Apple Health export.xml file"
                 accept=".xml"
                 className="hidden"
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}

@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useApp } from './AppContext';
-import { pushState, pullState, mergeCloud } from '../lib/sync';
+import { pushState, pullState, mergeCloud, forceFullResync } from '../lib/sync';
 
 export type SyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -32,17 +32,28 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const inFlight = useRef(false);
+  /**
+   * Whether a pull has succeeded since sign-in. Deleting cloud rows is gated on
+   * this: until we have confirmed what the account actually contains, an empty
+   * or partial local store is indistinguishable from "the user deleted it all",
+   * and pruning on that guess would destroy data.
+   */
+  const restored = useRef(false);
 
   const syncNow = useCallback(async () => {
     if (!user || inFlight.current) return;
     inFlight.current = true;
     setStatus('syncing');
     setError(null);
-    const res = await pushState(user.id, stateRef.current);
+    const res = await pushState(user.id, stateRef.current, { prune: restored.current });
     inFlight.current = false;
     if (res.ok) {
       setStatus('synced');
-      setLastSyncedAt(new Date().toISOString());
+      // pushState only writes rows whose content changed. A push that sent
+      // nothing means the cloud was already current, so leave the "Backed up
+      // 14:32" stamp pointing at the last real upload rather than advancing it
+      // every time an unrelated bit of state moves.
+      if (res.pushed > 0) setLastSyncedAt(new Date().toISOString());
     } else {
       setStatus('error');
       setError(res.error ?? 'Sync failed.');
@@ -56,6 +67,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     const res = await pullState(user.id);
     if (res.ok && res.snapshot) {
+      // From here the local store is known to reflect the account, so a record
+      // that is missing locally really was deleted and may be tombstoned.
+      restored.current = true;
+      // The merge below keeps the LOCAL copy of any row that exists on both
+      // sides, so the server may now hold a different version of a row whose
+      // hash has not moved. Force the next push to re-assert everything, or
+      // dirty tracking would skip it and the two would stay diverged.
+      forceFullResync();
       const merged = mergeCloud(stateRef.current, res.snapshot);
       dispatch({ type: 'SET_STATE', payload: merged });
       // Regenerate the training schedule for the (possibly restored) active camp.
@@ -70,6 +89,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!enabled) {
       setStatus('disabled');
+      // Signing out invalidates the guarantee; the next session must pull again
+      // before it is allowed to delete anything.
+      restored.current = false;
       return;
     }
     setStatus('idle');

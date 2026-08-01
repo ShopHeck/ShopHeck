@@ -760,6 +760,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <input
                 ref={bellInputRef}
                 type="file"
+                aria-label="Choose a custom round-start bell audio file"
                 accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,audio/*"
                 className="hidden"
                 onChange={e => { setBellFile(e.target.files?.[0] ?? null); setBellSaved(false); }}
@@ -972,30 +973,38 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         }>
           <div className="space-y-4">
             <div>
-              <label className="label">Full Name</label>
-              <input className="input" value={pName} onChange={e => setPName(e.target.value)} placeholder="Your name" />
+              <label className="block">
+                <span className="label">Full Name</span>
+                <input className="input" value={pName} onChange={e => setPName(e.target.value)} placeholder="Your name" />
+              </label>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Age</label>
-                <input className="input" type="number" min={16} max={60} value={pAge} onChange={e => setPAge(e.target.value)} />
+                <label className="block">
+                  <span className="label">Age</span>
+                  <input className="input" type="number" min={16} max={60} value={pAge} onChange={e => setPAge(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">Sport</label>
-                <select className="select" value={pSport} onChange={e => setPSport(e.target.value as Sport)}>
+                <label className="block">
+                  <span className="label">Sport</span>
+                  <select className="select" value={pSport} onChange={e => setPSport(e.target.value as Sport)}>
                   {SPORTS.map(s => <option key={s}>{s}</option>)}
                 </select>
+                </label>
               </div>
             </div>
             <div>
-              <label className="label">Weight Class</label>
-              <select className="select" value={pWeightClass} onChange={e => setPWeightClass(e.target.value as WeightClass)}>
+              <label className="block">
+                <span className="label">Weight Class</span>
+                <select className="select" value={pWeightClass} onChange={e => setPWeightClass(e.target.value as WeightClass)}>
                 {WEIGHT_CLASSES.map(wc => <option key={wc}>{wc}</option>)}
               </select>
+              </label>
             </div>
             <div>
               <label className="label">Experience Level</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div role="group" aria-label="Experience Level" className="grid grid-cols-2 gap-2">
                 {EXPERIENCE_LEVELS.map(level => (
                   <button
                     key={level}
@@ -1008,12 +1017,16 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
             </div>
             <div>
-              <label className="label">Gym / Team</label>
-              <input className="input" value={pGym} onChange={e => setPGym(e.target.value)} placeholder="Your gym or team" />
+              <label className="block">
+                <span className="label">Gym / Team</span>
+                <input className="input" value={pGym} onChange={e => setPGym(e.target.value)} placeholder="Your gym or team" />
+              </label>
             </div>
             <div>
-              <label className="label">Record (e.g. 5-2-0)</label>
-              <input className="input" value={pRecord} onChange={e => setPRecord(e.target.value)} placeholder="W-L-D" />
+              <label className="block">
+                <span className="label">Record (e.g. 5-2-0)</span>
+                <input className="input" value={pRecord} onChange={e => setPRecord(e.target.value)} placeholder="W-L-D" />
+              </label>
             </div>
           </div>
         </Modal>
@@ -1037,18 +1050,22 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
             )}
             <div>
-              <label className="label">Fight Date</label>
-              <input
+              <label className="block">
+                <span className="label">Fight Date</span>
+                <input
                 className="input"
                 type="date"
                 min={minDate}
                 value={cFightDate}
                 onChange={e => setCFightDate(e.target.value)}
               />
+              </label>
             </div>
             <div>
-              <label className="label">Opponent (Optional)</label>
-              <input className="input" placeholder="Opponent's name" value={cOpponent} onChange={e => setCOpponent(e.target.value)} />
+              <label className="block">
+                <span className="label">Opponent (Optional)</span>
+                <input className="input" placeholder="Opponent's name" value={cOpponent} onChange={e => setCOpponent(e.target.value)} />
+              </label>
             </div>
             {/* BKFC Format Preset */}
             <button
@@ -1070,28 +1087,36 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Rounds</label>
-                <select className="select" value={cRounds} onChange={e => setCRounds(e.target.value)}>
+                <label className="block">
+                  <span className="label">Rounds</span>
+                  <select className="select" value={cRounds} onChange={e => setCRounds(e.target.value)}>
                   {[3, 4, 5, 6, 8, 10, 12, 15].map(n => <option key={n} value={n}>{n} rounds</option>)}
                 </select>
+                </label>
               </div>
               <div>
-                <label className="label">Round Duration</label>
-                <select className="select" value={cRoundDuration} onChange={e => setCRoundDuration(e.target.value)}>
+                <label className="block">
+                  <span className="label">Round Duration</span>
+                  <select className="select" value={cRoundDuration} onChange={e => setCRoundDuration(e.target.value)}>
                   <option value="2">2 minutes</option>
                   <option value="3">3 minutes</option>
                   <option value="5">5 minutes</option>
                 </select>
+                </label>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Current Weight (lbs)</label>
-                <input className="input" type="number" step="0.1" value={cCurrentWeight} onChange={e => setCCurrentWeight(e.target.value)} />
+                <label className="block">
+                  <span className="label">Current Weight (lbs)</span>
+                  <input className="input" type="number" step="0.1" value={cCurrentWeight} onChange={e => setCCurrentWeight(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">Target Weight (lbs)</label>
-                <input className="input" type="number" step="0.1" value={cTargetWeight} onChange={e => setCTargetWeight(e.target.value)} />
+                <label className="block">
+                  <span className="label">Target Weight (lbs)</span>
+                  <input className="input" type="number" step="0.1" value={cTargetWeight} onChange={e => setCTargetWeight(e.target.value)} />
+                </label>
               </div>
             </div>
             <div className="bg-dark-600 rounded-xl p-3 border border-dark-400">

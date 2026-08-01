@@ -1,4 +1,5 @@
-import { Flame, Settings, ChevronLeft, Timer } from 'lucide-react';
+import { Settings, ChevronLeft, Timer } from 'lucide-react';
+import AppMark from './AppMark';
 import { useTimerContext } from '../../context/TimerContext';
 
 function fmt(sec: number) {
@@ -30,9 +31,7 @@ export default function Header({ title, showBack, onBack, onSettings, subtitle, 
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="bg-brand-600 rounded-lg p-1.5">
-              <Flame size={16} className="text-white" />
-            </div>
+            <AppMark size={28} />
           </div>
         )}
 

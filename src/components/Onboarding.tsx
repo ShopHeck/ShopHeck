@@ -3,6 +3,7 @@ import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, B
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import AuthScreen from './AuthScreen';
+import AppMark from './shared/AppMark';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
@@ -197,7 +198,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 {isOffSeason ? (
                   <div>
                     <label className="label">Training Goal</label>
-                    <div className="flex flex-col gap-2">
+                    <div role="group" aria-label="Training Goal" className="flex flex-col gap-2">
                       {OFF_SEASON_GOALS.map(g => (
                         <button
                           key={g.value}
@@ -216,12 +217,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 ) : (
                   <>
                     <div>
-                      <label className="label">Fight Date *</label>
-                      <input className="input" type="date" min={minDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                      <label className="block">
+                        <span className="label">Fight Date *</span>
+                        <input className="input" type="date" min={minDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                      </label>
                     </div>
                     <div>
-                      <label className="label">Opponent (Optional)</label>
-                      <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                      <label className="block">
+                        <span className="label">Opponent (Optional)</span>
+                        <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                      </label>
                     </div>
                     <button
                       type="button"
@@ -241,18 +246,22 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                     </button>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="label">Rounds</label>
-                        <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
+                        <label className="block">
+                          <span className="label">Rounds</span>
+                          <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
                           {[3,4,5,6,8,10,12,15].map(n => <option key={n} value={n}>{n} rounds</option>)}
                         </select>
+                        </label>
                       </div>
                       <div>
-                        <label className="label">Round Duration</label>
-                        <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                        <label className="block">
+                          <span className="label">Round Duration</span>
+                          <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
                           <option value="2">2 minutes</option>
                           <option value="3">3 minutes</option>
                           <option value="5">5 minutes</option>
                         </select>
+                        </label>
                       </div>
                     </div>
                   </>
@@ -261,12 +270,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 {/* Weight fields — always shown, optional in off-season */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Current Weight (lbs){!isOffSeason && ' *'}</label>
-                    <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                    <label className="block">
+                      <span className="label">Current Weight (lbs){!isOffSeason && ' *'}</span>
+                      <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                    </label>
                   </div>
                   <div>
-                    <label className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</label>
-                    <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                    <label className="block">
+                      <span className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</span>
+                      <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                    </label>
                   </div>
                 </div>
                 {showWeightHint && (
@@ -277,7 +290,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 {!isOffSeason && (
                   <div>
                     <label className="label">Camp Length</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div role="group" aria-label="Camp Length" className="grid grid-cols-3 gap-2">
                       {['6','8','10'].map(w => (
                         <button key={w} onClick={() => setCampWeeks(w)}
                           className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${campWeeks === w ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
@@ -343,9 +356,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
       <div className="min-h-screen bg-dark-900 flex flex-col">
         <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
           <div className="relative">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-900/50">
-              <Flame size={32} className="text-white" />
-            </div>
+            <AppMark size={72} rounded="rounded-2xl" className="mx-auto mb-4 shadow-lg shadow-black/50" />
             <h1 className="text-3xl font-black text-white mb-2 tracking-tight">FIGHT CAMP</h1>
             <p className="text-brand-400 font-semibold text-sm uppercase tracking-widest">Training Platform</p>
             <p className="text-gray-400 text-sm mt-3 max-w-xs mx-auto">
@@ -396,9 +407,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23f97316%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-30" />
           <div className="relative">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-900/50">
-              <Flame size={32} className="text-white" />
-            </div>
+            <AppMark size={72} rounded="rounded-2xl" className="mx-auto mb-4 shadow-lg shadow-black/50" />
             <h1 className="text-3xl font-black text-white mb-2 tracking-tight">FIGHT CAMP</h1>
             <p className="text-brand-400 font-semibold text-sm uppercase tracking-widest">Training Platform</p>
             <p className="text-gray-400 text-sm mt-3 max-w-xs mx-auto">
@@ -447,33 +456,41 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             </div>
 
             <div>
-              <label className="label">Full Name *</label>
-              <input className="input" placeholder="Enter your name" value={name} onChange={e => setName(e.target.value)} />
+              <label className="block">
+                <span className="label">Full Name *</span>
+                <input className="input" placeholder="Enter your name" value={name} onChange={e => setName(e.target.value)} />
+              </label>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Age *</label>
-                <input className="input" type="number" placeholder="Age" min={16} max={60} value={age} onChange={e => setAge(e.target.value)} />
+                <label className="block">
+                  <span className="label">Age *</span>
+                  <input className="input" type="number" placeholder="Age" min={16} max={60} value={age} onChange={e => setAge(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">Sport *</label>
-                <select className="select" value={sport} onChange={e => setSport(e.target.value as Sport)}>
+                <label className="block">
+                  <span className="label">Sport *</span>
+                  <select className="select" value={sport} onChange={e => setSport(e.target.value as Sport)}>
                   {SPORTS.map(s => <option key={s}>{s}</option>)}
                 </select>
+                </label>
               </div>
             </div>
 
             <div>
-              <label className="label">Weight Class *</label>
-              <select className="select" value={weightClass} onChange={e => setWeightClass(e.target.value as WeightClass)}>
+              <label className="block">
+                <span className="label">Weight Class *</span>
+                <select className="select" value={weightClass} onChange={e => setWeightClass(e.target.value as WeightClass)}>
                 {WEIGHT_CLASSES.map(wc => <option key={wc}>{wc}</option>)}
               </select>
+              </label>
             </div>
 
             <div>
               <label className="label">Experience Level *</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div role="group" aria-label="Experience Level" className="grid grid-cols-2 gap-2">
                 {EXPERIENCE_LEVELS.map(level => (
                   <button
                     key={level}
@@ -491,8 +508,10 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             </div>
 
             <div>
-              <label className="label">Gym / Team (Optional)</label>
-              <input className="input" placeholder="Your gym or team name" value={gym} onChange={e => setGym(e.target.value)} />
+              <label className="block">
+                <span className="label">Gym / Team (Optional)</span>
+                <input className="input" placeholder="Your gym or team name" value={gym} onChange={e => setGym(e.target.value)} />
+              </label>
             </div>
 
             <button
@@ -538,7 +557,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             {isOffSeason ? (
               <div>
                 <label className="label">Training Goal</label>
-                <div className="flex flex-col gap-2">
+                <div role="group" aria-label="Training Goal" className="flex flex-col gap-2">
                   {OFF_SEASON_GOALS.map(g => (
                     <button
                       key={g.value}
@@ -557,12 +576,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             ) : (
               <>
                 <div>
-                  <label className="label">Fight Date *</label>
-                  <input className="input" type="date" min={minDate} max={maxDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                  <label className="block">
+                    <span className="label">Fight Date *</span>
+                    <input className="input" type="date" min={minDate} max={maxDate} value={fightDate} onChange={e => setFightDate(e.target.value)} />
+                  </label>
                 </div>
                 <div>
-                  <label className="label">Opponent (Optional)</label>
-                  <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                  <label className="block">
+                    <span className="label">Opponent (Optional)</span>
+                    <input className="input" placeholder="Opponent's name" value={opponent} onChange={e => setOpponent(e.target.value)} />
+                  </label>
                 </div>
                 <button
                   type="button"
@@ -582,20 +605,24 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 </button>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Rounds</label>
-                    <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
+                    <label className="block">
+                      <span className="label">Rounds</span>
+                      <select className="select" value={rounds} onChange={e => setRounds(e.target.value)}>
                       {[3, 4, 5, 6, 8, 10, 12, 15].map(n => (
                         <option key={n} value={n}>{n} rounds</option>
                       ))}
                     </select>
+                    </label>
                   </div>
                   <div>
-                    <label className="label">Round Duration</label>
-                    <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
+                    <label className="block">
+                      <span className="label">Round Duration</span>
+                      <select className="select" value={roundDuration} onChange={e => setRoundDuration(e.target.value)}>
                       <option value="2">2 minutes</option>
                       <option value="3">3 minutes</option>
                       <option value="5">5 minutes</option>
                     </select>
+                    </label>
                   </div>
                 </div>
               </>
@@ -604,12 +631,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             {/* Weight fields */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Current Weight (lbs){!isOffSeason && ' *'}</label>
-                <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                <label className="block">
+                  <span className="label">Current Weight (lbs){!isOffSeason && ' *'}</span>
+                  <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</label>
-                <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                <label className="block">
+                  <span className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</span>
+                  <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
+                </label>
               </div>
             </div>
             {showWeightHint && (
@@ -620,7 +651,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             {!isOffSeason && (
               <div>
                 <label className="label">Camp Length</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div role="group" aria-label="Camp Length" className="grid grid-cols-3 gap-2">
                   {['6', '8', '10'].map(w => (
                     <button
                       key={w}

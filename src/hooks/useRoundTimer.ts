@@ -4,6 +4,11 @@ import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import { getCustomBellDataUrl } from '../utils/customBell';
+import {
+  scheduleRoundAlerts, cancelRoundAlerts, roundAlertsEnabled, setRoundAlertsEnabled,
+  requestNotificationPermission, notificationsSupported,
+  type RoundAlert,
+} from '../utils/notifications';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -291,6 +296,7 @@ export function useRoundTimer() {
   const [reactionMode,  setReactionMode]  = useState(false);
   const [workColor, setWorkColor] = useState('#22c55e');
   const [restColor, setRestColor] = useState('#ef4444');
+  const [bgAlerts, setBgAlertsState] = useState(roundAlertsEnabled());
 
   // Timer engine state
   const [phase,        setPhase]        = useState<Phase>('idle');
@@ -488,6 +494,84 @@ export function useRoundTimer() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Every remaining phase change from `deadline`, as wall-clock moments.
+   *
+   * Mirrors the state machine in the interval below exactly — prep ends into
+   * round 1, work ends into rest (or into "done" on the last round), rest ends
+   * into the next round — so the OS rings the same bells at the same instants
+   * the in-app timer would have.
+   */
+  const upcomingAlerts = useCallback((): RoundAlert[] => {
+    const alerts: RoundAlert[] = [];
+    let ph = phaseRef.current;
+    let round = roundRef.current;
+    let at = deadlineRef.current;
+    const total = roundsRef.current;
+
+    // Bounded by the phases actually left in the session, not by a while(true).
+    for (let i = 0; i < total * 2 + 2 && ph !== 'done'; i++) {
+      if (ph === 'prep') {
+        alerts.push({ at: new Date(at), title: 'Round 1', body: `Round 1 of ${total} — go.` });
+        ph = 'work';
+        at += workSecRef.current * 1000;
+      } else if (ph === 'work') {
+        if (round >= total) {
+          alerts.push({ at: new Date(at), title: 'Session complete', body: 'Great work.' });
+          ph = 'done';
+        } else {
+          alerts.push({ at: new Date(at), title: `End of round ${round}`, body: 'Rest.' });
+          ph = 'rest';
+          at += restSecRef.current * 1000;
+        }
+      } else {
+        round += 1;
+        alerts.push({
+          at: new Date(at),
+          title: round >= total ? 'Last round' : `Round ${round}`,
+          body: `Round ${round} of ${total} — go.`,
+        });
+        ph = 'work';
+        at += workSecRef.current * 1000;
+      }
+    }
+    return alerts;
+  }, []);
+
+  // ── Background round alerts ──────────────────────────────────────────────
+  // Handed to the OS only while the app is actually backgrounded, and revoked
+  // the moment it returns, so a notification and the in-app bell can never both
+  // fire for the same round.
+  // Bumped on every visibility change. Scheduling spans several awaits, so a
+  // quick background-then-foreground could otherwise let the schedule land
+  // after the cancel and ring every round twice.
+  const alertGenRef = useRef(0);
+  useEffect(() => {
+    const onVisibility = () => {
+      const gen = ++alertGenRef.current;
+      if (document.visibilityState === 'hidden' && isRunningRef.current) {
+        void scheduleRoundAlerts(upcomingAlerts(), () => alertGenRef.current === gen);
+      } else {
+        void cancelRoundAlerts();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      alertGenRef.current++;
+      void cancelRoundAlerts();
+    };
+  }, [upcomingAlerts]);
+
+  // Pausing, resetting or finishing while backgrounded must not leave bells
+  // queued for a session that is no longer running.
+  useEffect(() => {
+    if (!isRunning) {
+      alertGenRef.current++;
+      void cancelRoundAlerts();
+    }
+  }, [isRunning]);
 
   // ── Page-visibility fast-forward ─────────────────────────────────────────
   useEffect(() => {
@@ -711,10 +795,28 @@ export function useRoundTimer() {
     if (phase === 'idle') setTimeLeft(workSec);
   }, [workSec, phase]);
 
+  /**
+   * Turning this on needs the OS notification permission, so it is requested at
+   * the moment the fighter asks for the feature rather than at launch. If they
+   * decline, the toggle stays off instead of claiming a capability we don't
+   * have.
+   */
+  const setBgAlerts = useCallback(async (on: boolean) => {
+    if (!on) {
+      setRoundAlertsEnabled(false);
+      setBgAlertsState(false);
+      await cancelRoundAlerts();
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    setRoundAlertsEnabled(granted);
+    setBgAlertsState(granted);
+  }, []);
+
   return {
     // Settings
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
-    voiceEnabled, hapticEnabled, reactionMode,
+    voiceEnabled, hapticEnabled, reactionMode, bgAlerts,
     workColor, restColor,
     // Timer state
     phase, currentRound, timeLeft, isRunning, sessionId,
@@ -728,6 +830,9 @@ export function useRoundTimer() {
     setWarningSec:  (v: number) => { setWarningSec(v); warningSecRef.current = v; },
     setVoiceEnabled,
     setHapticEnabled,
+    setBgAlerts,
+    /** Background alerts need a native OS scheduler; hide the row on web. */
+    bgAlertsSupported: notificationsSupported(),
     setReactionMode,
     setWorkColor,
     setRestColor,

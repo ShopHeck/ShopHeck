@@ -111,19 +111,22 @@ export default function GamePlanBuilder() {
         </div>
         <div className="card space-y-3">
           <div>
-            <label className="label">Opponent Name</label>
-            <input
+            <label className="block">
+              <span className="label">Opponent Name</span>
+              <input
               className="input"
               placeholder="e.g. John Smith"
               value={form.opponentName}
               onChange={e => set('opponentName', e.target.value)}
             />
+            </label>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Stance</label>
+              <label className="label" htmlFor="gameplan-stance">Stance</label>
               <div className="relative">
                 <select
+                  id="gameplan-stance"
                   className="input appearance-none pr-8"
                   value={form.opponentStance ?? ''}
                   onChange={e => set('opponentStance', e.target.value)}
@@ -135,33 +138,39 @@ export default function GamePlanBuilder() {
               </div>
             </div>
             <div>
-              <label className="label">Height</label>
-              <input
+              <label className="block">
+                <span className="label">Height</span>
+                <input
                 className="input"
                 placeholder="5'11&quot;"
                 value={form.opponentHeight}
                 onChange={e => set('opponentHeight', e.target.value)}
               />
+              </label>
             </div>
             <div>
-              <label className="label">Reach</label>
-              <input
+              <label className="block">
+                <span className="label">Reach</span>
+                <input
                 className="input"
                 placeholder='74"'
                 value={form.opponentReach}
                 onChange={e => set('opponentReach', e.target.value)}
               />
+              </label>
             </div>
           </div>
           <div>
-            <label className="label">Style & Tendencies</label>
-            <textarea
+            <label className="block">
+              <span className="label">Style & Tendencies</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Heavy southpaw, likes to come forward, strong left hand, tends to drop right hand after jab..."
               value={form.styleNotes}
               onChange={e => set('styleNotes', e.target.value)}
             />
+            </label>
           </div>
         </div>
       </section>
@@ -174,35 +183,41 @@ export default function GamePlanBuilder() {
         </div>
         <div className="card space-y-4">
           <div>
-            <label className="label">Early Rounds (Rds 1–3)</label>
-            <textarea
+            <label className="block">
+              <span className="label">Early Rounds (Rds 1–3)</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Use the jab to establish range, stay on the outside, feel him out, don't get drawn into exchanges..."
               value={form.earlyRoundPlan}
               onChange={e => set('earlyRoundPlan', e.target.value)}
             />
+            </label>
           </div>
           <div>
-            <label className="label">Middle Rounds (Rds 4–8)</label>
-            <textarea
+            <label className="block">
+              <span className="label">Middle Rounds (Rds 4–8)</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Start working the body, look to cut the ring, step up pressure after establishing jab..."
               value={form.midRoundPlan}
               onChange={e => set('midRoundPlan', e.target.value)}
             />
+            </label>
           </div>
           {activeCamp.rounds > 8 && (
             <div>
-              <label className="label">Championship Rounds (Rds 9+)</label>
-              <textarea
+              <label className="block">
+                <span className="label">Championship Rounds (Rds 9+)</span>
+                <textarea
                 className="input resize-none"
                 rows={3}
                 placeholder="e.g. Push the pace, take calculated risks, work the combinations..."
                 value={form.lateRoundPlan}
                 onChange={e => set('lateRoundPlan', e.target.value)}
               />
+              </label>
             </div>
           )}
         </div>
@@ -216,24 +231,28 @@ export default function GamePlanBuilder() {
         </div>
         <div className="card space-y-4">
           <div>
-            <label className="label">Key Techniques to Execute</label>
-            <textarea
+            <label className="block">
+              <span className="label">Key Techniques to Execute</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Jab-cross-left hook, right uppercut on the inside, left hook to the body..."
               value={form.keyTechniques}
               onChange={e => set('keyTechniques', e.target.value)}
             />
+            </label>
           </div>
           <div>
-            <label className="label">Things to Watch Out For</label>
-            <textarea
+            <label className="block">
+              <span className="label">Things to Watch Out For</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Dangerous right hand counter, strong clinch game, tends to headbutt when pressured..."
               value={form.thingsToAvoid}
               onChange={e => set('thingsToAvoid', e.target.value)}
             />
+            </label>
           </div>
         </div>
       </section>
@@ -245,14 +264,16 @@ export default function GamePlanBuilder() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Corner Instructions</p>
         </div>
         <div className="card">
-          <label className="label">Between-Round Cues</label>
-          <textarea
+          <label className="block">
+            <span className="label">Between-Round Cues</span>
+            <textarea
             className="input resize-none"
             rows={4}
             placeholder="e.g. Stay relaxed, hands up, jab jab cross, work the body, don't let him breathe, move after combinations..."
             value={form.cornerInstructions}
             onChange={e => set('cornerInstructions', e.target.value)}
           />
+          </label>
         </div>
       </section>
 
