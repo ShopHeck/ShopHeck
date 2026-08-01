@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useApp } from './AppContext';
-import { pushState, pullState, mergeCloud } from '../lib/sync';
+import { pushState, pullState, mergeCloud, forceFullResync } from '../lib/sync';
 
 export type SyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -70,6 +70,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       // From here the local store is known to reflect the account, so a record
       // that is missing locally really was deleted and may be tombstoned.
       restored.current = true;
+      // The merge below keeps the LOCAL copy of any row that exists on both
+      // sides, so the server may now hold a different version of a row whose
+      // hash has not moved. Force the next push to re-assert everything, or
+      // dirty tracking would skip it and the two would stay diverged.
+      forceFullResync();
       const merged = mergeCloud(stateRef.current, res.snapshot);
       dispatch({ type: 'SET_STATE', payload: merged });
       // Regenerate the training schedule for the (possibly restored) active camp.

@@ -543,10 +543,15 @@ export function useRoundTimer() {
   // Handed to the OS only while the app is actually backgrounded, and revoked
   // the moment it returns, so a notification and the in-app bell can never both
   // fire for the same round.
+  // Bumped on every visibility change. Scheduling spans several awaits, so a
+  // quick background-then-foreground could otherwise let the schedule land
+  // after the cancel and ring every round twice.
+  const alertGenRef = useRef(0);
   useEffect(() => {
     const onVisibility = () => {
+      const gen = ++alertGenRef.current;
       if (document.visibilityState === 'hidden' && isRunningRef.current) {
-        void scheduleRoundAlerts(upcomingAlerts());
+        void scheduleRoundAlerts(upcomingAlerts(), () => alertGenRef.current === gen);
       } else {
         void cancelRoundAlerts();
       }
@@ -554,6 +559,7 @@ export function useRoundTimer() {
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      alertGenRef.current++;
       void cancelRoundAlerts();
     };
   }, [upcomingAlerts]);
@@ -561,7 +567,10 @@ export function useRoundTimer() {
   // Pausing, resetting or finishing while backgrounded must not leave bells
   // queued for a session that is no longer running.
   useEffect(() => {
-    if (!isRunning) void cancelRoundAlerts();
+    if (!isRunning) {
+      alertGenRef.current++;
+      void cancelRoundAlerts();
+    }
   }, [isRunning]);
 
   // ── Page-visibility fast-forward ─────────────────────────────────────────

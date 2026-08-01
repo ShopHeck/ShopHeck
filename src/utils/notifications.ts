@@ -118,7 +118,18 @@ export function setRoundAlertsEnabled(on: boolean): void {
  * are dropped — iOS fires a past-dated notification immediately, which would
  * ring the bell for a round that has already finished.
  */
-export async function scheduleRoundAlerts(alerts: RoundAlert[]): Promise<void> {
+export async function scheduleRoundAlerts(
+  alerts: RoundAlert[],
+  /**
+   * Re-checked immediately before and after the scheduling call. Scheduling is
+   * several awaits long, so a fighter who backgrounds the app and comes straight
+   * back can have the foreground cancel land *first* — leaving alerts queued
+   * while the in-app bell is also running, and every round ringing twice. The
+   * caller passes a generation check so a superseded call cleans up after
+   * itself instead.
+   */
+  stillWanted: () => boolean = () => true,
+): Promise<void> {
   if (!notificationsSupported() || !roundAlertsEnabled()) return;
   try {
     await LocalNotifications.cancel({ notifications: ROUND_ALERT_IDS });
@@ -129,7 +140,7 @@ export async function scheduleRoundAlerts(alerts: RoundAlert[]): Promise<void> {
     const due = alerts
       .filter(a => a.at.getTime() > now + 500)
       .slice(0, ROUND_ALERT_MAX);
-    if (due.length === 0) return;
+    if (due.length === 0 || !stillWanted()) return;
 
     await LocalNotifications.schedule({
       notifications: due.map((a, i) => ({
@@ -139,6 +150,10 @@ export async function scheduleRoundAlerts(alerts: RoundAlert[]): Promise<void> {
         schedule: { at: a.at, allowWhileIdle: true },
       })),
     });
+
+    // Superseded while we were scheduling — undo it rather than leave alerts
+    // queued for a foregrounded app.
+    if (!stillWanted()) await LocalNotifications.cancel({ notifications: ROUND_ALERT_IDS });
   } catch {
     /* best-effort; the in-app bell remains the primary cue */
   }

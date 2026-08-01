@@ -104,6 +104,24 @@ function saveHashes(store: HashStore): void {
   try { localStorage.setItem(HASH_KEY, JSON.stringify(store)); } catch { /* noop */ }
 }
 
+/**
+ * Make the next push send everything.
+ *
+ * mergeCloud keeps the LOCAL copy when a row exists on both sides, so after a
+ * pull the server can legitimately hold a different version of a row this
+ * device already pushed. Its hash is unchanged, so dirty tracking would skip it
+ * and the two would stay diverged — the unconditional push used to be what made
+ * the documented local-wins merge converge. Called after every successful pull.
+ */
+export function forceFullResync(): void {
+  try {
+    const raw = localStorage.getItem(HASH_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as HashStore;
+    saveHashes({ ...parsed, fullAt: 0 });
+  } catch { /* noop */ }
+}
+
 /** FNV-1a over the row's JSON — fast, and collisions only cost a skipped push. */
 function hashRow(row: unknown): string {
   const s = JSON.stringify(row);
@@ -174,18 +192,24 @@ export async function pushState(
   // Hashes are staged per table and only committed once that table's write has
   // actually landed, so a failed push retries the same rows next time.
   const staged: HashStore['tables'] = {};
-  const commitHashes = () => {
+  /**
+   * `complete` must be false on any bail-out. A forced 24h resync that failed
+   * partway still wrote some tables, but the failed one kept its old hashes —
+   * stamping fullAt anyway would un-force the retry and leave exactly the rows
+   * the resync existed to repair permanently skipped.
+   */
+  const commitHashes = (complete: boolean) => {
     saveHashes({
       userId,
       tables: { ...hashes.tables, ...staged },
-      fullAt: forceFull ? Date.now() : hashes.fullAt,
+      fullAt: forceFull && complete ? Date.now() : hashes.fullAt,
     });
   };
 
   /** Bail out, keeping whatever progress the successful tables already made. */
   const fail = (error: string): PushResult => {
     saveIdMap(map);
-    commitHashes();
+    commitHashes(false);
     return { ok: false, pushed, pruned, error };
   };
 
@@ -405,7 +429,7 @@ export async function pushState(
     if (errState) return fail(errState);
 
     saveIdMap(map);
-    commitHashes();
+    commitHashes(true);
     return { ok: true, pushed, pruned };
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Sync failed.');
@@ -437,6 +461,11 @@ export interface CloudSnapshot {
    * merge must not treat the still-present cloud row as "new" and restore it.
    */
   previouslySynced: Set<string>;
+  /**
+   * Local ids another device has tombstoned. mergeCloud removes these from
+   * local state, which is what makes a delete on one device reach the others.
+   */
+  tombstoned: Set<string>;
 }
 
 export interface PullResult {
@@ -473,17 +502,19 @@ export async function pullState(userId: string): Promise<PullResult> {
   try {
     const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      // `.is('deleted_at', null)` on every camp-scoped table: a row another
-      // device tombstoned must not come back down here. Nothing filtered on
-      // deleted_at before, so the column may as well not have existed.
-      supabase.from('camps').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('workout_logs').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('sparring_logs').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('conditioning_tests').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('weight_entries').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('nutrition_logs').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('hrv_entries').select('*').eq('user_id', userId).is('deleted_at', null),
-      supabase.from('fight_results').select('*').eq('user_id', userId).is('deleted_at', null),
+      // Tombstoned rows are fetched too, not filtered out. Filtering makes a
+      // deleted row indistinguishable from one that never existed, and
+      // mergeCloud only ever ADDS cloud rows to local state — so a device that
+      // already held the row would keep showing it forever. They are split out
+      // below and carried through as an explicit delete signal instead.
+      supabase.from('camps').select('*').eq('user_id', userId),
+      supabase.from('workout_logs').select('*').eq('user_id', userId),
+      supabase.from('sparring_logs').select('*').eq('user_id', userId),
+      supabase.from('conditioning_tests').select('*').eq('user_id', userId),
+      supabase.from('weight_entries').select('*').eq('user_id', userId),
+      supabase.from('nutrition_logs').select('*').eq('user_id', userId),
+      supabase.from('hrv_entries').select('*').eq('user_id', userId),
+      supabase.from('fight_results').select('*').eq('user_id', userId),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
@@ -495,7 +526,24 @@ export async function pullState(userId: string): Promise<PullResult> {
     const completedSessions: Record<string, boolean> = {};
     const dayOverrides: Record<string, boolean> = {};
 
-    const camps: FightCamp[] = (campsQ.data ?? []).map((c: Row<'camps'>) => {
+    /**
+     * Local ids of rows another device has tombstoned. mergeCloud removes these
+     * from local state — without an explicit signal a delete made elsewhere can
+     * never reach a device that already holds the row.
+     */
+    const tombstoned = new Set<string>();
+
+    /** Split a table's rows into the live ones and the tombstones. */
+    const live = <R extends { id: string; deleted_at?: string | null }>(rows: R[] | null): R[] => {
+      const out: R[] = [];
+      for (const row of rows ?? []) {
+        if (row.deleted_at) tombstoned.add(lid(row.id));
+        else out.push(row);
+      }
+      return out;
+    };
+
+    const camps: FightCamp[] = live(campsQ.data as Row<'camps'>[] | null).map((c: Row<'camps'>) => {
       const campLocalId = lid(c.id);
       const cs = c.completed_sessions as Record<string, boolean> | null;
       if (cs) for (const [rel, v] of Object.entries(cs)) completedSessions[`${campLocalId}-${rel}`] = v;
@@ -546,38 +594,38 @@ export async function pullState(userId: string): Promise<PullResult> {
     const snapshot: CloudSnapshot = {
       profile,
       camps,
-      workoutLogs: (workoutsQ.data ?? []).map((w: Row<'workout_logs'>) => ({
+      workoutLogs: live(workoutsQ.data as Row<'workout_logs'>[] | null).map((w: Row<'workout_logs'>) => ({
         id: lid(w.id), campId: lid(w.camp_id), date: w.date, weekNumber: w.week_number,
         dayLabel: w.day_label, sessionType: w.session_type as SessionType, title: w.title,
         duration: w.duration, rpe: w.rpe, notes: w.notes ?? '', completed: w.completed,
         createdAt: w.created_at, mep: w.mep ?? undefined,
       })),
-      sparringLogs: (sparringQ.data ?? []).map((s: Row<'sparring_logs'>) => ({
+      sparringLogs: live(sparringQ.data as Row<'sparring_logs'>[] | null).map((s: Row<'sparring_logs'>) => ({
         id: lid(s.id), campId: lid(s.camp_id), date: s.date, weekNumber: s.week_number,
         rounds: s.rounds, roundDuration: s.round_duration, partnerName: s.partner_name,
         partnerLevel: s.partner_level, focus: s.focus, performance: s.performance as 1 | 2 | 3 | 4 | 5,
         notes: s.notes ?? '', createdAt: s.created_at,
       })),
-      conditioningTests: (condQ.data ?? []).map((t: Row<'conditioning_tests'>) => ({
+      conditioningTests: live(condQ.data as Row<'conditioning_tests'>[] | null).map((t: Row<'conditioning_tests'>) => ({
         id: lid(t.id), campId: lid(t.camp_id), date: t.date, weekNumber: t.week_number,
         testType: t.test_type, value: t.value, unit: t.unit, notes: t.notes ?? '', createdAt: t.created_at,
       })),
-      weightEntries: (weightQ.data ?? []).map((e: Row<'weight_entries'>) => ({
+      weightEntries: live(weightQ.data as Row<'weight_entries'>[] | null).map((e: Row<'weight_entries'>) => ({
         id: lid(e.id), campId: lid(e.camp_id), date: e.date, weight: e.weight,
         notes: e.notes ?? '', createdAt: e.created_at,
       })),
-      nutritionLogs: (nutritionQ.data ?? []).map((n: Row<'nutrition_logs'>) => ({
+      nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) => ({
         id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
         mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
         macros: (n.macros ?? undefined) as MacroEntry | undefined,
         notes: n.notes ?? '', createdAt: n.created_at,
       })),
-      hrvEntries: (hrvQ.data ?? []).map((h: Row<'hrv_entries'>) => ({
+      hrvEntries: live(hrvQ.data as Row<'hrv_entries'>[] | null).map((h: Row<'hrv_entries'>) => ({
         id: lid(h.id), campId: lid(h.camp_id), date: h.date, rmssd: h.rmssd,
         restingHR: h.resting_hr ?? undefined, source: h.source as HRVSource,
         notes: h.notes ?? undefined, createdAt: h.created_at,
       })),
-      fightResults: (fightQ.data ?? []).map((r: Row<'fight_results'>) => ({
+      fightResults: live(fightQ.data as Row<'fight_results'>[] | null).map((r: Row<'fight_results'>) => ({
         id: lid(r.id), campId: lid(r.camp_id), fighterId: userId, fightDate: r.fight_date,
         opponent: r.opponent, outcome: r.outcome as FightResult['outcome'],
         method: r.method as FightResult['method'], roundStopped: r.round_stopped ?? undefined,
@@ -594,6 +642,7 @@ export async function pullState(userId: string): Promise<PullResult> {
       dashboardPrefs: (st?.dashboard_prefs ?? null) as DashboardPrefs | null,
       fitbitConfig: (st?.fitbit_config ?? null) as FitbitConfig | null,
       previouslySynced,
+      tombstoned,
     };
 
     saveIdMap(map);
@@ -616,9 +665,14 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
   // delete on every sign-in. Rows this device has never seen still come down,
   // which is what makes cross-device restore work.
   const deletedHere = c.previouslySynced;
+  // …and a row another device tombstoned has to be removed from local state.
+  // The union below only ever ADDS cloud rows, so without this a delete made on
+  // one device could never reach a device that already held the record.
+  const deletedElsewhere = c.tombstoned;
   const union = <T extends { id: string }>(local: T[], cloud: T[]): T[] => {
-    const ids = new Set(local.map(x => x.id));
-    return [...local, ...cloud.filter(x => !ids.has(x.id) && !deletedHere.has(x.id))];
+    const kept = local.filter(x => !deletedElsewhere.has(x.id));
+    const ids = new Set(kept.map(x => x.id));
+    return [...kept, ...cloud.filter(x => !ids.has(x.id) && !deletedHere.has(x.id))];
   };
 
   const camps = union(state.camps, c.camps);
@@ -639,6 +693,12 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
       Object.entries(map).filter(([k]) => campPrefixes.some(prefix => k.startsWith(prefix))),
     );
 
+  // The active camp can itself have been deleted on another device, in which
+  // case pointing at it would leave the dashboard rendering a camp that is no
+  // longer in `camps`.
+  const activeStillExists =
+    state.activeCamp !== null && liveCampIds.has(state.activeCamp.id);
+
   return {
     ...state,
     currentUser: state.currentUser ?? c.profile,
@@ -646,7 +706,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
       ? [...state.fighters, c.profile]
       : state.fighters,
     camps,
-    activeCamp: state.activeCamp ?? (camps[camps.length - 1] ?? null),
+    activeCamp: activeStillExists ? state.activeCamp : (camps[camps.length - 1] ?? null),
     workoutLogs: union(state.workoutLogs, c.workoutLogs),
     sparringLogs: union(state.sparringLogs, c.sparringLogs),
     conditioningTests: union(state.conditioningTests, c.conditioningTests),
@@ -654,13 +714,15 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults: union(state.fightResults ?? [], c.fightResults),
-    // Cloud first so local keys win on conflict.
-    completedSessions: { ...forLiveCamps(c.completedSessions), ...state.completedSessions },
-    dayOverrides: { ...forLiveCamps(c.dayOverrides), ...state.dayOverrides },
-    gamePlans: Object.fromEntries([
-      ...Object.entries(c.gamePlans).filter(([campId]) => liveCampIds.has(campId)),
-      ...Object.entries(state.gamePlans),
-    ]),
+    // Cloud first so local keys win on conflict. Both sides are filtered to the
+    // surviving camps — the local maps too, or metadata for a camp deleted on
+    // another device would outlive the camp itself.
+    completedSessions: { ...forLiveCamps(c.completedSessions), ...forLiveCamps(state.completedSessions) },
+    dayOverrides: { ...forLiveCamps(c.dayOverrides), ...forLiveCamps(state.dayOverrides) },
+    gamePlans: Object.fromEntries(
+      [...Object.entries(c.gamePlans), ...Object.entries(state.gamePlans)]
+        .filter(([campId]) => liveCampIds.has(campId)),
+    ),
     gamification: state.gamification ?? c.gamification ?? undefined,
     dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
