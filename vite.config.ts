@@ -17,13 +17,23 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
+        // All three are cut from the same source as the iOS AppIcon (see
+        // scripts/generate-icons.mjs). The maskable variant is a separate file
+        // because Android crops a circle out of the icon: declaring the
+        // full-bleed art as `maskable` clipped the wordmark off the lockup.
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Two large images live in public/ for other consumers, not for the
+        // app: the 1024px App Store submission icon and the Open Graph card
+        // (fetched by crawlers, never by the page). Precaching them cost ~1.8 MB
+        // of every first visit's data for bytes the app never requests.
+        globIgnores: ['**/AppIcon-*.png', '**/og-image.png'],
       },
     }),
   ],

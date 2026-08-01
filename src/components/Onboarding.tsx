@@ -3,6 +3,7 @@ import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, B
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import AuthScreen from './AuthScreen';
+import AppMark from './shared/AppMark';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
@@ -343,9 +344,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
       <div className="min-h-screen bg-dark-900 flex flex-col">
         <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
           <div className="relative">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-900/50">
-              <Flame size={32} className="text-white" />
-            </div>
+            <AppMark size={72} rounded="rounded-2xl" className="mx-auto mb-4 shadow-lg shadow-black/50" />
             <h1 className="text-3xl font-black text-white mb-2 tracking-tight">FIGHT CAMP</h1>
             <p className="text-brand-400 font-semibold text-sm uppercase tracking-widest">Training Platform</p>
             <p className="text-gray-400 text-sm mt-3 max-w-xs mx-auto">
@@ -396,9 +395,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         <div className="relative overflow-hidden bg-gradient-to-b from-brand-900/40 to-dark-900 px-6 pt-16 pb-8 text-center">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23f97316%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-30" />
           <div className="relative">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4 shadow-lg shadow-brand-900/50">
-              <Flame size={32} className="text-white" />
-            </div>
+            <AppMark size={72} rounded="rounded-2xl" className="mx-auto mb-4 shadow-lg shadow-black/50" />
             <h1 className="text-3xl font-black text-white mb-2 tracking-tight">FIGHT CAMP</h1>
             <p className="text-brand-400 font-semibold text-sm uppercase tracking-widest">Training Platform</p>
             <p className="text-gray-400 text-sm mt-3 max-w-xs mx-auto">
