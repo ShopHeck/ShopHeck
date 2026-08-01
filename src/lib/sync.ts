@@ -460,6 +460,23 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
   };
 
   const camps = union(state.camps, c.camps);
+
+  // The camp-keyed metadata maps have to be filtered by the SAME rule as the
+  // camps themselves. `union` drops a deleted camp and its row-based logs, but
+  // these maps are keyed by camp id (`${campId}-…` for the session/day maps,
+  // the bare camp id for game plans), so merging them wholesale re-seeded
+  // completed sessions and a game plan for a camp that no longer exists —
+  // undoing half of deleteCamp's cascade on the next pull.
+  // Prefix matching, the exact inverse of deleteCamp's cascade — generateId()
+  // ids contain a hyphen of their own, so splitting the key on '-' would not be
+  // safe.
+  const liveCampIds = new Set(camps.map(camp => camp.id));
+  const campPrefixes = camps.map(camp => `${camp.id}-`);
+  const forLiveCamps = (map: Record<string, boolean>): Record<string, boolean> =>
+    Object.fromEntries(
+      Object.entries(map).filter(([k]) => campPrefixes.some(prefix => k.startsWith(prefix))),
+    );
+
   return {
     ...state,
     currentUser: state.currentUser ?? c.profile,
@@ -476,9 +493,12 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults: union(state.fightResults ?? [], c.fightResults),
     // Cloud first so local keys win on conflict.
-    completedSessions: { ...c.completedSessions, ...state.completedSessions },
-    dayOverrides: { ...c.dayOverrides, ...state.dayOverrides },
-    gamePlans: { ...c.gamePlans, ...state.gamePlans },
+    completedSessions: { ...forLiveCamps(c.completedSessions), ...state.completedSessions },
+    dayOverrides: { ...forLiveCamps(c.dayOverrides), ...state.dayOverrides },
+    gamePlans: Object.fromEntries([
+      ...Object.entries(c.gamePlans).filter(([campId]) => liveCampIds.has(campId)),
+      ...Object.entries(state.gamePlans),
+    ]),
     gamification: state.gamification ?? c.gamification ?? undefined,
     dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
