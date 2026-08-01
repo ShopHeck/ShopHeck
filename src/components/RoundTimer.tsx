@@ -53,14 +53,16 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 p-5 space-y-4" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
           <div>
-            <label className="label">Name</label>
-            <input
+            <label className="block">
+              <span className="label">Name</span>
+              <input
               className="input"
               value={label}
               onChange={e => setLabel(e.target.value)}
               placeholder="e.g. Thai Clinch"
               maxLength={20}
             />
+            </label>
           </div>
 
           {[

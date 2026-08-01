@@ -122,6 +122,7 @@ export default function WorkoutLibrary() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             className="input pl-9 text-sm"
+            aria-label="Search the workout library"
             placeholder="Search exercises, muscles, sport…"
             value={search}
             onChange={e => setSearch(e.target.value)}

@@ -320,12 +320,14 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
         }>
           <div className="space-y-4">
             <div>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={wDate} onChange={e => setWDate(e.target.value)} />
+              <label className="block">
+                <span className="label">Date</span>
+                <input className="input" type="date" value={wDate} onChange={e => setWDate(e.target.value)} />
+              </label>
             </div>
             <div>
               <label className="label">Session Type</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div role="group" aria-label="Session Type" className="grid grid-cols-3 gap-2">
                 {SESSION_TYPES.map(st => (
                   <button key={st.value} onClick={() => setWType(st.value)}
                     className={`py-2 px-2 rounded-xl text-xs font-medium border-2 transition-all ${wType === st.value ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
@@ -335,12 +337,16 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               </div>
             </div>
             <div>
-              <label className="label">Workout Title *</label>
-              <input className="input" placeholder="e.g. Morning Pad Work" value={wTitle} onChange={e => setWTitle(e.target.value)} />
+              <label className="block">
+                <span className="label">Workout Title *</span>
+                <input className="input" placeholder="e.g. Morning Pad Work" value={wTitle} onChange={e => setWTitle(e.target.value)} />
+              </label>
             </div>
             <div>
-              <label className="label">Duration (min)</label>
-              <input className="input" type="number" min="5" max="300" value={wDuration} onChange={e => setWDuration(e.target.value)} />
+              <label className="block">
+                <span className="label">Duration (min)</span>
+                <input className="input" type="number" min="5" max="300" value={wDuration} onChange={e => setWDuration(e.target.value)} />
+              </label>
             </div>
             <div>
               <label className="label mb-0">Effort: {wRpe}/10</label>
@@ -348,8 +354,10 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                 className="w-full accent-brand-500 mt-2" />
             </div>
             <div>
-              <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} placeholder="How did it feel? What went well?" value={wNotes} onChange={e => setWNotes(e.target.value)} />
+              <label className="block">
+                <span className="label">Notes</span>
+                <textarea className="input resize-none" rows={2} placeholder="How did it feel? What went well?" value={wNotes} onChange={e => setWNotes(e.target.value)} />
+              </label>
             </div>
           </div>
         </Modal>
@@ -362,45 +370,57 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
         }>
           <div className="space-y-4">
             <div>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={sDate} onChange={e => setSDate(e.target.value)} />
+              <label className="block">
+                <span className="label">Date</span>
+                <input className="input" type="date" value={sDate} onChange={e => setSDate(e.target.value)} />
+              </label>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Rounds</label>
-                <input className="input" type="number" min="1" max="20" value={sRounds} onChange={e => setSRounds(e.target.value)} />
+                <label className="block">
+                  <span className="label">Rounds</span>
+                  <input className="input" type="number" min="1" max="20" value={sRounds} onChange={e => setSRounds(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">Round Duration (min)</label>
-                <select className="select" value={sRoundDur} onChange={e => setSRoundDur(e.target.value)}>
+                <label className="block">
+                  <span className="label">Round Duration (min)</span>
+                  <select className="select" value={sRoundDur} onChange={e => setSRoundDur(e.target.value)}>
                   <option value="2">2 min</option>
                   <option value="3">3 min</option>
                   <option value="5">5 min</option>
                 </select>
+                </label>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Partner Name</label>
-                <input className="input" placeholder="Partner's name" value={sPartner} onChange={e => setSPartner(e.target.value)} />
+                <label className="block">
+                  <span className="label">Partner Name</span>
+                  <input className="input" placeholder="Partner's name" value={sPartner} onChange={e => setSPartner(e.target.value)} />
+                </label>
               </div>
               <div>
-                <label className="label">Partner Level</label>
-                <select className="select" value={sPartnerLevel} onChange={e => setSPartnerLevel(e.target.value)}>
+                <label className="block">
+                  <span className="label">Partner Level</span>
+                  <select className="select" value={sPartnerLevel} onChange={e => setSPartnerLevel(e.target.value)}>
                   <option>Beginner</option>
                   <option>Similar</option>
                   <option>More Experienced</option>
                   <option>Pro</option>
                 </select>
+                </label>
               </div>
             </div>
             <div>
-              <label className="label">Focus / Goal</label>
-              <input className="input" placeholder="e.g. Jab defense, pressure fighting" value={sFocus} onChange={e => setSFocus(e.target.value)} />
+              <label className="block">
+                <span className="label">Focus / Goal</span>
+                <input className="input" placeholder="e.g. Jab defense, pressure fighting" value={sFocus} onChange={e => setSFocus(e.target.value)} />
+              </label>
             </div>
             <div>
               <label className="label">Performance</label>
-              <div className="flex gap-2">
+              <div role="group" aria-label="Performance" className="flex gap-2">
                 {([1,2,3,4,5] as const).map(n => (
                   <button key={n} onClick={() => setSPerf(n)}
                     className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${sPerf === n ? `border-transparent text-white ${PERF_COLORS[n]}` : 'border-dark-400 bg-dark-600 text-gray-500'}`}>
@@ -411,8 +431,10 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <p className="text-xs text-center text-gray-500 mt-1">{PERF_LABELS[sPerf]}</p>
             </div>
             <div>
-              <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} placeholder="What worked? What to improve?" value={sNotes} onChange={e => setSNotes(e.target.value)} />
+              <label className="block">
+                <span className="label">Notes</span>
+                <textarea className="input resize-none" rows={2} placeholder="What worked? What to improve?" value={sNotes} onChange={e => setSNotes(e.target.value)} />
+              </label>
             </div>
           </div>
         </Modal>
@@ -425,26 +447,34 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
         }>
           <div className="space-y-4">
             <div>
-              <label className="label">Date</label>
-              <input className="input" type="date" value={cDate} onChange={e => setCDate(e.target.value)} />
+              <label className="block">
+                <span className="label">Date</span>
+                <input className="input" type="date" value={cDate} onChange={e => setCDate(e.target.value)} />
+              </label>
             </div>
             <div>
-              <label className="label">Test Type</label>
-              <select className="select" value={cType} onChange={e => {
+              <label className="block">
+                <span className="label">Test Type</span>
+                <select className="select" value={cType} onChange={e => {
                 const t = COND_TESTS.find(c => c.label === e.target.value);
                 setCType(e.target.value);
                 if (t) setCUnit(t.unit);
               }}>
                 {COND_TESTS.map(t => <option key={t.label}>{t.label}</option>)}
               </select>
+              </label>
             </div>
             <div>
-              <label className="label">Result ({cUnit})</label>
-              <input className="input" type="number" step="0.01" placeholder={`Enter result in ${cUnit}`} value={cValue} onChange={e => setCValue(e.target.value)} />
+              <label className="block">
+                <span className="label">Result ({cUnit})</span>
+                <input className="input" type="number" step="0.01" placeholder={`Enter result in ${cUnit}`} value={cValue} onChange={e => setCValue(e.target.value)} />
+              </label>
             </div>
             <div>
-              <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} placeholder="Conditions, how you felt, etc." value={cNotes} onChange={e => setCNotes(e.target.value)} />
+              <label className="block">
+                <span className="label">Notes</span>
+                <textarea className="input resize-none" rows={2} placeholder="Conditions, how you felt, etc." value={cNotes} onChange={e => setCNotes(e.target.value)} />
+              </label>
             </div>
           </div>
         </Modal>

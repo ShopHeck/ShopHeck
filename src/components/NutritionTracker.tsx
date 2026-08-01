@@ -194,6 +194,7 @@ export default function NutritionTracker() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tracking Date</p>
           <input
             type="date"
+            aria-label="Tracking date"
             className="input w-auto text-sm py-1.5 px-3"
             value={selectedDate}
             max={todayStr()}
@@ -337,14 +338,16 @@ export default function NutritionTracker() {
       <section className="mx-4">
         {showNotes ? (
           <div className="card space-y-3">
-            <label className="label">Notes</label>
-            <textarea
+            <label className="block">
+              <span className="label">Notes</span>
+              <textarea
               className="input resize-none"
               rows={3}
               placeholder="e.g. Felt dehydrated before sparring, had a cheat meal at lunch..."
               value={notes}
               onChange={e => setNotes(e.target.value)}
             />
+            </label>
             <div className="flex gap-2">
               <button onClick={saveNotes} className="btn-primary flex-1 py-2 text-sm">Save Notes</button>
               <button onClick={() => setShowNotes(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
@@ -443,14 +446,16 @@ export default function NutritionTracker() {
               { key: 'fat',      label: 'Fat (g)' },
             ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
               <div key={key}>
-                <label className="label">{label}</label>
-                <input
+                <label className="block">
+                  <span className="label">{label}</span>
+                  <input
                   type="number"
                   min={0}
                   className="input"
                   value={macroInput[key] || ''}
                   onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
                 />
+                </label>
               </div>
             ))}
           </div>
@@ -480,14 +485,16 @@ export default function NutritionTracker() {
               { key: 'fat',      label: 'Fat (g)' },
             ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
               <div key={key}>
-                <label className="label">{label}</label>
-                <input
+                <label className="block">
+                  <span className="label">{label}</span>
+                  <input
                   type="number"
                   min={0}
                   className="input"
                   value={targetInput[key] || ''}
                   onChange={e => setTargetInput(t => ({ ...t, [key]: Number(e.target.value) }))}
                 />
+                </label>
               </div>
             ))}
           </div>
