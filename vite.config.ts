@@ -30,10 +30,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Only libraries that are genuinely on the first-paint path get a named
+        // chunk — a named chunk is treated as a static import of the entry and
+        // gets a <link rel="modulepreload">, so it is downloaded before the app
+        // renders.
+        //
+        // `charts: ['recharts']` and `utils: ['date-fns','lucide-react']` used
+        // to live here. Every recharts consumer (WeightTracker, ProgressCharts,
+        // CampComparison, CoachDashboard) is lazy-loaded, but naming the chunk
+        // hoisted it onto the critical path anyway: ~114 kB gzipped of chart
+        // code preloaded for users who may never open a chart. Left unnamed,
+        // Rollup keeps recharts inside the async chunks that actually use it,
+        // and date-fns/lucide-react tree-shake into whatever imports them.
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          charts: ['recharts'],
-          utils: ['date-fns', 'lucide-react'],
+          sentry: ['@sentry/capacitor', '@sentry/react'],
+          supabase: ['@supabase/supabase-js'],
         },
       },
     },

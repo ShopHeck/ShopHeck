@@ -6,6 +6,7 @@ import AuthScreen from './AuthScreen';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { getApiKey, setApiKey } from '../utils/apiKey';
+import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
 
 const OFF_SEASON_GOALS: { value: OffSeasonGoal; label: string; desc: string }[] = [
   { value: 'base-building', label: 'Base Building', desc: 'Aerobic engine, technical drilling, volume work' },
@@ -81,8 +82,22 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
     }
   }
 
+  // A fight camp's start/target weights drive the cut projection and the
+  // unsafe-cut alert from day one, so they're required and range-checked. In
+  // off-season mode both are optional (the fields say so) and simply omitted.
+  const parsedCurrentWeight = parseWeightLbs(currentWeight);
+  const parsedTargetWeight = parseWeightLbs(targetWeight);
+  const campWeightsOk = isOffSeason
+    ? (!currentWeight.trim() || parsedCurrentWeight !== null) &&
+      (!targetWeight.trim() || parsedTargetWeight !== null)
+    : parsedCurrentWeight !== null && parsedTargetWeight !== null;
+  const showWeightHint =
+    (currentWeight.trim() !== '' && parsedCurrentWeight === null) ||
+    (targetWeight.trim() !== '' && parsedTargetWeight === null);
+  const canContinueCamp = (isOffSeason || !!fightDate) && campWeightsOk;
+
   function handleCampNext() {
-    if (!isOffSeason && !fightDate) return;
+    if (!canContinueCamp) return;
     setStep(2);
   }
 
@@ -122,8 +137,8 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           fightDate: isOffSeason ? undefined : fightDate,
           opponent: (!isOffSeason && opponent.trim()) ? opponent.trim() : undefined,
           weightClass: campOnly ? (user?.weightClass ?? weightClass) : weightClass,
-          currentWeight: parseFloat(currentWeight) || 0,
-          targetWeight: parseFloat(targetWeight) || parseFloat(currentWeight) || 0,
+          currentWeight: parsedCurrentWeight ?? 0,
+          targetWeight: parsedTargetWeight ?? parsedCurrentWeight ?? 0,
           rounds: parseInt(rounds),
           roundDuration: parseInt(roundDuration),
           sport: campOnly ? (user?.sport ?? sport) : sport,
@@ -254,6 +269,9 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                     <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
                   </div>
                 </div>
+                {showWeightHint && (
+                  <p className="-mt-3 text-xs text-red-400">{WEIGHT_RANGE_HINT}</p>
+                )}
 
                 {/* Camp Length — fight camp only (off-season is always 12 weeks) */}
                 {!isOffSeason && (
@@ -272,7 +290,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
 
                 <button
                   onClick={handleCampNext}
-                  disabled={!isOffSeason && !fightDate}
+                  disabled={!canContinueCamp}
                   className={`flex items-center justify-center gap-2 disabled:opacity-50 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300 hover:!bg-teal-900/50' : 'btn-primary'}`}
                 >
                   {isOffSeason ? <><Dumbbell size={16} /> Generate Off Season Plan</> : <><Flame size={16} /> Generate Camp</>}
@@ -594,6 +612,9 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
               </div>
             </div>
+            {showWeightHint && (
+              <p className="-mt-3 text-xs text-red-400">{WEIGHT_RANGE_HINT}</p>
+            )}
 
             {/* Camp Length — fight camp only */}
             {!isOffSeason && (
@@ -619,7 +640,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
 
             <button
               onClick={handleCampNext}
-              disabled={!isOffSeason && !fightDate}
+              disabled={!canContinueCamp}
               className={`flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300 hover:!bg-teal-900/50' : 'btn-primary'}`}
             >
               {isOffSeason ? <><Dumbbell size={18} /> Generate Off Season Plan</> : <>Generate Training Camp <Flame size={18} /></>}

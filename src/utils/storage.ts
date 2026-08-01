@@ -134,7 +134,19 @@ export function deleteCamp(state: AppState, campId: string): AppState {
   const activeCamp = state.activeCamp?.id === campId
     ? (camps[camps.length - 1] ?? null)
     : state.activeCamp;
-  // Cascade: remove all logs associated with deleted camp
+
+  // Cascade across EVERY camp-scoped collection. Nutrition, HRV, fight results,
+  // the game plan and the camp-keyed session/day maps used to survive the
+  // delete: their rows kept feeding streaks, achievements and cloud pushes for
+  // a camp the fighter could no longer see, and a new camp that happened to
+  // reuse the id prefix inherited the old ticks.
+  const prefix = `${campId}-`;
+  const withoutCampKeys = (map: Record<string, boolean>): Record<string, boolean> =>
+    Object.fromEntries(Object.entries(map).filter(([k]) => !k.startsWith(prefix)));
+
+  const { [campId]: _removedPlan, ...gamePlans } = state.gamePlans;
+  void _removedPlan;
+
   return {
     ...state,
     camps,
@@ -143,6 +155,12 @@ export function deleteCamp(state: AppState, campId: string): AppState {
     sparringLogs: state.sparringLogs.filter(l => l.campId !== campId),
     conditioningTests: state.conditioningTests.filter(t => t.campId !== campId),
     weightEntries: state.weightEntries.filter(e => e.campId !== campId),
+    nutritionLogs: state.nutritionLogs.filter(n => n.campId !== campId),
+    hrvEntries: (state.hrvEntries ?? []).filter(h => h.campId !== campId),
+    fightResults: (state.fightResults ?? []).filter(r => r.campId !== campId),
+    gamePlans,
+    completedSessions: withoutCampKeys(state.completedSessions),
+    dayOverrides: withoutCampKeys(state.dayOverrides),
   };
 }
 

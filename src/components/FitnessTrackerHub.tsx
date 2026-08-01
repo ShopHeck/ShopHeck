@@ -13,6 +13,7 @@ import {
   refreshFitbitToken,
 } from '../utils/fitbitAuth';
 import type { HRVSource } from '../types';
+import { parseRmssdMs } from '../utils/validation';
 
 // ─── Recovery score ───────────────────────────────────────────────────────
 
@@ -140,8 +141,10 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
 
   // ── Log HRV manually ─────────────────────────────────────────────────
   const logManualHrv = () => {
-    const rmssd = parseFloat(manualRmssd);
-    if (!rmssd || !activeCamp) return;
+    // Out-of-range readings would skew the recovery baseline the readiness
+    // score reads from; the input's min/max don't apply to a click handler.
+    const rmssd = parseRmssdMs(manualRmssd);
+    if (rmssd === null || !activeCamp) return;
     dispatch({
       type: 'LOG_HRV',
       payload: {
@@ -528,7 +531,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
             </div>
             <input type="text" value={manualNotes} onChange={e => setManualNotes(e.target.value)}
               placeholder="Notes (optional)" className="input text-sm w-full" />
-            <button onClick={logManualHrv} disabled={!manualRmssd || !activeCamp}
+            <button onClick={logManualHrv} disabled={parseRmssdMs(manualRmssd) === null || !activeCamp}
               className="w-full btn-primary text-sm py-2 disabled:opacity-50">
               Save HRV Entry
             </button>

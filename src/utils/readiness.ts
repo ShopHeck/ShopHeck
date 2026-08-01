@@ -95,12 +95,19 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const weightScore = scale(weightRatio, w.weightCut);
 
   // ── 2. Training Volume (max = w.trainingVolume) ──────────────────────────
-  const expectedSessions = Math.max(1, Math.round(campProgress * activeCamp.campWeeks * 4.5));
+  // No Math.max(1, …) floor here: a camp that starts tomorrow has a progress of
+  // 0, and forcing "1 session expected" told a fighter they were already a
+  // session behind — and scored them 0 on volume — before day one of camp. With
+  // nothing expected yet, volume is unscored (neutral 0.5), like every other
+  // "no data yet" branch in this file.
+  const expectedSessions = Math.round(campProgress * activeCamp.campWeeks * 4.5);
   const totalLogged = campWorkouts.length;
-  const volumeRatio = Math.min(1, totalLogged / expectedSessions);
-  const volumeScore = scale(volumeRatio, w.trainingVolume);
   const gap = Math.max(0, expectedSessions - totalLogged);
-  const volumeDetail = gap > 0
+  const volumeRatio = expectedSessions > 0 ? Math.min(1, totalLogged / expectedSessions) : 0.5;
+  const volumeScore = scale(volumeRatio, w.trainingVolume);
+  const volumeDetail = expectedSessions === 0
+    ? (totalLogged > 0 ? `${totalLogged} logged · camp hasn't started` : 'Camp starts soon — nothing due yet')
+    : gap > 0
     ? `${totalLogged} logged · ${gap} behind pace`
     : `${totalLogged} sessions logged · on pace`;
 
@@ -212,7 +219,12 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     if (item.label === 'Weight Cut' && lbsToGo > 0) {
       insights.push(`Log your weight daily — you need to cut ${lbsToGo.toFixed(1)} lbs in ${daysUntilFight} days.`);
     } else if (item.label === 'Training Volume') {
-      insights.push(`You're ${gap} session${gap > 1 ? 's' : ''} behind pace — push consistency this week.`);
+      // gap can legitimately be 0 (nothing due yet, or logging is on pace but
+      // the neutral no-data score still lands in the bottom three) — don't tell
+      // a fighter they're "0 sessions behind".
+      insights.push(gap > 0
+        ? `You're ${gap} session${gap > 1 ? 's' : ''} behind pace — push consistency this week.`
+        : 'Log every session as you train — training volume is what drives this score.');
     } else if (item.label === 'Session Quality') {
       insights.push('Aim for RPE 7–8 in most sessions for peak fight-readiness gains.');
     } else if (item.label === 'Sparring') {

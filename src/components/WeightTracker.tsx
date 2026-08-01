@@ -18,6 +18,7 @@ import Modal from './shared/Modal';
 import ProGate from './shared/ProGate';
 import CutCoach from './CutCoach';
 import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
+import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -108,25 +109,28 @@ export default function WeightTracker() {
     ? campEntries[campEntries.length - 1].weight - campEntries[campEntries.length - 2].weight
     : 0;
 
+  // A weigh-in feeds the cut projection, the chart and the unsafe-cut alert, so
+  // it has to be a real bodyweight. The input's min/max are advisory only.
+  const parsedWeight = parseWeightLbs(weight);
+
   function logWeight() {
-    if (!weight) return;
+    if (parsedWeight === null) return;
     triggerHaptic(HAPTIC.sessionComplete);
     dispatch({
       type: 'LOG_WEIGHT',
       payload: {
         campId: activeCamp!.id,
         date,
-        weight: parseFloat(weight),
+        weight: parsedWeight,
         notes,
       },
     });
-    void writeWeightToHealth({ date, weight: parseFloat(weight) });
+    void writeWeightToHealth({ date, weight: parsedWeight });
     setWeight('');
     setNotes('');
     setShowModal(false);
   }
 
-  const isOnTrack = daysUntilFight === null || toGo <= (daysUntilFight * 0.3);
   // Flag the hard "concern" on the RATE required, not just absolute lbs — an 8-lb
   // cut in 4 days (2 lb/day) is dangerous even though it's under 10 lbs. proj
   // .lbsPerDayNeeded is calendar-day based and collapses to the raw remaining lbs
@@ -137,6 +141,18 @@ export default function WeightTracker() {
   const isCritical =
     (cutRatePerDay !== null && cutRatePerDay >= 1) ||
     (daysUntilFight !== null && toGo > 10 && daysUntilFight < 14);
+
+  // The "cut done" chip reads off the same projection as the Cut Pace card
+  // below it. They used to disagree — a fighter could see a green dot next to a
+  // yellow "Behind pace" on the same screen — because this chip had its own
+  // lbs-per-remaining-day rule of thumb.
+  const cutChip = isCritical
+    ? { dot: 'bg-red-500', text: 'text-red-400' }
+    : !proj.trackable || proj.status === 'made' || proj.status === 'ahead'
+    ? { dot: 'bg-green-500', text: 'text-green-400' }
+    : proj.status === 'behind'
+    ? { dot: 'bg-yellow-500', text: 'text-yellow-400' }
+    : { dot: 'bg-blue-500', text: 'text-blue-400' };
 
   return (
     <div className="space-y-4 pb-4">
@@ -155,8 +171,8 @@ export default function WeightTracker() {
           <div className="text-xs text-gray-500">lbs to cut</div>
         </div>
         <div className="stat-card">
-          <div className={`w-4 h-4 rounded-full ${isOnTrack && !isCritical ? 'bg-green-500' : isCritical ? 'bg-red-500' : 'bg-yellow-500'}`} />
-          <div className={`text-xl font-black ${isOnTrack ? 'text-green-400' : 'text-yellow-400'}`}>
+          <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
+          <div className={`text-xl font-black ${cutChip.text}`}>
             {Math.round(cutProgress)}%
           </div>
           <div className="text-xs text-gray-500">cut done</div>
@@ -240,8 +256,10 @@ export default function WeightTracker() {
               {!proj.trendEstablished
                 ? 'Log weigh-ins on a few different days and your projected weigh-in weight will appear here.'
                 : proj.projectedMiss > 0
-                ? `At your current rate you'll be ~${proj.projectedMiss} lbs over on fight day (${proj.daysRemaining} days out).`
-                : `At your current rate you'll make weight with ~${Math.abs(proj.projectedMiss)} lbs to spare.`}
+                ? `At your recent rate you'll be ~${proj.projectedMiss} lbs over on fight day (${proj.daysRemaining} days out).`
+                : proj.daysEarlyAtRate !== null && proj.daysEarlyAtRate > 0
+                ? `At your recent rate you'd be on weight about ${proj.daysEarlyAtRate} day${proj.daysEarlyAtRate === 1 ? '' : 's'} before weigh-in.`
+                : 'At your recent rate you make weight right on schedule.'}
             </p>
           </div>
         </div>
@@ -349,7 +367,7 @@ export default function WeightTracker() {
           title="Log Weight"
           onClose={() => setShowModal(false)}
           footer={
-            <button onClick={logWeight} disabled={!weight} className="btn-primary w-full disabled:opacity-50">
+            <button onClick={logWeight} disabled={parsedWeight === null} className="btn-primary w-full disabled:opacity-50">
               Save Weight
             </button>
           }
@@ -372,12 +390,17 @@ export default function WeightTracker() {
                 onChange={e => setWeight(e.target.value)}
               />
             </div>
-            {weight && (
-              <div className={`rounded-xl p-3 border ${parseFloat(weight) <= targetW ? 'bg-green-900/30 border-green-700' : 'bg-dark-600 border-dark-400'}`}>
-                <p className={`text-sm font-medium ${parseFloat(weight) <= targetW ? 'text-green-400' : 'text-gray-300'}`}>
-                  {parseFloat(weight) <= targetW
+            {weight && parsedWeight === null && (
+              <div className="rounded-xl p-3 border bg-red-900/25 border-red-800">
+                <p className="text-sm font-medium text-red-300">{WEIGHT_RANGE_HINT}</p>
+              </div>
+            )}
+            {parsedWeight !== null && (
+              <div className={`rounded-xl p-3 border ${parsedWeight <= targetW ? 'bg-green-900/30 border-green-700' : 'bg-dark-600 border-dark-400'}`}>
+                <p className={`text-sm font-medium ${parsedWeight <= targetW ? 'text-green-400' : 'text-gray-300'}`}>
+                  {parsedWeight <= targetW
                     ? '✓ At or below fight weight!'
-                    : `${(parseFloat(weight) - targetW).toFixed(1)} lbs above target (${targetW} lbs)`
+                    : `${(parsedWeight - targetW).toFixed(1)} lbs above target (${targetW} lbs)`
                   }
                 </p>
               </div>
