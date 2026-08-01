@@ -32,13 +32,20 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const inFlight = useRef(false);
+  /**
+   * Whether a pull has succeeded since sign-in. Deleting cloud rows is gated on
+   * this: until we have confirmed what the account actually contains, an empty
+   * or partial local store is indistinguishable from "the user deleted it all",
+   * and pruning on that guess would destroy data.
+   */
+  const restored = useRef(false);
 
   const syncNow = useCallback(async () => {
     if (!user || inFlight.current) return;
     inFlight.current = true;
     setStatus('syncing');
     setError(null);
-    const res = await pushState(user.id, stateRef.current);
+    const res = await pushState(user.id, stateRef.current, { prune: restored.current });
     inFlight.current = false;
     if (res.ok) {
       setStatus('synced');
@@ -60,6 +67,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     const res = await pullState(user.id);
     if (res.ok && res.snapshot) {
+      // From here the local store is known to reflect the account, so a record
+      // that is missing locally really was deleted and may be tombstoned.
+      restored.current = true;
       const merged = mergeCloud(stateRef.current, res.snapshot);
       dispatch({ type: 'SET_STATE', payload: merged });
       // Regenerate the training schedule for the (possibly restored) active camp.
@@ -74,6 +84,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!enabled) {
       setStatus('disabled');
+      // Signing out invalidates the guarantee; the next session must pull again
+      // before it is allowed to delete anything.
+      restored.current = false;
       return;
     }
     setStatus('idle');

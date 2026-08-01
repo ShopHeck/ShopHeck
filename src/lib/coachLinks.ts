@@ -94,7 +94,7 @@ export async function listLinkedFighters(coachId: string): Promise<LinkedFighter
 
   const [{ data: profiles }, { data: camps }] = await Promise.all([
     supabase.from('profiles').select('*').in('id', ids),
-    supabase.from('camps').select('*').in('user_id', ids),
+    supabase.from('camps').select('*').in('user_id', ids).is('deleted_at', null),
   ]);
 
   const latestByFighter = new Map<string, CampRow>();
@@ -121,10 +121,12 @@ export async function listLinkedFighters(coachId: string): Promise<LinkedFighter
 export async function getFighterDetail(fighterId: string): Promise<FighterDetail> {
   if (!supabase) return { camps: [], workouts: [], sparring: [], weights: [] };
   const [camps, workouts, sparring, weights] = await Promise.all([
-    supabase.from('camps').select('*').eq('user_id', fighterId),
-    supabase.from('workout_logs').select('*').eq('user_id', fighterId),
-    supabase.from('sparring_logs').select('*').eq('user_id', fighterId),
-    supabase.from('weight_entries').select('*').eq('user_id', fighterId),
+    // Deleted rows are tombstoned, not removed (see lib/sync.ts) — a coach
+    // should see the same camp history the fighter does.
+    supabase.from('camps').select('*').eq('user_id', fighterId).is('deleted_at', null),
+    supabase.from('workout_logs').select('*').eq('user_id', fighterId).is('deleted_at', null),
+    supabase.from('sparring_logs').select('*').eq('user_id', fighterId).is('deleted_at', null),
+    supabase.from('weight_entries').select('*').eq('user_id', fighterId).is('deleted_at', null),
   ]);
   return {
     camps: (camps.data ?? []) as CampRow[],

@@ -136,20 +136,38 @@ export interface PushResult {
   ok: boolean;
   /** Rows actually written this time — 0 means nothing had changed. */
   pushed: number;
+  /** Rows removed from the cloud because they were deleted on this device. */
+  pruned: number;
   error?: string;
+}
+
+export interface PushOptions {
+  /**
+   * Allow deleting cloud rows that this device previously pushed and has since
+   * deleted locally. Off by default, and SyncProvider only turns it on after a
+   * pull has succeeded in this session — otherwise a device that failed to
+   * restore (offline, transient error) could read its own empty local store as
+   * "the user deleted everything" and prune the account.
+   */
+  prune?: boolean;
 }
 
 /**
  * Upsert the signed-in user's local state into Supabase. `userId` is the auth
  * user id; the profile row's PK must equal it to satisfy RLS.
  */
-export async function pushState(userId: string, state: AppState): Promise<PushResult> {
-  if (!supabase) return { ok: false, pushed: 0, error: 'Cloud sync is not configured.' };
+export async function pushState(
+  userId: string,
+  state: AppState,
+  opts: PushOptions = {},
+): Promise<PushResult> {
+  if (!supabase) return { ok: false, pushed: 0, pruned: 0, error: 'Cloud sync is not configured.' };
 
   const map = loadIdMap();
   const uuidFor = makeUuidFor(map);
   const now = new Date().toISOString();
   let pushed = 0;
+  let pruned = 0;
 
   const hashes = loadHashes(userId);
   const forceFull = Date.now() - hashes.fullAt > FULL_RESYNC_MS;
@@ -168,7 +186,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
   const fail = (error: string): PushResult => {
     saveIdMap(map);
     commitHashes();
-    return { ok: false, pushed, error };
+    return { ok: false, pushed, pruned, error };
   };
 
   // Only push camps that exist locally; log rows that reference a missing camp
@@ -180,6 +198,13 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     table: T,
     rows: Ins<T>[],
     onConflict = 'id',
+    /**
+     * Whether rows this device deleted locally should also be deleted in the
+     * cloud. Never set for `profiles` or `user_state`: those are one row per
+     * account that must simply follow the local value, and a stray delete there
+     * would take the account's identity row with it.
+     */
+    prunable = false,
   ): Promise<string | null> => {
     const key = String(table);
     const prev = hashes.tables[key] ?? {};
@@ -195,16 +220,46 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       if (forceFull || prev[rowKey] !== h) dirty.push(row);
     }
 
-    if (dirty.length === 0) {
-      // Still record the hashes — this also drops entries for rows that no
-      // longer exist locally, so re-adding one later pushes it again.
-      staged[key] = next;
-      return null;
+    if (dirty.length > 0) {
+      const { error } = await supabase!.from(table).upsert(dirty as never, { onConflict });
+      if (error) return `${String(table)}: ${error.message}`;
+      pushed += dirty.length;
     }
-    const { error } = await supabase!.from(table).upsert(dirty as never, { onConflict });
-    if (error) return `${String(table)}: ${error.message}`;
+
+    // Anything this device pushed before and is no longer sending was deleted
+    // here. Deriving the tombstones from the hash store means we only ever
+    // touch rows we ourselves created — a row another device added that this
+    // one has never seen is not in `prev`, so it is left alone.
+    //
+    // Stamped rather than deleted: the schema has carried a deleted_at column
+    // on every table since the start ("so an offline delete syncing late
+    // doesn't get resurrected by an older edit on another device"), but nothing
+    // ever wrote it. A tombstone is also recoverable, which a DELETE is not.
+    if (prunable) {
+      const gone = Object.keys(prev).filter(k => k && !(k in next));
+      if (gone.length > 0) {
+        if (opts.prune) {
+          const { error } = await supabase!
+            .from(table)
+            .update({ deleted_at: now } as never)
+            // `onConflict` is the table's key column ('id' everywhere
+            // prunable), but it is typed as a plain string here.
+            .in(onConflict as never, gone);
+          if (error) return `${String(table)} (prune): ${error.message}`;
+          pruned += gone.length;
+        } else {
+          // Pruning is not permitted yet (no successful pull this session), so
+          // keep these keys in the ledger. Dropping them would erase the only
+          // record that they were ever deleted, and the row would live on in
+          // the cloud forever.
+          for (const k of gone) next[k] = prev[k];
+        }
+      }
+    }
+
+    // Recorded last so a failed write above leaves the old hashes in place and
+    // the rows are retried next push.
     staged[key] = next;
-    pushed += dirty.length;
     return null;
   };
 
@@ -268,7 +323,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       };
     });
     {
-      const err = await run('camps', campRows);
+      const err = await run('camps', campRows, 'id', true);
       if (err) return fail(err);
     }
 
@@ -281,7 +336,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       session_type: l.sessionType, title: l.title, duration: l.duration,
       rpe: l.rpe, notes: l.notes ?? '', completed: l.completed, mep: l.mep ?? null,
       created_at: ts(l, now),
-    })));
+    })), 'id', true);
     if (err1) return fail(err1);
 
     const err2 = await run('sparring_logs', (state.sparringLogs ?? []).filter(l => childOf(l.campId)).map(l => ({
@@ -290,34 +345,34 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       round_duration: l.roundDuration, partner_name: l.partnerName,
       partner_level: l.partnerLevel, focus: l.focus, performance: l.performance,
       notes: l.notes ?? '', created_at: ts(l, now),
-    })));
+    })), 'id', true);
     if (err2) return fail(err2);
 
     const err3 = await run('conditioning_tests', (state.conditioningTests ?? []).filter(t => childOf(t.campId)).map(t => ({
       id: uuidFor(t.id), user_id: userId, camp_id: uuidFor(t.campId),
       date: t.date, week_number: t.weekNumber, test_type: t.testType,
       value: t.value, unit: t.unit, notes: t.notes ?? '', created_at: ts(t, now),
-    })));
+    })), 'id', true);
     if (err3) return fail(err3);
 
     const err4 = await run('weight_entries', (state.weightEntries ?? []).filter(e => childOf(e.campId)).map(e => ({
       id: uuidFor(e.id), user_id: userId, camp_id: uuidFor(e.campId),
       date: e.date, weight: e.weight, notes: e.notes ?? '', created_at: ts(e, now),
-    })));
+    })), 'id', true);
     if (err4) return fail(err4);
 
     const err5 = await run('nutrition_logs', (state.nutritionLogs ?? []).filter(n => childOf(n.campId)).map(n => ({
       id: uuidFor(n.id), user_id: userId, camp_id: uuidFor(n.campId),
       date: n.date, water_oz: n.waterOz, meal_ratings: n.mealRatings as Ins<'nutrition_logs'>['meal_ratings'],
       macros: (n.macros ?? null) as Ins<'nutrition_logs'>['macros'], notes: n.notes ?? '', created_at: ts(n, now),
-    })));
+    })), 'id', true);
     if (err5) return fail(err5);
 
     const err6 = await run('hrv_entries', (state.hrvEntries ?? []).filter(h => childOf(h.campId)).map(h => ({
       id: uuidFor(h.id), user_id: userId, camp_id: uuidFor(h.campId),
       date: h.date, rmssd: h.rmssd, resting_hr: h.restingHR ?? null,
       source: h.source, notes: h.notes ?? null, created_at: ts(h, now),
-    })));
+    })), 'id', true);
     if (err6) return fail(err6);
 
     const err7 = await run('fight_results', (state.fightResults ?? []).filter(r => childOf(r.campId)).map(r => ({
@@ -328,7 +383,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       fight_night_weight: r.fightNightWeight ?? null, style_plan_followed: r.stylePlanFollowed,
       overall_notes: r.overallNotes ?? '', lessons: r.lessons ?? '',
       readiness_at_fight: r.readinessAtFight ?? null, created_at: ts(r, now),
-    })));
+    })), 'id', true);
     if (err7) return fail(err7);
 
     // 4) Misc per-user state (single row).
@@ -351,7 +406,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
 
     saveIdMap(map);
     commitHashes();
-    return { ok: true, pushed };
+    return { ok: true, pushed, pruned };
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Sync failed.');
   }
@@ -418,14 +473,17 @@ export async function pullState(userId: string): Promise<PullResult> {
   try {
     const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('camps').select('*').eq('user_id', userId),
-      supabase.from('workout_logs').select('*').eq('user_id', userId),
-      supabase.from('sparring_logs').select('*').eq('user_id', userId),
-      supabase.from('conditioning_tests').select('*').eq('user_id', userId),
-      supabase.from('weight_entries').select('*').eq('user_id', userId),
-      supabase.from('nutrition_logs').select('*').eq('user_id', userId),
-      supabase.from('hrv_entries').select('*').eq('user_id', userId),
-      supabase.from('fight_results').select('*').eq('user_id', userId),
+      // `.is('deleted_at', null)` on every camp-scoped table: a row another
+      // device tombstoned must not come back down here. Nothing filtered on
+      // deleted_at before, so the column may as well not have existed.
+      supabase.from('camps').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('workout_logs').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('sparring_logs').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('conditioning_tests').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('weight_entries').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('nutrition_logs').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('hrv_entries').select('*').eq('user_id', userId).is('deleted_at', null),
+      supabase.from('fight_results').select('*').eq('user_id', userId).is('deleted_at', null),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
