@@ -42,7 +42,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     inFlight.current = false;
     if (res.ok) {
       setStatus('synced');
-      setLastSyncedAt(new Date().toISOString());
+      // pushState only writes rows whose content changed. A push that sent
+      // nothing means the cloud was already current, so leave the "Backed up
+      // 14:32" stamp pointing at the last real upload rather than advancing it
+      // every time an unrelated bit of state moves.
+      if (res.pushed > 0) setLastSyncedAt(new Date().toISOString());
     } else {
       setStatus('error');
       setError(res.error ?? 'Sync failed.');

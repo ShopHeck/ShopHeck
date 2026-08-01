@@ -49,7 +49,70 @@ function saveIdMap(map: Record<string, string>): void {
  * reset would make the next restore skip everything.
  */
 export function clearIdMap(): void {
-  try { localStorage.removeItem(IDMAP_KEY); } catch { /* noop */ }
+  try {
+    localStorage.removeItem(IDMAP_KEY);
+    // The dirty-tracking hashes describe rows this device pushed under that
+    // mapping; keeping them past a wipe would make the next push think the
+    // server is already up to date.
+    localStorage.removeItem(HASH_KEY);
+  } catch { /* noop */ }
+}
+
+// ─── Dirty tracking ─────────────────────────────────────────────────────────
+//
+// Every push used to upsert the entire account — every camp, every log, every
+// weigh-in — because the debounce in SyncProvider fires on any state change and
+// the hourly gamification recompute counts as one. A fighter mid-camp was
+// re-uploading their whole history at least once an hour to change nothing.
+//
+// We remember a cheap content hash per row and only send rows whose hash moved.
+
+const HASH_KEY = 'fightcamp_sync_hashes';
+/** Force a full re-push occasionally, so a hash store that has drifted out of
+ *  step with the server (a write we never saw, a restore from backup) heals on
+ *  its own rather than silently pinning stale rows. */
+const FULL_RESYNC_MS = 24 * 60 * 60 * 1000;
+
+interface HashStore {
+  /** table -> row key -> content hash */
+  tables: Record<string, Record<string, string>>;
+  /** Epoch ms of the last push that deliberately sent everything. */
+  fullAt: number;
+  /** Whose data these hashes describe; a different user invalidates them. */
+  userId: string;
+}
+
+function emptyHashStore(userId: string): HashStore {
+  return { tables: {}, fullAt: 0, userId };
+}
+
+function loadHashes(userId: string): HashStore {
+  try {
+    const raw = localStorage.getItem(HASH_KEY);
+    if (!raw) return emptyHashStore(userId);
+    const parsed = JSON.parse(raw) as HashStore;
+    if (parsed?.userId !== userId || typeof parsed.tables !== 'object') {
+      return emptyHashStore(userId);
+    }
+    return { tables: parsed.tables ?? {}, fullAt: parsed.fullAt ?? 0, userId };
+  } catch {
+    return emptyHashStore(userId);
+  }
+}
+
+function saveHashes(store: HashStore): void {
+  try { localStorage.setItem(HASH_KEY, JSON.stringify(store)); } catch { /* noop */ }
+}
+
+/** FNV-1a over the row's JSON — fast, and collisions only cost a skipped push. */
+function hashRow(row: unknown): string {
+  const s = JSON.stringify(row);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
 /** Stable uuid for a local id, minted once and persisted. */
@@ -71,6 +134,7 @@ function ts(record: { createdAt?: string }, fallback: string): string {
 
 export interface PushResult {
   ok: boolean;
+  /** Rows actually written this time — 0 means nothing had changed. */
   pushed: number;
   error?: string;
 }
@@ -87,6 +151,26 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
   const now = new Date().toISOString();
   let pushed = 0;
 
+  const hashes = loadHashes(userId);
+  const forceFull = Date.now() - hashes.fullAt > FULL_RESYNC_MS;
+  // Hashes are staged per table and only committed once that table's write has
+  // actually landed, so a failed push retries the same rows next time.
+  const staged: HashStore['tables'] = {};
+  const commitHashes = () => {
+    saveHashes({
+      userId,
+      tables: { ...hashes.tables, ...staged },
+      fullAt: forceFull ? Date.now() : hashes.fullAt,
+    });
+  };
+
+  /** Bail out, keeping whatever progress the successful tables already made. */
+  const fail = (error: string): PushResult => {
+    saveIdMap(map);
+    commitHashes();
+    return { ok: false, pushed, error };
+  };
+
   // Only push camps that exist locally; log rows that reference a missing camp
   // are skipped so we never violate the camp_id foreign key.
   const localCamps: FightCamp[] = state.camps ?? [];
@@ -97,10 +181,30 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     rows: Ins<T>[],
     onConflict = 'id',
   ): Promise<string | null> => {
-    if (rows.length === 0) return null;
-    const { error } = await supabase!.from(table).upsert(rows as never, { onConflict });
+    const key = String(table);
+    const prev = hashes.tables[key] ?? {};
+    const next: Record<string, string> = {};
+    const dirty: Ins<T>[] = [];
+
+    for (const row of rows) {
+      // Rows are keyed by whatever column resolves the conflict, so a
+      // single-row table like user_state keys on user_id.
+      const rowKey = String((row as Record<string, unknown>)[onConflict] ?? '');
+      const h = hashRow(row);
+      next[rowKey] = h;
+      if (forceFull || prev[rowKey] !== h) dirty.push(row);
+    }
+
+    if (dirty.length === 0) {
+      // Still record the hashes — this also drops entries for rows that no
+      // longer exist locally, so re-adding one later pushes it again.
+      staged[key] = next;
+      return null;
+    }
+    const { error } = await supabase!.from(table).upsert(dirty as never, { onConflict });
     if (error) return `${String(table)}: ${error.message}`;
-    pushed += rows.length;
+    staged[key] = next;
+    pushed += dirty.length;
     return null;
   };
 
@@ -125,7 +229,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
         factor_weights: (me.factorWeights ?? null) as unknown as Ins<'profiles'>['factor_weights'],
       };
       const err = await run('profiles', [row]);
-      if (err) return { ok: false, pushed, error: err };
+      if (err) return fail(err);
     }
 
     // 2) Camps (parents of every log) — push before children.
@@ -165,7 +269,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
     });
     {
       const err = await run('camps', campRows);
-      if (err) return { ok: false, pushed, error: err };
+      if (err) return fail(err);
     }
 
     const childOf = (campId: string) => validCampUuids.has(uuidFor(campId));
@@ -178,7 +282,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       rpe: l.rpe, notes: l.notes ?? '', completed: l.completed, mep: l.mep ?? null,
       created_at: ts(l, now),
     })));
-    if (err1) return { ok: false, pushed, error: err1 };
+    if (err1) return fail(err1);
 
     const err2 = await run('sparring_logs', (state.sparringLogs ?? []).filter(l => childOf(l.campId)).map(l => ({
       id: uuidFor(l.id), user_id: userId, camp_id: uuidFor(l.campId),
@@ -187,34 +291,34 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       partner_level: l.partnerLevel, focus: l.focus, performance: l.performance,
       notes: l.notes ?? '', created_at: ts(l, now),
     })));
-    if (err2) return { ok: false, pushed, error: err2 };
+    if (err2) return fail(err2);
 
     const err3 = await run('conditioning_tests', (state.conditioningTests ?? []).filter(t => childOf(t.campId)).map(t => ({
       id: uuidFor(t.id), user_id: userId, camp_id: uuidFor(t.campId),
       date: t.date, week_number: t.weekNumber, test_type: t.testType,
       value: t.value, unit: t.unit, notes: t.notes ?? '', created_at: ts(t, now),
     })));
-    if (err3) return { ok: false, pushed, error: err3 };
+    if (err3) return fail(err3);
 
     const err4 = await run('weight_entries', (state.weightEntries ?? []).filter(e => childOf(e.campId)).map(e => ({
       id: uuidFor(e.id), user_id: userId, camp_id: uuidFor(e.campId),
       date: e.date, weight: e.weight, notes: e.notes ?? '', created_at: ts(e, now),
     })));
-    if (err4) return { ok: false, pushed, error: err4 };
+    if (err4) return fail(err4);
 
     const err5 = await run('nutrition_logs', (state.nutritionLogs ?? []).filter(n => childOf(n.campId)).map(n => ({
       id: uuidFor(n.id), user_id: userId, camp_id: uuidFor(n.campId),
       date: n.date, water_oz: n.waterOz, meal_ratings: n.mealRatings as Ins<'nutrition_logs'>['meal_ratings'],
       macros: (n.macros ?? null) as Ins<'nutrition_logs'>['macros'], notes: n.notes ?? '', created_at: ts(n, now),
     })));
-    if (err5) return { ok: false, pushed, error: err5 };
+    if (err5) return fail(err5);
 
     const err6 = await run('hrv_entries', (state.hrvEntries ?? []).filter(h => childOf(h.campId)).map(h => ({
       id: uuidFor(h.id), user_id: userId, camp_id: uuidFor(h.campId),
       date: h.date, rmssd: h.rmssd, resting_hr: h.restingHR ?? null,
       source: h.source, notes: h.notes ?? null, created_at: ts(h, now),
     })));
-    if (err6) return { ok: false, pushed, error: err6 };
+    if (err6) return fail(err6);
 
     const err7 = await run('fight_results', (state.fightResults ?? []).filter(r => childOf(r.campId)).map(r => ({
       id: uuidFor(r.id), user_id: userId, camp_id: uuidFor(r.campId),
@@ -225,7 +329,7 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
       overall_notes: r.overallNotes ?? '', lessons: r.lessons ?? '',
       readiness_at_fight: r.readinessAtFight ?? null, created_at: ts(r, now),
     })));
-    if (err7) return { ok: false, pushed, error: err7 };
+    if (err7) return fail(err7);
 
     // 4) Misc per-user state (single row).
     //
@@ -243,13 +347,13 @@ export async function pushState(userId: string, state: AppState): Promise<PushRe
         : null) as Ins<'user_state'>['fitbit_config'],
       subscription: (state.subscription ?? null) as unknown as Ins<'user_state'>['subscription'],
     }], 'user_id');
-    if (errState) return { ok: false, pushed, error: errState };
+    if (errState) return fail(errState);
 
     saveIdMap(map);
+    commitHashes();
     return { ok: true, pushed };
   } catch (e) {
-    saveIdMap(map);
-    return { ok: false, pushed, error: e instanceof Error ? e.message : 'Sync failed.' };
+    return fail(e instanceof Error ? e.message : 'Sync failed.');
   }
 }
 
