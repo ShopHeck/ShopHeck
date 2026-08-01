@@ -47,7 +47,7 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
         {/* Fixed header */}
         <div className="flex items-center justify-between p-5 flex-shrink-0 border-b border-dark-600">
           <h3 className="text-base font-bold text-white">New Preset</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-white p-1"><X size={18} /></button>
         </div>
 
         {/* Scrollable body */}
@@ -72,14 +72,16 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
               <span className="text-sm text-gray-300">{row.label}</span>
               <div className="flex items-center gap-3">
                 <button onClick={() => adj(row.setter, -row.step, row.min, row.max)}
-                  className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
+                  aria-label={`Decrease ${row.label.toLowerCase()}`}
+                  className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
                   <ChevronDown size={16} />
                 </button>
                 <span className="text-sm font-bold text-white w-10 text-center">
                   {row.label === 'Rounds' ? row.value : fmt(row.value)}
                 </span>
                 <button onClick={() => adj(row.setter, row.step, row.min, row.max)}
-                  className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
+                  aria-label={`Increase ${row.label.toLowerCase()}`}
+                  className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white">
                   <ChevronUp size={16} />
                 </button>
               </div>
@@ -329,13 +331,14 @@ export default function RoundTimer() {
         {customPresets.length < FREE_PRESET_LIMIT || isPro ? (
           <button
             onClick={() => setShowPresetModal(true)}
+            aria-label="Create a custom timer preset"
             className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dark-500 border-dashed text-gray-500 hover:text-white hover:border-dark-300 flex items-center justify-center transition-all"
           >
             <Plus size={16} />
           </button>
         ) : (
           <ProGate required="fighter_pro" inline={false}>
-            <button className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-500 flex items-center justify-center">
+            <button aria-label="Create a custom timer preset (Fighter Pro)" className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-500 flex items-center justify-center">
               <Plus size={16} />
             </button>
           </ProGate>
@@ -448,12 +451,14 @@ export default function RoundTimer() {
       <div className="mx-4 mt-6 flex gap-3 justify-center items-center">
         <button
           onClick={reset}
+          aria-label="Reset timer"
           className="w-14 h-14 rounded-full bg-dark-700 border border-dark-500 flex items-center justify-center text-gray-400 hover:text-white hover:border-dark-300 transition-all active:scale-95"
         >
           <RotateCcw size={20} />
         </button>
         <button
           onClick={onStartPause}
+          aria-label={phase === 'done' ? 'Start a new session' : isRunning ? 'Pause timer' : 'Start timer'}
           className={`w-20 h-20 rounded-full flex items-center justify-center text-white transition-all active:scale-95 shadow-lg ${
             phase === 'done'
               ? 'bg-green-600 hover:bg-green-500'
@@ -469,6 +474,7 @@ export default function RoundTimer() {
           <button
             onClick={hr.connected ? hr.disconnect : hr.connect}
             disabled={hr.connecting}
+            aria-label={hr.connected ? `Disconnect heart rate monitor (${hr.deviceName})` : 'Connect heart rate monitor'}
             title={hr.connected ? `Connected: ${hr.deviceName}` : 'Connect HR device'}
             className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
               hr.connected
@@ -488,6 +494,7 @@ export default function RoundTimer() {
         <ProGate required="fighter_pro" inline>
           <button
             onClick={toggleFullscreen}
+            aria-label={isFullscreen ? 'Exit fullscreen gym display' : 'Fullscreen gym display'}
             className="w-14 h-14 rounded-full bg-dark-700 border border-dark-500 flex items-center justify-center text-gray-400 hover:text-white hover:border-dark-300 transition-all active:scale-95"
           >
             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
@@ -504,12 +511,14 @@ export default function RoundTimer() {
           <span className="text-sm font-medium text-white">Rounds</span>
           <div className="flex items-center gap-3">
             <button onClick={() => adj(setRounds, rounds, -1, 1, 30)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Decrease rounds"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronDown size={16} />
             </button>
             <span className="text-lg font-bold text-white w-8 text-center">{rounds}</span>
             <button onClick={() => adj(setRounds, rounds, 1, 1, 30)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Increase rounds"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronUp size={16} />
             </button>
           </div>
@@ -523,12 +532,14 @@ export default function RoundTimer() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => adj(setWorkSec, workSec, -15, 15, 1800)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Decrease work time"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronDown size={16} />
             </button>
             <span className="text-lg font-bold text-brand-400 w-12 text-center">{fmt(workSec)}</span>
             <button onClick={() => adj(setWorkSec, workSec, 15, 15, 1800)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Increase work time"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronUp size={16} />
             </button>
           </div>
@@ -542,12 +553,14 @@ export default function RoundTimer() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => adj(setRestSec, restSec, -5, 5, 600)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Decrease rest time"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronDown size={16} />
             </button>
             <span className="text-lg font-bold text-blue-400 w-12 text-center">{fmt(restSec)}</span>
             <button onClick={() => adj(setRestSec, restSec, 5, 5, 600)} disabled={isRunning}
-              className="w-8 h-8 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
+              aria-label="Increase rest time"
+              className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center text-gray-400 hover:text-white disabled:opacity-40 transition-all">
               <ChevronUp size={16} />
             </button>
           </div>
@@ -665,6 +678,9 @@ export default function RoundTimer() {
             </div>
             <button
               onClick={() => setVoiceEnabled(!voiceEnabled)}
+              role="switch"
+              aria-checked={voiceEnabled}
+              aria-label="Voice announcements"
               className={`w-11 h-6 rounded-full transition-colors ${voiceEnabled ? 'bg-brand-600' : 'bg-dark-500'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white shadow mx-0.5 transition-transform ${voiceEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -681,6 +697,9 @@ export default function RoundTimer() {
             </div>
             <button
               onClick={() => setHapticEnabled(!hapticEnabled)}
+              role="switch"
+              aria-checked={hapticEnabled}
+              aria-label="Vibration"
               className={`w-11 h-6 rounded-full transition-colors ${hapticEnabled ? 'bg-brand-600' : 'bg-dark-500'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white shadow mx-0.5 transition-transform ${hapticEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -697,6 +716,9 @@ export default function RoundTimer() {
             </div>
             <button
               onClick={() => setReactionMode(!reactionMode)}
+              role="switch"
+              aria-checked={reactionMode}
+              aria-label="Reaction training"
               className={`w-11 h-6 rounded-full transition-colors ${reactionMode ? 'bg-brand-600' : 'bg-dark-500'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white shadow mx-0.5 transition-transform ${reactionMode ? 'translate-x-5' : 'translate-x-0'}`} />

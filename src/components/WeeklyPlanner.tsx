@@ -94,6 +94,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
           <button
             onClick={() => setSelectedWeek(w => Math.max(1, w - 1))}
             disabled={selectedWeek <= 1}
+            aria-label="Previous week"
             className="p-2 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
           >
             <ChevronLeft size={20} />
@@ -117,6 +118,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
           <button
             onClick={() => setSelectedWeek(w => Math.min(activeCamp.campWeeks, w + 1))}
             disabled={selectedWeek >= activeCamp.campWeeks}
+            aria-label="Next week"
             className="p-2 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
           >
             <ChevronRight size={20} />

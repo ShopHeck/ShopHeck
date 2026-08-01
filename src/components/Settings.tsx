@@ -379,12 +379,14 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openEditCamp(camp)}
+                          aria-label={`Edit camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
                           className="p-2 text-gray-500 hover:text-white transition-colors"
                         >
                           <Edit3 size={15} />
                         </button>
                         <button
                           onClick={() => setConfirmDeleteCamp(camp.id)}
+                          aria-label={`Delete camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
                           className="p-2 text-gray-600 hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={15} />

@@ -215,7 +215,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold text-white text-sm">{log.title}</p>
                       <button onClick={() => setDeleteConfirmId(log.id)}
-                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
+                        aria-label={`Delete workout: ${log.title}`}
+                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -262,7 +263,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                     {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
                   </div>
                   <button onClick={() => setDeleteSparConfirmId(log.id)}
-                    className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
+                    aria-label={`Delete sparring session with ${log.partnerName}`}
+                    className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -299,7 +301,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       <p className="text-xs text-gray-500">{test.unit}</p>
                     </div>
                     <button onClick={() => setDeleteCondConfirmId(test.id)}
-                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 p-1">
+                      aria-label={`Delete ${test.testType} test result`}
+                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                       <Trash2 size={14} />
                     </button>
                   </div>

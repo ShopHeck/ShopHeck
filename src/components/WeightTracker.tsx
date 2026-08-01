@@ -59,6 +59,12 @@ export default function WeightTracker() {
   const toGo = currentW - targetW;
   const totalCut = startW - targetW;
   const cutProgress = totalCut > 0 ? Math.min(100, Math.max(0, ((startW - currentW) / totalCut) * 100)) : 100;
+  /**
+   * Whether this camp actually has a cut to report on. Off-season camps leave
+   * both weight fields blank (they're optional there), which left every cut
+   * stat reading off zeroes.
+   */
+  const hasCutTarget = targetW > 0 && startW > 0;
 
   // null when the camp has no fight date (off-season) — parseISO('') is an
   // Invalid Date and would turn every downstream stat into NaN.
@@ -156,28 +162,49 @@ export default function WeightTracker() {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Header Stats */}
-      <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
-        <div className="stat-card">
-          <Scale size={16} className="text-blue-400" />
-          <div className="text-xl font-black text-white">{currentW}</div>
-          <div className="text-xs text-gray-500">current (lbs)</div>
-        </div>
-        <div className="stat-card">
-          <TrendingDown size={16} className="text-brand-500" />
-          <div className={`text-xl font-black ${toGo > 0 ? 'text-brand-400' : 'text-green-400'}`}>
-            {toGo > 0 ? toGo.toFixed(1) : '✓'}
+      {/* Header Stats — a camp with no target weight (the off-season default,
+          where both weight fields are optional) has no cut to report on. It
+          used to render "0 current · ✓ lbs to cut · 100% cut done · 0 → 0 lbs",
+          which reads as a completed cut that never existed. */}
+      {hasCutTarget ? (
+        <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
+          <div className="stat-card">
+            <Scale size={16} className="text-blue-400" />
+            <div className="text-xl font-black text-white">{currentW}</div>
+            <div className="text-xs text-gray-500">current (lbs)</div>
           </div>
-          <div className="text-xs text-gray-500">lbs to cut</div>
-        </div>
-        <div className="stat-card">
-          <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
-          <div className={`text-xl font-black ${cutChip.text}`}>
-            {Math.round(cutProgress)}%
+          <div className="stat-card">
+            <TrendingDown size={16} className="text-brand-500" />
+            <div className={`text-xl font-black ${toGo > 0 ? 'text-brand-400' : 'text-green-400'}`}>
+              {toGo > 0 ? toGo.toFixed(1) : '✓'}
+            </div>
+            <div className="text-xs text-gray-500">lbs to cut</div>
           </div>
-          <div className="text-xs text-gray-500">cut done</div>
+          <div className="stat-card">
+            <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
+            <div className={`text-xl font-black ${cutChip.text}`}>
+              {Math.round(cutProgress)}%
+            </div>
+            <div className="text-xs text-gray-500">cut done</div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mx-4 mt-4 card flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+            <Scale size={22} className="text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-black text-white">
+              {latestEntry ? `${currentW} lbs` : 'No weigh-ins yet'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {latestEntry
+                ? `Last weigh-in ${format(parseISO(latestEntry.date), 'MMM d')} · set a goal weight in Settings to track a cut`
+                : 'Log your bodyweight to start a trend. Set a goal weight in Settings to track a cut.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Alert if critical */}
       {isCritical && (
@@ -194,7 +221,8 @@ export default function WeightTracker() {
         </div>
       )}
 
-      {/* Progress Arc */}
+      {/* Progress Arc — cut camps only (see hasCutTarget above). */}
+      {hasCutTarget && (
       <div className="mx-4">
         <div className="card">
           <div className="flex items-center justify-between mb-3">
@@ -223,6 +251,7 @@ export default function WeightTracker() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Cut Pace projection */}
       {proj.trackable && proj.status !== 'made' && (
@@ -351,7 +380,11 @@ export default function WeightTracker() {
                     )}
                     <p className="text-xs text-gray-600 mt-1">{(entry.weight - targetW).toFixed(1)} to go</p>
                   </div>
-                  <button onClick={() => setDeleteConfirmId(entry.id)} className="text-gray-600 hover:text-red-400 transition-colors p-1">
+                  <button
+                    onClick={() => setDeleteConfirmId(entry.id)}
+                    aria-label={`Delete weigh-in: ${entry.weight} lbs on ${format(parseISO(entry.date), 'MMM d')}`}
+                    className="text-gray-600 hover:text-red-400 transition-colors -m-2 p-2"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
