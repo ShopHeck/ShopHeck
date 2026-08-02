@@ -73,6 +73,9 @@ dollar per heavy Pro user per month. No app release needed; it's an env var.
 Runaway protection: quotas are enforced atomically in Postgres, prompt length
 is capped server-side, `max_tokens` is fixed per feature, and the endpoint
 carries a scoped system prompt so the key can't be borrowed as a general LLM.
+A call that fails before any output reaches the user is refunded
+(`refund_ai_usage`), so provider outages can't drain anyone's monthly
+allowance; once text has streamed, the unit stays spent.
 
 ## Entitlement trust levels (and the RevenueCat gap)
 

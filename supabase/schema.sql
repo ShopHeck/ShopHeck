@@ -620,6 +620,21 @@ begin
 end;
 $$;
 
+-- Give one consumed analysis back. Called by the AI proxy when generation
+-- failed before the user received any output (provider outage, bad key), so
+-- upstream failures can't silently drain a month's allowance.
+create or replace function public.refund_ai_usage(p_user_id uuid, p_month text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.ai_usage
+     set count = greatest(count - 1, 0), updated_at = now()
+   where user_id = p_user_id and month = p_month;
+$$;
+
 -- Only the service role (which bypasses the revoke) may meter usage — a client
--- must never be able to burn or reset its own quota.
+-- must never be able to burn, refund, or reset its own quota.
 revoke execute on function public.increment_ai_usage(uuid, text, integer) from public, anon, authenticated;
+revoke execute on function public.refund_ai_usage(uuid, text) from public, anon, authenticated;

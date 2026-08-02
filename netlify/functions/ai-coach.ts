@@ -65,13 +65,27 @@ const SYSTEM_PROMPT =
   'dangerous dehydration, and tell the fighter to involve a coach or doctor ' +
   'when a cut looks medically risky.';
 
+// The native iOS app runs from capacitor://localhost, so its requests are
+// cross-origin and WKWebView preflights them (Authorization + JSON headers).
+// Auth is a bearer token — never cookies — so a wildcard origin is safe: the
+// token itself is the credential, and CORS with `*` never sends cookies.
+const CORS_HEADERS: Record<string, string> = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'POST, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-expose-headers': 'x-ai-remaining',
+  'access-control-max-age': '86400',
+};
+
 const json = (status: number, code: string, message: string): Response =>
   new Response(JSON.stringify({ code, message }), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...CORS_HEADERS },
   });
 
 export default async (req: Request): Promise<Response> => {
+  // Preflights carry no auth and must succeed before the real POST can happen.
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
   if (req.method !== 'POST') return json(405, 'method_not_allowed', 'POST only.');
 
   const { ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
@@ -178,20 +192,35 @@ export default async (req: Request): Promise<Response> => {
     messages: [{ role: 'user', content: prompt }],
   });
 
+  // Give the consumed quota unit back — best-effort — when generation fails
+  // before the user received anything (bad key/model, provider outage). Once
+  // text has streamed, the unit stays spent: partial output has value, and
+  // refunding after output would let induced disconnects mint free calls.
+  const refundQuota = async (): Promise<void> => {
+    const { error } = await supabase.rpc('refund_ai_usage', {
+      p_user_id: user.id,
+      p_month: month,
+    });
+    if (error) console.error('ai-coach refund error:', error.message);
+  };
+
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let sentAny = false;
       try {
         for await (const event of stream) {
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            sentAny = true;
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
         controller.close();
       } catch (err) {
-        // Mid-stream failure: the client keeps whatever streamed and shows a
-        // retry message; erroring the controller aborts its reader cleanly.
+        // Failure before any output → refund. Mid-stream failure → the client
+        // keeps whatever streamed; erroring the controller aborts its reader.
         console.error('ai-coach stream error:', err);
+        if (!sentAny) await refundQuota();
         controller.error(err);
       }
     },
@@ -203,6 +232,7 @@ export default async (req: Request): Promise<Response> => {
       'content-type': 'text/plain; charset=utf-8',
       'cache-control': 'no-store',
       'x-ai-remaining': String(remaining ?? ''),
+      ...CORS_HEADERS,
     },
   });
 };
