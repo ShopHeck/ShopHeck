@@ -28,11 +28,18 @@ export const defaultState: AppState = {
 };
 
 export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs>): AppState {
+  // Rebuilt key-by-key (not `...state.dashboardPrefs`) so the shape stays the
+  // allowlist — but every key MUST be carried here, or dispatching one pref
+  // silently drops the others. weightUnit is deliberately NOT defaulted:
+  // undefined means "never chosen", which is what lets mergeCloud restore the
+  // account's synced choice on a fresh device (defaulting it here would stamp
+  // 'lbs' as an explicit choice the moment any other pref is toggled).
   return {
     ...state,
     dashboardPrefs: {
       progressWidgetCollapsed: state.dashboardPrefs?.progressWidgetCollapsed ?? false,
       progressWidgetHidden: state.dashboardPrefs?.progressWidgetHidden ?? false,
+      weightUnit: state.dashboardPrefs?.weightUnit,
       ...prefs,
     },
   };

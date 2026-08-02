@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { writeWeightToHealth } from '../utils/healthSync';
 import { maybeRequestReview } from '../utils/appReview';
+import { useWeightUnit } from '../hooks/useWeightUnit';
+import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import {
   LineChart,
@@ -19,19 +21,21 @@ import Modal from './shared/Modal';
 import ProGate from './shared/ProGate';
 import CutCoach from './CutCoach';
 import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
-import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
+import { parseWeightInput, weightRangeHint } from '../utils/validation';
 
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ value: number; payload: { date: string } }>;
+  /** Chart values are pre-converted to the display unit; this labels them. */
+  unit?: string;
 }
 
-function CustomTooltip({ active, payload }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, unit = 'lbs' }: CustomTooltipProps) {
   if (active && payload && payload.length) {
     return (
       <div className="bg-dark-700 border border-dark-400 rounded-lg px-3 py-2 text-xs">
         <p className="text-gray-400">{payload[0].payload.date}</p>
-        <p className="text-white font-bold">{payload[0].value} lbs</p>
+        <p className="text-white font-bold">{payload[0].value} {unit}</p>
       </div>
     );
   }
@@ -41,6 +45,9 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 export default function WeightTracker() {
   const { state, dispatch } = useApp();
   const { activeCamp, weightEntries, currentUser } = state;
+  const unit = useWeightUnit();
+  /** Stored lbs → display number in the user's unit (chart/stat shorthand). */
+  const d = (lbs: number) => toDisplayWeight(lbs, unit);
   const [showModal, setShowModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -87,24 +94,25 @@ export default function WeightTracker() {
   }[proj.status];
 
   // Build chart data: include camp start, all entries, target, and the ideal
-  // "pace" line a steady cut would follow.
+  // "pace" line a steady cut would follow. Values are converted to the display
+  // unit here so the axis, lines and tooltip all speak the user's unit.
   const chartData = (() => {
     const data: { date: string; weight: number; target: number; pace: number }[] = [];
 
     // Add a start point
     data.push({
       date: format(parseISO(activeCamp.startDate), 'MMM d'),
-      weight: activeCamp.currentWeight,
-      target: activeCamp.targetWeight,
-      pace: idealWeightAt(activeCamp, parseISO(activeCamp.startDate)),
+      weight: d(activeCamp.currentWeight),
+      target: d(activeCamp.targetWeight),
+      pace: d(idealWeightAt(activeCamp, parseISO(activeCamp.startDate))),
     });
 
     campEntries.forEach(e => {
       data.push({
         date: format(parseISO(e.date), 'MMM d'),
-        weight: e.weight,
-        target: activeCamp.targetWeight,
-        pace: idealWeightAt(activeCamp, parseISO(e.date)),
+        weight: d(e.weight),
+        target: d(activeCamp.targetWeight),
+        pace: d(idealWeightAt(activeCamp, parseISO(e.date))),
       });
     });
 
@@ -117,8 +125,8 @@ export default function WeightTracker() {
     : 0;
 
   // A weigh-in feeds the cut projection, the chart and the unsafe-cut alert, so
-  // it has to be a real bodyweight. The input's min/max are advisory only.
-  const parsedWeight = parseWeightLbs(weight);
+  // it has to be a real bodyweight. Typed in the display unit, stored in lbs.
+  const parsedWeight = parseWeightInput(weight, unit);
 
   function logWeight() {
     if (parsedWeight === null) return;
@@ -179,15 +187,15 @@ export default function WeightTracker() {
         <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
           <div className="stat-card">
             <Scale size={16} className="text-blue-400" />
-            <div className="text-xl font-black text-white">{currentW}</div>
-            <div className="text-xs text-gray-500">current (lbs)</div>
+            <div className="text-xl font-black text-white">{d(currentW)}</div>
+            <div className="text-xs text-gray-500">current ({unit})</div>
           </div>
           <div className="stat-card">
             <TrendingDown size={16} className="text-brand-500" />
             <div className={`text-xl font-black ${toGo > 0 ? 'text-brand-400' : 'text-green-400'}`}>
-              {toGo > 0 ? toGo.toFixed(1) : '✓'}
+              {toGo > 0 ? d(toGo).toFixed(1) : '✓'}
             </div>
-            <div className="text-xs text-gray-500">lbs to cut</div>
+            <div className="text-xs text-gray-500">{unit} to cut</div>
           </div>
           <div className="stat-card">
             <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
@@ -204,7 +212,7 @@ export default function WeightTracker() {
           </div>
           <div className="min-w-0">
             <p className="text-xl font-black text-white">
-              {latestEntry ? `${currentW} lbs` : 'No weigh-ins yet'}
+              {latestEntry ? formatWeight(currentW, unit) : 'No weigh-ins yet'}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {latestEntry
@@ -223,8 +231,8 @@ export default function WeightTracker() {
             <p className="text-sm font-semibold text-red-300">Weight Cut Concern</p>
             <p className="text-xs text-red-400/80 mt-0.5">
               {isDangerousRate
-                ? `Making weight would take about ${cutRatePerDay!.toFixed(1)} lbs/day — an unsafe pace. Talk to your coach before cutting further.`
-                : `You have ${toGo.toFixed(1)} lbs to cut with ${daysUntilFight ?? 0} days until fight${cutRatePerDay !== null ? ` (~${cutRatePerDay.toFixed(1)} lbs/day)` : ''}. Consult your coach.`}
+                ? `Making weight would take about ${d(cutRatePerDay!).toFixed(1)} ${unit}/day — an unsafe pace. Talk to your coach before cutting further.`
+                : `You have ${formatWeightDelta(toGo, unit)} to cut with ${daysUntilFight ?? 0} days until fight${cutRatePerDay !== null ? ` (~${d(cutRatePerDay).toFixed(1)} ${unit}/day)` : ''}. Consult your coach.`}
             </p>
           </div>
         </div>
@@ -237,12 +245,12 @@ export default function WeightTracker() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Weight Cut Progress</p>
-              <p className="text-sm text-white font-semibold">{startW} → {targetW} lbs</p>
+              <p className="text-sm text-white font-semibold">{d(startW)} → {formatWeight(targetW, unit)}</p>
             </div>
             <div className="text-right">
               {weightTrend !== 0 && (
                 <span className={`badge ${weightTrend < 0 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}`}>
-                  {weightTrend > 0 ? '↑' : '↓'} {Math.abs(weightTrend).toFixed(1)} lbs
+                  {weightTrend > 0 ? '↑' : '↓'} {formatWeightDelta(weightTrend, unit)}
                 </span>
               )}
               {daysUntilFight !== null && <p className="text-xs text-gray-500 mt-1">{daysUntilFight} days out</p>}
@@ -255,8 +263,8 @@ export default function WeightTracker() {
             />
           </div>
           <div className="flex justify-between text-xs text-gray-600 mt-1.5">
-            <span>Start: {startW} lbs</span>
-            <span>Target: {targetW} lbs</span>
+            <span>Start: {formatWeight(startW, unit)}</span>
+            <span>Target: {formatWeight(targetW, unit)}</span>
           </div>
         </div>
       </div>
@@ -275,7 +283,7 @@ export default function WeightTracker() {
                 <p className="text-xs text-gray-500">Projected weigh-in</p>
                 <p className="text-lg font-black text-white">
                   {proj.trendEstablished
-                    ? <>{proj.projectedWeighIn}<span className="text-xs text-gray-500"> lbs</span></>
+                    ? <>{d(proj.projectedWeighIn)}<span className="text-xs text-gray-500"> {unit}</span></>
                     : '—'}
                 </p>
               </div>
@@ -283,18 +291,18 @@ export default function WeightTracker() {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="bg-dark-600 rounded-lg px-3 py-2">
                 <p className="text-xs text-gray-500">Need / day</p>
-                <p className="text-sm text-white font-semibold">{proj.lbsPerDayNeeded} lbs</p>
+                <p className="text-sm text-white font-semibold">{d(proj.lbsPerDayNeeded)} {unit}</p>
               </div>
               <div className="bg-dark-600 rounded-lg px-3 py-2">
                 <p className="text-xs text-gray-500">Avg so far / day</p>
-                <p className="text-sm text-white font-semibold">{proj.trendEstablished ? `${proj.lbsPerDayActual} lbs` : '—'}</p>
+                <p className="text-sm text-white font-semibold">{proj.trendEstablished ? `${d(proj.lbsPerDayActual)} ${unit}` : '—'}</p>
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2.5">
               {!proj.trendEstablished
                 ? 'Log weigh-ins on a few different days and your projected weigh-in weight will appear here.'
                 : proj.projectedMiss > 0
-                ? `At your recent rate you'll be ~${proj.projectedMiss} lbs over on fight day (${proj.daysRemaining} days out).`
+                ? `At your recent rate you'll be ~${formatWeightDelta(proj.projectedMiss, unit)} over on fight day (${proj.daysRemaining} days out).`
                 : proj.daysEarlyAtRate !== null && proj.daysEarlyAtRate > 0
                 ? `At your recent rate you'd be on weight about ${proj.daysEarlyAtRate} day${proj.daysEarlyAtRate === 1 ? '' : 's'} before weigh-in.`
                 : 'At your recent rate you make weight right on schedule.'}
@@ -318,13 +326,13 @@ export default function WeightTracker() {
                   axisLine={false}
                 />
                 <YAxis
-                  domain={[Math.min(targetW - 2, currentW - 2), Math.max(startW + 2, currentW + 2)]}
+                  domain={[Math.min(d(targetW) - 2, d(currentW) - 2), Math.max(d(startW) + 2, d(currentW) + 2)]}
                   tick={{ fill: '#666', fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
                 />
-                <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={targetW} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1.5} label={{ value: 'Target', fill: '#f97316', fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip unit={unit} />} />
+                <ReferenceLine y={d(targetW)} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1.5} label={{ value: 'Target', fill: '#f97316', fontSize: 10 }} />
                 {activeCamp.fightDate && (
                   <Line
                     type="monotone"
@@ -377,21 +385,21 @@ export default function WeightTracker() {
               return (
                 <div key={entry.id} className="card flex items-center gap-3">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-white">{entry.weight} lbs</p>
+                    <p className="text-sm font-semibold text-white">{formatWeight(entry.weight, unit)}</p>
                     <p className="text-xs text-gray-500">{format(parseISO(entry.date), 'EEEE, MMM d')}</p>
                     {entry.notes && <p className="text-xs text-gray-600 italic mt-0.5">{entry.notes}</p>}
                   </div>
                   <div className="text-right">
                     {change !== null && (
                       <span className={`badge text-xs ${change < 0 ? 'bg-green-900/40 text-green-400' : change > 0 ? 'bg-red-900/40 text-red-400' : 'bg-dark-500 text-gray-500'}`}>
-                        {change > 0 ? '+' : ''}{change.toFixed(1)} lbs
+                        {change > 0 ? '+' : ''}{formatWeightDelta(change, unit)}
                       </span>
                     )}
-                    <p className="text-xs text-gray-600 mt-1">{(entry.weight - targetW).toFixed(1)} to go</p>
+                    <p className="text-xs text-gray-600 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>
                   </div>
                   <button
                     onClick={() => setDeleteConfirmId(entry.id)}
-                    aria-label={`Delete weigh-in: ${entry.weight} lbs on ${format(parseISO(entry.date), 'MMM d')}`}
+                    aria-label={`Delete weigh-in: ${formatWeight(entry.weight, unit)} on ${format(parseISO(entry.date), 'MMM d')}`}
                     className="text-gray-600 hover:text-red-400 transition-colors -m-2 p-2"
                   >
                     <Trash2 size={14} />
@@ -423,14 +431,12 @@ export default function WeightTracker() {
             </div>
             <div>
               <label className="block">
-                <span className="label">Weight (lbs) *</span>
+                <span className="label">Weight ({unit}) *</span>
                 <input
                 className="input text-2xl font-bold"
                 type="number"
                 step="0.1"
-                min="100"
-                max="400"
-                placeholder="e.g. 158.5"
+                placeholder={unit === 'kg' ? 'e.g. 71.9' : 'e.g. 158.5'}
                 value={weight}
                 onChange={e => setWeight(e.target.value)}
               />
@@ -438,7 +444,7 @@ export default function WeightTracker() {
             </div>
             {weight && parsedWeight === null && (
               <div className="rounded-xl p-3 border bg-red-900/25 border-red-800">
-                <p className="text-sm font-medium text-red-300">{WEIGHT_RANGE_HINT}</p>
+                <p className="text-sm font-medium text-red-300">{weightRangeHint(unit)}</p>
               </div>
             )}
             {parsedWeight !== null && (
@@ -446,7 +452,7 @@ export default function WeightTracker() {
                 <p className={`text-sm font-medium ${parsedWeight <= targetW ? 'text-green-400' : 'text-gray-300'}`}>
                   {parsedWeight <= targetW
                     ? '✓ At or below fight weight!'
-                    : `${(parsedWeight - targetW).toFixed(1)} lbs above target (${targetW} lbs)`
+                    : `${formatWeightDelta(parsedWeight - targetW, unit)} above target (${formatWeight(targetW, unit)})`
                   }
                 </p>
               </div>

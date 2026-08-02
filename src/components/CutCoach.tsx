@@ -6,6 +6,8 @@ import UpgradeModal from './shared/UpgradeModal';
 import { format, parseISO } from 'date-fns';
 import type { CutProjection } from '../utils/weightCut';
 import type { FightCamp, FighterProfile, WeightEntry } from '../types';
+import { useWeightUnit } from '../hooks/useWeightUnit';
+import { toDisplayWeight, formatWeight, formatWeightDelta, type WeightUnit } from '../utils/units';
 
 interface Props {
   camp: FightCamp;
@@ -14,7 +16,7 @@ interface Props {
   entries: WeightEntry[];
 }
 
-function buildCutPrompt(camp: FightCamp, user: FighterProfile | null, proj: CutProjection, entries: WeightEntry[]): string {
+function buildCutPrompt(camp: FightCamp, user: FighterProfile | null, proj: CutProjection, entries: WeightEntry[], unit: WeightUnit): string {
   const recent = entries
     .filter(e => e.campId === camp.id)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -26,17 +28,17 @@ function buildCutPrompt(camp: FightCamp, user: FighterProfile | null, proj: CutP
 - ${user?.name ?? 'Athlete'} | ${camp.sport} | ${camp.weightClass} | ${user?.experienceLevel ?? 'unknown level'}
 
 ## Cut status
-- Start ${proj.startWeight} lbs → target ${proj.targetWeight} lbs
-- Current ${proj.currentWeight} lbs (${proj.toGo} lbs to go)
+- Start ${formatWeight(proj.startWeight, unit)} → target ${formatWeight(proj.targetWeight, unit)}
+- Current ${formatWeight(proj.currentWeight, unit)} (${formatWeightDelta(proj.toGo, unit)} to go)
 - Fight ${camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d') : 'n/a'} · ${proj.daysRemaining} days out
-- Pace: ${proj.status} (${proj.paceDelta > 0 ? `${proj.paceDelta} lbs behind` : `${Math.abs(proj.paceDelta)} lbs ahead of`} a steady cut)
-- Need ~${proj.lbsPerDayNeeded} lbs/day${proj.trendEstablished
-    ? `; averaging ${proj.lbsPerDayActual} lbs/day
-- Projected weigh-in at current rate: ${proj.projectedWeighIn} lbs (${proj.projectedMiss > 0 ? `${proj.projectedMiss} lbs OVER` : 'on/under target'})`
+- Pace: ${proj.status} (${proj.paceDelta > 0 ? `${formatWeightDelta(proj.paceDelta, unit)} behind` : `${formatWeightDelta(proj.paceDelta, unit)} ahead of`} a steady cut)
+- Need ~${toDisplayWeight(proj.lbsPerDayNeeded, unit)} ${unit}/day${proj.trendEstablished
+    ? `; averaging ${toDisplayWeight(proj.lbsPerDayActual, unit)} ${unit}/day
+- Projected weigh-in at current rate: ${formatWeight(proj.projectedWeighIn, unit)} (${proj.projectedMiss > 0 ? `${formatWeightDelta(proj.projectedMiss, unit)} OVER` : 'on/under target'})`
     : `; no observed rate yet (weigh-ins don't span multiple days)`}
 
 ## Recent weigh-ins
-${recent.length ? recent.map(e => `${format(parseISO(e.date), 'M/d')}: ${e.weight}lbs`).join(' · ') : 'none logged'}
+${recent.length ? recent.map(e => `${format(parseISO(e.date), 'M/d')}: ${toDisplayWeight(e.weight, unit)}${unit}`).join(' · ') : 'none logged'}
 
 Respond in under 180 words using these exact headers:
 **Verdict** — one line: on track, needs adjustment, or unsafe pace.
@@ -63,6 +65,7 @@ function render(text: string) {
 }
 
 export default function CutCoach({ camp, user, proj, entries }: Props) {
+  const unit = useWeightUnit();
   const [advice, setAdvice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -76,7 +79,7 @@ export default function CutCoach({ camp, user, proj, entries }: Props) {
     setErrorCode(null);
     setAdvice('');
     try {
-      await streamAiCoach('cut', buildCutPrompt(camp, user, proj, entries), text => {
+      await streamAiCoach('cut', buildCutPrompt(camp, user, proj, entries, unit), text => {
         setAdvice(prev => prev + text);
       });
     } catch (e) {

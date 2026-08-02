@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { isCoachPro } from '../utils/subscription';
+import { toDisplayWeight, formatWeight } from '../utils/units';
 import { listLinkedFighters, getFighterDetail, type LinkedFighter, type FighterDetail } from '../lib/coachLinks';
 import UpgradeModal from './shared/UpgradeModal';
 import type { CoachNoteCategory } from '../types';
@@ -46,6 +47,7 @@ const CATEGORY_STYLES: Record<CoachNoteCategory, { label: string; cls: string }>
 
 export default function CoachDashboard() {
   const { state, dispatch } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { fighters, camps, workoutLogs, sparringLogs, weightEntries, currentUser, coachNotes } = state;
   const [selectedFighter, setSelectedFighter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -180,8 +182,8 @@ export default function CoachDashboard() {
               </div>
               <div className="stat-card">
                 <Scale size={14} className="text-blue-400" />
-                <div className="text-lg font-black text-white">{latestW}</div>
-                <div className="text-xs text-gray-500">lbs now</div>
+                <div className="text-lg font-black text-white">{toDisplayWeight(latestW, unit)}</div>
+                <div className="text-xs text-gray-500">{unit} now</div>
               </div>
             </div>
 
@@ -248,8 +250,8 @@ export default function CoachDashboard() {
     const weeklyData = Object.values(weeklyStats);
 
     const weightChartData = [
-      { date: 'Start', weight: activeCamp.currentWeight },
-      ...campWeights.map(e => ({ date: format(parseISO(e.date), 'M/d'), weight: e.weight })),
+      { date: 'Start', weight: toDisplayWeight(activeCamp.currentWeight, unit) },
+      ...campWeights.map(e => ({ date: format(parseISO(e.date), 'M/d'), weight: toDisplayWeight(e.weight, unit) })),
     ];
 
     const fighterNotes = coachNotes
@@ -321,8 +323,8 @@ export default function CoachDashboard() {
           </div>
           <div className="stat-card">
             <Scale size={14} className="text-blue-400" />
-            <div className="text-lg font-black text-white">{currentW}</div>
-            <div className="text-xs text-gray-500">lbs now</div>
+            <div className="text-lg font-black text-white">{toDisplayWeight(currentW, unit)}</div>
+            <div className="text-xs text-gray-500">{unit} now</div>
           </div>
         </div>
 
@@ -452,8 +454,8 @@ export default function CoachDashboard() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weight Trend</p>
             <div className="card p-2">
               <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
-                <span>Current: {currentW} lbs</span>
-                <span>Target: {activeCamp.targetWeight} lbs</span>
+                <span>Current: {formatWeight(currentW, unit)}</span>
+                <span>Target: {formatWeight(activeCamp.targetWeight, unit)}</span>
               </div>
               <ResponsiveContainer width="100%" height={120}>
                 <LineChart data={weightChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>

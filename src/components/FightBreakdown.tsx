@@ -9,6 +9,7 @@ import { proposeFactorWeights } from '../utils/factorTuner';
 import PostFightInsights from './PostFightInsights';
 import ProGate from './shared/ProGate';
 import ShareCard, { type MilestoneShare } from './ShareCard';
+import { formatWeightDelta } from '../utils/units';
 
 // Fight results are the most shareable artifact in combat sports; the card
 // headline states the outcome plainly (a loss shared is a comeback story, not
@@ -42,6 +43,7 @@ const OUTCOME_COLOR = {
 
 export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
   const { state, dispatch } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const fight = state.fightResults.find(r => r.id === fightId);
   const camp = fight ? state.camps.find(c => c.id === fight.campId) : undefined;
   const fighter = fight ? (state.fighters.find(f => f.id === fight.fighterId) ?? state.currentUser) : state.currentUser;
@@ -50,7 +52,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
   const { kpis, analysis, proposal } = useMemo(() => {
     if (!fight || !camp) return { kpis: null, analysis: null, proposal: null };
     const k = computeCampKpis(state, camp.id, fight);
-    const a = analyzeFight(fight, k);
+    const a = analyzeFight(fight, k, unit);
     const p = proposeFactorWeights(fighter?.factorWeights, fight, k, a);
     return { kpis: k, analysis: a, proposal: p };
   }, [fight, camp, state, fighter]);
@@ -188,8 +190,8 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
           <KV label="Training" value={`${Math.round(kpis.totalMinutes / 60)}h`} />
           <KV label="Sparring rounds" value={`${kpis.sparringRoundsTotal}`} />
           <KV label="Sparring sessions" value={`${kpis.sparringSessionsCount}`} />
-          <KV label="Weight cut" value={`${kpis.weightCutLbs.toFixed(1)} lbs`} />
-          <KV label="Cut pace" value={`${kpis.weightCutPaceLbsPerWeek.toFixed(1)} /wk`} />
+          <KV label="Weight cut" value={formatWeightDelta(kpis.weightCutLbs, unit)} />
+          <KV label="Cut pace" value={`${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk`} />
           <KV label="Conditioning" value={kpis.conditioningDelta === null ? '—' : `${kpis.conditioningDelta >= 0 ? '+' : ''}${kpis.conditioningDelta.toFixed(1)}%`} />
           <KV label="HRV trend" value={kpis.hrvTrend} />
           <KV label="Nutrition" value={`${Math.round(kpis.nutritionAdherence * 100)}%`} />

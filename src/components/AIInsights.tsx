@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Brain, RefreshCw, AlertCircle, Sparkles, User, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { streamAiCoach, AiCoachError, type AiCoachErrorCode } from '../lib/aiCoach';
 import AuthScreen from './AuthScreen';
@@ -49,7 +50,8 @@ function buildPrompt(state: ReturnType<typeof useApp>['state']): string {
 
   const latestWeight = campWeights[0];
   const currentWeight = latestWeight?.weight ?? activeCamp.currentWeight;
-  const weightToGo = (currentWeight - activeCamp.targetWeight).toFixed(1);
+  // Weights in the prompt use the display unit so the coach voice replies in it.
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
 
   const recentSpar = [...campSparring]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -64,7 +66,7 @@ function buildPrompt(state: ReturnType<typeof useApp>['state']): string {
 ## Fight Camp
 - Fight: ${activeCamp.fightDate ? `${format(parseISO(activeCamp.fightDate), 'MMM d, yyyy')} (${daysOut} days out)` : 'no fight scheduled (off-season block)'}${activeCamp.opponent ? ` vs ${activeCamp.opponent}` : ''}
 - Format: ${activeCamp.rounds}R × ${activeCamp.roundDuration}min
-- Weight: ${currentWeight} lbs → ${activeCamp.targetWeight} lbs target (${weightToGo} lbs to cut)
+- Weight: ${formatWeight(currentWeight, unit)} → ${formatWeight(activeCamp.targetWeight, unit)} target (${formatWeightDelta(currentWeight - activeCamp.targetWeight, unit)} to cut)
 - Progress: Week ${currentWeekNum}/${activeCamp.campWeeks} · ${progress}%${currentWeek ? ` · ${currentWeek.phase} (${currentWeek.intensity})` : ''}
 
 ## Camp Totals
@@ -78,7 +80,7 @@ ${recentLogs.length > 0
 
 ## Weight (last 8)
 ${campWeights.slice(0, 8).length > 0
-  ? campWeights.slice(0, 8).map(e => `${format(parseISO(e.date), 'M/d')}: ${e.weight}lbs`).join(' · ')
+  ? campWeights.slice(0, 8).map(e => `${format(parseISO(e.date), 'M/d')}: ${toDisplayWeight(e.weight, unit)}${unit}`).join(' · ')
   : 'No entries'}
 
 ## Conditioning

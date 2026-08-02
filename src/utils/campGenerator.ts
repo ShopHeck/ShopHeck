@@ -526,7 +526,7 @@ export function generateTrainingCamp(camp: FightCamp, weights?: CampFactorWeight
     } else if (phaseConfig.phase === 'Peak') {
       goals.push(
         isBKFC ? 'Peak BK sparring — compete every round' : 'Peak performance sparring',
-        'Maintain weight within 3lbs of target',
+        'Maintain weight within 3 lbs (1.4 kg) of target',
         isBKFC ? 'Mental toughness drills — embrace discomfort' : 'Mental visualization daily',
       );
     } else {

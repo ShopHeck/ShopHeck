@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -10,7 +10,8 @@ import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '..
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders, syncStreakRiskAlert, syncWeeklyReport } from '../utils/notifications';
 import { computeWeekReportStats } from '../utils/weeklyReport';
 import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
-import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
+import { parseWeightInput, weightRangeHint } from '../utils/validation';
+import { toDisplayWeight } from '../utils/units';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
@@ -68,6 +69,7 @@ interface Props {
 export default function Settings({ onNewCamp, onNavigate }: Props) {
   const { state, dispatch } = useApp();
   const { currentUser, camps, activeCamp, coaches } = state;
+  const weightUnit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const [showUpgrade, setShowUpgrade] = useState(false);
   const sub = state.subscription;
   const userIsPro = isPro(sub);
@@ -182,8 +184,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     setCOpponent(camp.opponent ?? '');
     setCRounds(String(camp.rounds));
     setCRoundDuration(String(camp.roundDuration));
-    setCCurrentWeight(String(camp.currentWeight));
-    setCTargetWeight(String(camp.targetWeight));
+    // Seed the fields in the user's display unit; saveCamp converts back.
+    setCCurrentWeight(String(toDisplayWeight(camp.currentWeight, weightUnit)));
+    setCTargetWeight(String(toDisplayWeight(camp.targetWeight, weightUnit)));
   }
 
   function saveProfile() {
@@ -209,11 +212,12 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     if (!editingCamp || !cFightDate) return;
     // These two weights anchor the cut projection and the unsafe-cut alert, so
     // an out-of-range value has to be rejected here — the input's min/max only
-    // apply to native form submission, which this button doesn't use.
-    const currentWeight = parseWeightLbs(cCurrentWeight);
-    const targetWeight = parseWeightLbs(cTargetWeight);
+    // apply to native form submission, which this button doesn't use. Typed in
+    // the display unit; stored in lbs.
+    const currentWeight = parseWeightInput(cCurrentWeight, weightUnit);
+    const targetWeight = parseWeightInput(cTargetWeight, weightUnit);
     if (currentWeight === null || targetWeight === null) {
-      setCampWeightError(WEIGHT_RANGE_HINT);
+      setCampWeightError(weightRangeHint(weightUnit));
       return;
     }
     setCampWeightError('');
@@ -843,6 +847,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </button>
           )}
           <button
+            onClick={() => dispatch({ type: 'SET_DASHBOARD_PREF', payload: { weightUnit: weightUnit === 'kg' ? 'lbs' : 'kg' } })}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Scale size={15} className="text-gray-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Weight units</p>
+              <p className="text-xs text-gray-600">
+                {weightUnit === 'kg' ? 'Kilograms (kg) — tap for lbs' : 'Pounds (lbs) — tap for kg'}
+              </p>
+            </div>
+            <span className="text-xs font-mono font-bold text-brand-400 flex-shrink-0 uppercase">{weightUnit}</span>
+          </button>
+          <button
             onClick={() => {
               const hidden = !(state.dashboardPrefs?.progressWidgetHidden ?? false);
               dispatch({ type: 'SET_DASHBOARD_PREF', payload: { progressWidgetHidden: hidden } });
@@ -978,7 +997,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         <Modal title="Edit Fight Camp" onClose={() => { setEditingCamp(null); setCampWeightError(''); }} footer={
           <button
             onClick={saveCamp}
-            disabled={!cFightDate || parseWeightLbs(cCurrentWeight) === null || parseWeightLbs(cTargetWeight) === null}
+            disabled={!cFightDate || parseWeightInput(cCurrentWeight, weightUnit) === null || parseWeightInput(cTargetWeight, weightUnit) === null}
             className="btn-primary w-full disabled:opacity-50"
           >
             Save Changes
@@ -1049,13 +1068,13 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block">
-                  <span className="label">Current Weight (lbs)</span>
+                  <span className="label">Current Weight ({weightUnit})</span>
                   <input className="input" type="number" step="0.1" value={cCurrentWeight} onChange={e => setCCurrentWeight(e.target.value)} />
                 </label>
               </div>
               <div>
                 <label className="block">
-                  <span className="label">Target Weight (lbs)</span>
+                  <span className="label">Target Weight ({weightUnit})</span>
                   <input className="input" type="number" step="0.1" value={cTargetWeight} onChange={e => setCTargetWeight(e.target.value)} />
                 </label>
               </div>
