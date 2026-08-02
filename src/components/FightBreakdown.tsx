@@ -55,7 +55,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
     const a = analyzeFight(fight, k, unit);
     const p = proposeFactorWeights(fighter?.factorWeights, fight, k, a);
     return { kpis: k, analysis: a, proposal: p };
-  }, [fight, camp, state, fighter]);
+  }, [fight, camp, state, fighter, unit]);
 
   if (!fight || !camp || !kpis || !analysis || !proposal) {
     return (
