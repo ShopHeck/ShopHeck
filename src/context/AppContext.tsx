@@ -37,7 +37,8 @@ import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 import { useAuth } from './AuthContext';
 import { fetchServerSubscription, clearIdMap } from '../lib/sync';
-import { syncStreakRiskAlert } from '../utils/notifications';
+import { syncStreakRiskAlert, syncWeeklyReport } from '../utils/notifications';
+import { computeWeekReportStats } from '../utils/weeklyReport';
 import { seedDemoState } from '../utils/demoSeed';
 
 type Action =
@@ -411,6 +412,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     state.gamification?.streak.current,
     state.gamification?.streak.expired,
   ]);
+
+  // Arm the Sunday-evening Fight Ready recap with this week's real numbers,
+  // re-armed on every log so the body stays current. One-shot by design (see
+  // syncWeeklyReport) — an abandoned install gets one re-engagement ping, not
+  // a stale weekly drumbeat. No-op on web / reminders off / empty week.
+  useEffect(() => {
+    void syncWeeklyReport(computeWeekReportStats(state));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.workoutLogs, state.gamification?.streak.current]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

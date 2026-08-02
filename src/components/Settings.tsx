@@ -7,7 +7,8 @@ import { isPro, isCoachPro } from '../utils/subscription';
 import { RevenueCat } from '../plugins/RevenueCat';
 import { useApp } from '../context/AppContext';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
-import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders, syncStreakRiskAlert } from '../utils/notifications';
+import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders, syncStreakRiskAlert, syncWeeklyReport } from '../utils/notifications';
+import { computeWeekReportStats } from '../utils/weeklyReport';
 import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
 import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
 import { useAuth } from '../context/AuthContext';
@@ -124,10 +125,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     setReminders(true);
     const weighIn = !!(activeCamp && !activeCamp.isOffSeason && activeCamp.fightDate);
     await syncReminders({ weighIn });
-    // The streak alert reconciles on streak changes; flipping the pref on is
-    // one more moment it must catch, or an already-at-risk streak stays silent
-    // until the next workout.
+    // The streak alert and weekly recap reconcile on state changes; flipping
+    // the pref on is one more moment they must catch, or an already-at-risk
+    // streak / already-trained week stays silent until the next workout.
     if (state.gamification?.streak) await syncStreakRiskAlert(state.gamification.streak);
+    await syncWeeklyReport(computeWeekReportStats(state));
   }
 
   // Apple Health write-back (native iOS only)

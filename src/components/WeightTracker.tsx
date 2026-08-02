@@ -3,6 +3,7 @@ import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { writeWeightToHealth } from '../utils/healthSync';
+import { maybeRequestReview } from '../utils/appReview';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import {
   LineChart,
@@ -122,6 +123,14 @@ export default function WeightTracker() {
   function logWeight() {
     if (parsedWeight === null) return;
     triggerHaptic(HAPTIC.sessionComplete);
+    // P0-4 earned moment: the rating ask fires only when THIS weigh-in takes
+    // the cut from not-made to made — never on merely opening the tab with an
+    // already-at-target camp, which would burn the 120-day throttle on a
+    // routine visit.
+    const wasMade = computeCutProjection(activeCamp!, weightEntries).status === 'made';
+    const entry = { id: 'pending', campId: activeCamp!.id, date, weight: parsedWeight, notes, createdAt: new Date().toISOString() };
+    const nowMade = computeCutProjection(activeCamp!, [...weightEntries, entry]).status === 'made';
+    if (!wasMade && nowMade) void maybeRequestReview('made_weight');
     dispatch({
       type: 'LOG_WEIGHT',
       payload: {

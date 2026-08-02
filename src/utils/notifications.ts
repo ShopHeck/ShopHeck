@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications, type LocalNotificationSchema } from '@capacitor/local-notifications';
+import type { WeekReportStats } from './weeklyReport';
 
 const PREF_KEY = 'fightcamp_reminders';
 const ROUND_ALERTS_KEY = 'fightcamp_round_alerts';
@@ -9,11 +10,13 @@ const ROUND_ALERTS_KEY = 'fightcamp_round_alerts';
 const ID_CHECKIN = 1001;
 const ID_WEIGHIN = 1002;
 const ID_STREAK_RISK = 1003;
-// syncReminders owns only the repeating dailies; the streak alert is
-// reconciled separately (syncStreakRiskAlert) and must not be cancelled here
-// or the daily resync would silently eat it.
+const ID_WEEKLY_REPORT = 1004;
+// syncReminders owns only the repeating dailies; the streak alert and weekly
+// report are reconciled separately (syncStreakRiskAlert / syncWeeklyReport)
+// and must not be cancelled here or the daily resync would silently eat them.
 const ALL_IDS = [{ id: ID_CHECKIN }, { id: ID_WEIGHIN }];
 const STREAK_IDS = [{ id: ID_STREAK_RISK }];
+const REPORT_IDS = [{ id: ID_WEEKLY_REPORT }];
 
 // Round alerts get their own block so cancelling them never disturbs the daily
 // reminders above. 30 rounds is the timer's own maximum, and each round can
@@ -163,6 +166,55 @@ export async function syncStreakRiskAlert(streak: StreakSnapshot): Promise<void>
   }
 }
 
+// ─── Weekly Fight Ready recap ───────────────────────────────────────────────
+
+/** Next Sunday at 18:00 local (today's 18:00 if it's Sunday and still ahead). */
+function nextSundayEvening(now: Date): Date {
+  const d = new Date(now);
+  d.setHours(18, 0, 0, 0);
+  let add = (7 - d.getDay()) % 7; // 0 = Sunday
+  if (add === 0 && d.getTime() <= now.getTime()) add = 7;
+  d.setDate(d.getDate() + add);
+  return d;
+}
+
+/**
+ * Arm the Sunday-evening week recap with this week's real numbers. A one-shot
+ * on purpose, re-armed on every log: the body is only as fresh as the last
+ * time the app computed it, so an abandoned install gets exactly one recap —
+ * a re-engagement ping — instead of a stale weekly drumbeat repeating numbers
+ * from a month ago. An empty week arms nothing (there is no report to read,
+ * and the daily reminder already does the nudging).
+ */
+export async function syncWeeklyReport(stats: WeekReportStats): Promise<void> {
+  if (!notificationsSupported()) return;
+  try {
+    await LocalNotifications.cancel({ notifications: REPORT_IDS });
+    if (!remindersEnabled()) return;
+    if (stats.sessions === 0) return;
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') return;
+
+    const hours = stats.hours >= 1 ? ` · ${stats.hours} hrs` : '';
+    const streak = stats.streak >= 2 ? ` · ${stats.streak}-day streak` : '';
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: ID_WEEKLY_REPORT,
+          title: 'Your week in the gym 🥊',
+          // Tapping a local notification opens the app at the dashboard — the
+          // copy promises exactly that (progress lives one tap away there),
+          // not a dedicated report screen the app doesn't have yet.
+          body: `${stats.sessions} session${stats.sessions === 1 ? '' : 's'}${hours}${streak}. Check your progress and plan next week.`,
+          schedule: { at: nextSundayEvening(new Date()), allowWhileIdle: true },
+        },
+      ],
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
 // ─── Round-timer alerts while the app is backgrounded ───────────────────────
 //
 // The round timer runs on a setInterval, which the OS throttles hard once the
@@ -245,12 +297,12 @@ export async function cancelRoundAlerts(): Promise<void> {
   }
 }
 
-/** Turn reminders off and clear anything scheduled (dailies + streak alert). */
+/** Turn reminders off and clear anything scheduled (dailies + streak + recap). */
 export async function disableReminders(): Promise<void> {
   setRemindersEnabled(false);
   if (!notificationsSupported()) return;
   try {
-    await LocalNotifications.cancel({ notifications: [...ALL_IDS, ...STREAK_IDS] });
+    await LocalNotifications.cancel({ notifications: [...ALL_IDS, ...STREAK_IDS, ...REPORT_IDS] });
   } catch {
     /* noop */
   }
