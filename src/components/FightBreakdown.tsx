@@ -7,6 +7,7 @@ import { computeCampKpis } from '../utils/campKpis';
 import { analyzeFight } from '../utils/fightAnalysis';
 import { proposeFactorWeights } from '../utils/factorTuner';
 import PostFightInsights from './PostFightInsights';
+import ProGate from './shared/ProGate';
 
 interface Props {
   fightId: string;
@@ -228,7 +229,11 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
                 <Trophy size={14} /> Applied to your profile — next camp will use these.
               </div>
             ) : (
-              <button onClick={applyWeights} className="btn-primary w-full">Apply to Next Camp</button>
+              /* The proposal above stays fully visible to everyone — that IS the
+                 preview. Carrying it into the next camp is the Pro loop. */
+              <ProGate required="fighter_pro" inline>
+                <button onClick={applyWeights} className="btn-primary w-full">Apply to Next Camp</button>
+              </ProGate>
             )}
           </>
         )}

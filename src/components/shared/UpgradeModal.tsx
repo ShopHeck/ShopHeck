@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../../plugins/RevenueCat';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { PRICES } from '../../utils/pricing';
 
 interface Props {
   onClose: () => void;
@@ -44,11 +45,6 @@ const LINKS = {
     monthly: (import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/cNi3cvf4q2t1cfG41OgYU01',
     annual:  (import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL  as string | undefined) || 'https://buy.stripe.com/28EcN57BY2t13Ja55SgYU02',
   },
-};
-
-const PRICES = {
-  fighter: { monthly: '$7.99', annual: '$59.99', annualMonthly: '$5.00', saving: '37%' },
-  coach:   { monthly: '$19.99', annual: '$149.99', annualMonthly: '$12.50', saving: '37%' },
 };
 
 export default function UpgradeModal({ onClose }: Props) {

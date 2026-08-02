@@ -1,5 +1,6 @@
 import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
 import { format, parseISO } from 'date-fns';
@@ -16,6 +17,15 @@ const PHASE_COLORS: Record<string, string> = {
 const INTENSITY_DOTS: Record<string, number> = {
   Low: 1, Medium: 2, High: 3, 'Very High': 4,
 };
+
+/** Small tier chip on gated tool tiles, so a paywall is never a surprise tap. */
+function ProChip() {
+  return (
+    <span className="ml-auto flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-900/50 border border-brand-800/60 text-brand-400">
+      PRO
+    </span>
+  );
+}
 
 import type { LogPrefill } from '../App';
 
@@ -65,6 +75,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   ).length;
 
   const readiness = computeReadiness(state);
+  const pro = isPro(state.subscription);
 
   // Post-fight CTA: fight date has passed and no FightResult exists for this camp.
   const campFightResult = fightResults.find(r => r.campId === activeCamp.id);
@@ -469,6 +480,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               <p className="text-sm font-semibold text-white">AI Insights</p>
               <p className="text-xs text-gray-500">Coach analysis</p>
             </div>
+            {!pro && <ProChip />}
           </button>
           <button
             onClick={() => onNavigate('gameplan')}
@@ -481,6 +493,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               <p className="text-sm font-semibold text-white">Game Plan</p>
               <p className="text-xs text-gray-500">Fight strategy</p>
             </div>
+            {!pro && <ProChip />}
           </button>
           <button
             onClick={() => onNavigate('nutrition')}
@@ -493,6 +506,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               <p className="text-sm font-semibold text-white">Nutrition</p>
               <p className="text-xs text-gray-500">Water & meals</p>
             </div>
+            {!pro && <ProChip />}
           </button>
           <button
             onClick={() => onNavigate('trackers')}
@@ -528,6 +542,18 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             <div>
               <p className="text-sm font-semibold text-white">Meal Library</p>
               <p className="text-xs text-gray-500">Plans & generator</p>
+            </div>
+          </button>
+          <button
+            onClick={() => onNavigate('camp-history')}
+            className="card flex items-center gap-3 hover:border-brand-800 transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-brand-900/30 flex items-center justify-center flex-shrink-0">
+              <History size={18} className="text-brand-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Camp History</p>
+              <p className="text-xs text-gray-500">Past camps & fights</p>
             </div>
           </button>
         </div>
