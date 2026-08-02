@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import Anthropic from '@anthropic-ai/sdk';
-import { Sparkles, RefreshCw, Key, AlertCircle } from 'lucide-react';
-import { getApiKey, setApiKey } from '../utils/apiKey';
+import { Sparkles, RefreshCw, AlertCircle, User, Zap } from 'lucide-react';
+import { streamAiCoach, AiCoachError, type AiCoachErrorCode } from '../lib/aiCoach';
+import AuthScreen from './AuthScreen';
+import UpgradeModal from './shared/UpgradeModal';
 import { format, parseISO } from 'date-fns';
 import type { CutProjection } from '../utils/weightCut';
 import type { FightCamp, FighterProfile, WeightEntry } from '../types';
@@ -65,40 +66,29 @@ export default function CutCoach({ camp, user, proj, entries }: Props) {
   const [advice, setAdvice] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyDraft, setKeyDraft] = useState('');
+  const [errorCode, setErrorCode] = useState<AiCoachErrorCode | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   async function generate() {
-    const apiKey = getApiKey();
-    if (!apiKey) { setShowKeyInput(true); return; }
     setLoading(true);
     setError('');
+    setErrorCode(null);
     setAdvice('');
     try {
-      const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-      const stream = client.messages.stream({
-        model: 'claude-opus-4-6',
-        max_tokens: 700,
-        messages: [{ role: 'user', content: buildCutPrompt(camp, user, proj, entries) }],
+      await streamAiCoach('cut', buildCutPrompt(camp, user, proj, entries), text => {
+        setAdvice(prev => prev + text);
       });
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta' && 'text' in event.delta) {
-          setAdvice(prev => prev + (event.delta as { type: 'text_delta'; text: string }).text);
-        }
-      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to generate guidance');
+      if (e instanceof AiCoachError) {
+        setError(e.message);
+        setErrorCode(e.code);
+      } else {
+        setError('Failed to generate guidance. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }
-
-  function saveKey() {
-    if (!keyDraft.trim()) return;
-    setApiKey(keyDraft.trim());
-    setKeyDraft('');
-    setShowKeyInput(false);
-    generate();
   }
 
   return (
@@ -106,45 +96,38 @@ export default function CutCoach({ camp, user, proj, entries }: Props) {
       <div className="flex items-center gap-2">
         <Sparkles size={16} className="text-brand-400" />
         <p className="text-sm font-bold text-white">AI Cut Coach</p>
+        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-gray-600">Included with Pro</span>
       </div>
 
-      {showKeyInput ? (
-        <div className="space-y-2">
-          <p className="text-xs text-gray-400 flex items-center gap-1.5">
-            <Key size={12} /> Paste your Anthropic API key to enable AI guidance.
-          </p>
-          <input
-            className="input text-sm"
-            type="password"
-            placeholder="sk-ant-…"
-            value={keyDraft}
-            onChange={e => setKeyDraft(e.target.value)}
-            autoComplete="off"
-          />
-          <button onClick={saveKey} disabled={!keyDraft.trim()} className="btn-primary w-full text-sm disabled:opacity-50">
-            Save &amp; Generate
-          </button>
-        </div>
-      ) : (
-        <>
-          {!advice && !loading && (
-            <p className="text-xs text-gray-500">
-              Personalised guidance to hit your weigh-in safely, based on your current pace.
-            </p>
-          )}
-          {advice && <div>{render(advice)}</div>}
-          {error && (
-            <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertCircle size={12} /> {error}</p>
-          )}
-          <button
-            onClick={generate}
-            disabled={loading}
-            className="btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? <><RefreshCw size={14} className="animate-spin" /> Analysing…</> : <><Sparkles size={14} /> {advice ? 'Regenerate' : 'Get Cut Guidance'}</>}
-          </button>
-        </>
+      {!advice && !loading && (
+        <p className="text-xs text-gray-500">
+          Personalised guidance to hit your weigh-in safely, based on your current pace.
+        </p>
       )}
+      {advice && <div>{render(advice)}</div>}
+      {error && (
+        <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertCircle size={12} /> {error}</p>
+      )}
+      {errorCode === 'signin_required' && (
+        <button onClick={() => setShowAuth(true)} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+          <User size={14} /> Sign in
+        </button>
+      )}
+      {errorCode === 'upgrade_required' && (
+        <button onClick={() => setShowUpgrade(true)} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+          <Zap size={14} /> Unlock with Fighter Pro
+        </button>
+      )}
+      <button
+        onClick={generate}
+        disabled={loading}
+        className="btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {loading ? <><RefreshCw size={14} className="animate-spin" /> Analysing…</> : <><Sparkles size={14} /> {advice ? 'Regenerate' : 'Get Cut Guidance'}</>}
+      </button>
+
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

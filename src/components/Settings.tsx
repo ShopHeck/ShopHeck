@@ -1,12 +1,11 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, Key, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
 import { RevenueCat } from '../plugins/RevenueCat';
 import { useApp } from '../context/AppContext';
-import { getApiKey, setApiKey as saveApiKeyUtil, clearApiKey } from '../utils/apiKey';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
 import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders } from '../utils/notifications';
 import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
@@ -90,18 +89,6 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     if (!currentUser) return;
     dispatch({ type: 'UPDATE_PROFILE', payload: { ...currentUser, mepTarget: parseInt(mepDraft) || 65 } });
     setEditingMEP(false);
-  }
-
-  // AI key
-  const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [editingKey, setEditingKey] = useState(false);
-  const [keySaved, setKeySaved] = useState(false);
-  const hasApiKey = !!getApiKey();
-
-  function handleSaveKey() {
-    saveApiKeyUtil(apiKeyDraft.trim());
-    setKeySaved(true);
-    setTimeout(() => { setKeySaved(false); setEditingKey(false); setApiKeyDraft(''); }, 1200);
   }
 
   // Custom bell
@@ -677,62 +664,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">AI Coach Insights</p>
-              <p className="text-xs text-gray-600">Claude Opus · {hasApiKey ? 'API key set' : 'API key required'}</p>
+              <p className="text-xs text-gray-600">Included with Pro — no setup needed</p>
             </div>
             <ChevronRight size={15} className="text-gray-600" />
           </button>
-
-          {/* API Key */}
-          <div className="px-4 py-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Key size={14} className="text-yellow-500" />
-                <p className="text-sm font-medium text-white">Anthropic API Key</p>
-              </div>
-              {hasApiKey ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-green-400 font-semibold">✓ Set</span>
-                  <button
-                    onClick={() => { clearApiKey(); setEditingKey(false); }}
-                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <span className="text-xs text-gray-600">Not set</span>
-              )}
-            </div>
-            {editingKey ? (
-              <div className="space-y-2">
-                <input
-                  type="password"
-                  className="input font-mono text-sm"
-                  placeholder="sk-ant-..."
-                  value={apiKeyDraft}
-                  onChange={e => setApiKeyDraft(e.target.value)}
-                  autoFocus
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveKey}
-                    disabled={!apiKeyDraft.trim().startsWith('sk-')}
-                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${keySaved ? 'bg-green-700 text-white' : 'btn-primary'}`}
-                  >
-                    {keySaved ? '✓ Saved' : 'Save Key'}
-                  </button>
-                  <button onClick={() => setEditingKey(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setEditingKey(true)}
-                className="text-xs text-brand-500 hover:text-brand-400 transition-colors"
-              >
-                {hasApiKey ? 'Update key' : 'Add API key →'}
-              </button>
-            )}
-          </div>
 
           {/* Custom Round Bell */}
           <div className="px-4 py-3.5 border-t border-dark-600">

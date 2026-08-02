@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Eye, EyeOff, Star, Brain, Dumbbell, Cloud } from 'lucide-react';
+import { Flame, ChevronRight, Shield, User, X, CheckCircle, Star, Dumbbell, Cloud } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import AuthScreen from './AuthScreen';
 import AppMark from './shared/AppMark';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
-import { getApiKey, setApiKey } from '../utils/apiKey';
 import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
 
 const OFF_SEASON_GOALS: { value: OffSeasonGoal; label: string; desc: string }[] = [
@@ -67,17 +66,13 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
   const [targetWeight, setTargetWeight] = useState('');
   const [campWeeks, setCampWeeks] = useState('8');
 
-  // Integrations
-  const [anthropicKey, setAnthropicKey] = useState(getApiKey());
-  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
-
   const minDate = format(addDays(new Date(), 42), 'yyyy-MM-dd');
   const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
 
   function handleProfileNext() {
     if (!name.trim() || !age) return;
     if (role === 'coach') {
-      setStep(3);
+      setStep(4);
     } else {
       setStep(1);
     }
@@ -100,11 +95,6 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
   function handleCampNext() {
     if (!canContinueCamp) return;
     setStep(2);
-  }
-
-  function handleIntegrationsNext() {
-    if (anthropicKey.trim()) setApiKey(anthropicKey.trim());
-    setStep(4);
   }
 
   function handleFinish() {
@@ -392,13 +382,10 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
 
   // ─── Full first-run onboarding ───────────────────────────────────────────────
 
-  // Step indicator dots — only shown during the "form" steps
-  // Fighters: 0 (profile), 1 (camp), 3 (integrations)
-  // Coaches:  0 (profile), 3 (integrations)
-  const fighterDotSteps = [0, 1, 3];
-  const coachDotSteps   = [0, 3];
-  const dotSteps        = role === 'coach' ? coachDotSteps : fighterDotSteps;
-  const showDots        = dotSteps.includes(step);
+  // Step indicator dots — only shown during the fighter "form" steps
+  // (0 profile, 1 camp). Coaches have a single form step, so no dots.
+  const dotSteps = [0, 1];
+  const showDots = role !== 'coach' && dotSteps.includes(step);
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
@@ -741,74 +728,10 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               )}
             </div>
 
-            <button onClick={() => setStep(3)} className={`flex items-center justify-center gap-2 text-lg py-4 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
+            <button onClick={() => setStep(4)} className={`flex items-center justify-center gap-2 text-lg py-4 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
               Continue
               <ChevronRight size={20} />
             </button>
-          </div>
-        )}
-
-        {/* ── Step 3: Integrations ── */}
-        {step === 3 && (
-          <div className="flex flex-col gap-6 mt-4">
-            <div>
-              <h2 className="text-2xl font-black text-white">Supercharge Your Training</h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Optional — you can always add these later in Settings.
-              </p>
-            </div>
-
-            {/* AI Coach card */}
-            <div className="bg-dark-700 rounded-2xl border border-dark-500 p-4 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-brand-900/60 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Brain size={20} className="text-brand-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">AI Coach Insights</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Personalised training analysis powered by Claude AI</p>
-                </div>
-              </div>
-              <div className="relative">
-                <input
-                  className="input pr-10 text-sm"
-                  type={showAnthropicKey ? 'text' : 'password'}
-                  placeholder="Paste Anthropic API key…"
-                  value={anthropicKey}
-                  onChange={e => setAnthropicKey(e.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAnthropicKey(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                  tabIndex={-1}
-                >
-                  {showAnthropicKey ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              <p className="text-xs text-gray-600">
-                Get your key at{' '}
-                <span className="text-brand-500">console.anthropic.com</span>
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={handleIntegrationsNext}
-                className="btn-primary flex items-center justify-center gap-2"
-              >
-                Continue
-                <ChevronRight size={18} />
-              </button>
-              <button
-                onClick={() => setStep(4)}
-                className="text-sm text-gray-500 hover:text-gray-300 py-2 transition-colors"
-              >
-                Skip for now →
-              </button>
-            </div>
           </div>
         )}
 
