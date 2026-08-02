@@ -3,6 +3,7 @@ import { Heart, Upload, Download, CheckCircle, AlertCircle, ChevronDown, X } fro
 import { useApp } from '../context/AppContext';
 import { addDays, format, parseISO } from 'date-fns';
 import type { WeightEntry, WorkoutLog, SessionType } from '../types';
+import { formatWeight } from '../utils/units';
 
 // Map Apple Health workout types to app session types
 const HK_TYPE_MAP: Record<string, { type: SessionType; label: string }> = {
@@ -99,6 +100,7 @@ type Tab = 'import' | 'export';
 
 export default function AppleHealthSync() {
   const { state, dispatch } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { activeCamp, workoutLogs, weightEntries, sparringLogs } = state;
 
   const [tab, setTab] = useState<Tab>('import');
@@ -364,7 +366,7 @@ export default function AppleHealthSync() {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Weight samples:</p>
                         {preview.weights.slice(0, 3).map((w, i) => (
-                          <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {w.weight} lbs</p>
+                          <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {formatWeight(w.weight, unit)}</p>
                         ))}
                         {preview.weights.length > 3 && <p className="text-xs text-gray-600">… and {preview.weights.length - 3} more</p>}
                       </div>

@@ -1,6 +1,7 @@
 import { Activity, Brain, Bluetooth, ChevronRight, Clock, Dumbbell, Droplets, Flame, Target, UtensilsCrossed, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
+import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
@@ -35,6 +36,7 @@ interface Props {
 
 export default function OffSeasonDashboard({ onNavigate }: Props) {
   const { state } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { activeCamp, trainingSchedule, workoutLogs, weightEntries, completedSessions, currentUser, gamification } = state;
 
   if (!activeCamp) return null;
@@ -325,7 +327,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="text-center">
-              <div className="text-2xl font-black text-white">{currentW}</div>
+              <div className="text-2xl font-black text-white">{toDisplayWeight(currentW, unit)}</div>
               <div className="text-xs text-gray-500">current</div>
             </div>
             <div className="flex-1 px-4">
@@ -344,8 +346,8 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
                     />
                   </div>
                   <div className="flex justify-between text-xs text-gray-600 mt-1">
-                    <span>{activeCamp.currentWeight} lbs</span>
-                    <span>{targetW} lbs</span>
+                    <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
+                    <span>{formatWeight(targetW, unit)}</span>
                   </div>
                 </>
               ) : (
@@ -353,13 +355,13 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
               )}
             </div>
             <div className="text-center">
-              <div className="text-2xl font-black text-teal-400">{targetW}</div>
+              <div className="text-2xl font-black text-teal-400">{toDisplayWeight(targetW, unit)}</div>
               <div className="text-xs text-gray-500">goal</div>
             </div>
           </div>
           {currentW !== targetW && (
             <p className="text-center text-xs text-gray-500 mt-2">
-              {Math.abs(weightDiff)} lbs {weightDiff > 0 ? 'to lose' : 'to gain'} to reach goal
+              {formatWeightDelta(weightDiff, unit)} {weightDiff > 0 ? 'to lose' : 'to gain'} to reach goal
             </p>
           )}
         </div>

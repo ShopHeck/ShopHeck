@@ -724,7 +724,20 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
         .filter(([campId]) => liveCampIds.has(campId)),
     ),
     gamification: state.gamification ?? c.gamification ?? undefined,
-    dashboardPrefs: state.dashboardPrefs ?? c.dashboardPrefs ?? undefined,
+    // Per-KEY merge, unlike the object-level fields around it: defaultState
+    // always materializes a dashboardPrefs object, so object-level local-wins
+    // would let a fresh device's defaults shadow the account's synced choices
+    // forever (and the next push would overwrite them). A key the local
+    // device has actually set wins; one it never touched fills from cloud.
+    dashboardPrefs: state.dashboardPrefs || c.dashboardPrefs
+      ? {
+          progressWidgetCollapsed:
+            state.dashboardPrefs?.progressWidgetCollapsed ?? c.dashboardPrefs?.progressWidgetCollapsed ?? false,
+          progressWidgetHidden:
+            state.dashboardPrefs?.progressWidgetHidden ?? c.dashboardPrefs?.progressWidgetHidden ?? false,
+          weightUnit: state.dashboardPrefs?.weightUnit ?? c.dashboardPrefs?.weightUnit,
+        }
+      : undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
   };
 }

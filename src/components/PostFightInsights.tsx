@@ -7,6 +7,8 @@ import type { FightResult, FightCamp } from '../types';
 import type { CampKpis } from '../utils/campKpis';
 import type { FightAnalysis } from '../utils/fightAnalysis';
 import type { WeightProposal } from '../utils/factorTuner';
+import { useWeightUnit } from '../hooks/useWeightUnit';
+import { formatWeightDelta, type WeightUnit } from '../utils/units';
 
 interface Props {
   camp: FightCamp;
@@ -16,7 +18,7 @@ interface Props {
   proposal: WeightProposal;
 }
 
-function buildPrompt({ camp, fight, kpis, analysis, proposal }: Props): string {
+function buildPrompt({ camp, fight, kpis, analysis, proposal }: Props, unit: WeightUnit): string {
   const roundLines = fight.rounds
     .sort((a, b) => a.roundNumber - b.roundNumber)
     .map(r =>
@@ -40,7 +42,7 @@ ${roundLines}
 - Total sessions: ${kpis.totalSessions} · adherence ${Math.round(kpis.adherence * 100)}%
 - Avg RPE: ${kpis.avgRpe.toFixed(1)}
 - Sparring: ${kpis.sparringRoundsTotal} rounds across ${kpis.sparringSessionsCount} sessions
-- Weight cut: ${kpis.weightCutLbs.toFixed(1)} lbs (${kpis.weightCutPaceLbsPerWeek.toFixed(1)} lbs/wk)
+- Weight cut: ${formatWeightDelta(kpis.weightCutLbs, unit)} (${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk)
 - Conditioning delta: ${kpis.conditioningDelta === null ? 'n/a' : kpis.conditioningDelta.toFixed(1) + '%'}
 - HRV trend: ${kpis.hrvTrend}
 - Nutrition adherence: ${Math.round(kpis.nutritionAdherence * 100)}%
@@ -105,6 +107,7 @@ function renderInsights(text: string) {
 }
 
 export default function PostFightInsights(props: Props) {
+  const unit = useWeightUnit();
   const [insights, setInsights] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -119,7 +122,7 @@ export default function PostFightInsights(props: Props) {
     setInsights('');
 
     try {
-      await streamAiCoach('postfight', buildPrompt(props), text => {
+      await streamAiCoach('postfight', buildPrompt(props, unit), text => {
         setInsights(prev => prev + text);
       });
     } catch (err) {

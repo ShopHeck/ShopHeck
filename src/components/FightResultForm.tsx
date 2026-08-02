@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import type { FightCamp, FightMethod, FightOutcome, FightRound, DamageLevel, FightResult } from '../types';
 import { computeReadiness } from '../utils/readiness';
 import { buildFightResult } from '../utils/storage';
+import { toDisplayWeight, fromDisplayWeight } from '../utils/units';
 
 interface Props {
   camp: FightCamp;
@@ -44,6 +45,7 @@ function emptyRound(n: number): FightRound {
 
 export default function FightResultForm({ camp, existingId, onDone, onCancel }: Props) {
   const { state, dispatch } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const existing = state.fightResults.find(r => r.id === existingId);
 
   const [step, setStep] = useState(0);
@@ -56,8 +58,8 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   const [rounds, setRounds] = useState<FightRound[]>(
     existing?.rounds ?? Array.from({ length: camp.rounds }, (_, i) => emptyRound(i + 1)),
   );
-  const [weighInWeight, setWeighInWeight] = useState<string>(existing?.weighInWeight?.toString() ?? '');
-  const [fightNightWeight, setFightNightWeight] = useState<string>(existing?.fightNightWeight?.toString() ?? '');
+  const [weighInWeight, setWeighInWeight] = useState<string>(existing?.weighInWeight != null ? String(toDisplayWeight(existing.weighInWeight, unit)) : '');
+  const [fightNightWeight, setFightNightWeight] = useState<string>(existing?.fightNightWeight != null ? String(toDisplayWeight(existing.fightNightWeight, unit)) : '');
   const [stylePlanFollowed, setStylePlanFollowed] = useState<1 | 2 | 3 | 4 | 5>(existing?.stylePlanFollowed ?? 3);
   const [overallNotes, setOverallNotes] = useState(existing?.overallNotes ?? '');
   const [lessons, setLessons] = useState(existing?.lessons ?? '');
@@ -109,8 +111,8 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
       roundStopped,
       totalRounds,
       rounds: fightedRounds,
-      weighInWeight: weighInWeight ? Number(weighInWeight) : undefined,
-      fightNightWeight: fightNightWeight ? Number(fightNightWeight) : undefined,
+      weighInWeight: weighInWeight ? fromDisplayWeight(Number(weighInWeight), unit) : undefined,
+      fightNightWeight: fightNightWeight ? fromDisplayWeight(Number(fightNightWeight), unit) : undefined,
       stylePlanFollowed,
       overallNotes,
       lessons,
@@ -285,20 +287,20 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
         <div className="mx-4 mt-6 space-y-4">
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Weigh-in weight (lbs)</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Weigh-in weight ({unit})</span>
               <input
               type="number"
               step="0.1"
               value={weighInWeight}
               onChange={e => setWeighInWeight(e.target.value)}
-              placeholder={`${camp.targetWeight}`}
+              placeholder={`${toDisplayWeight(camp.targetWeight, unit)}`}
               className="input"
             />
             </label>
           </div>
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Fight-night weight (lbs)</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Fight-night weight ({unit})</span>
               <input
               type="number"
               step="0.1"

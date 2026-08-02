@@ -1,5 +1,6 @@
 import type { FightResult, FightRound } from '../types';
 import type { CampKpis } from './campKpis';
+import { formatWeightDelta, type WeightUnit } from './units';
 
 export interface FightAnalysis {
   /** 0..1. Used as a correlation target when tuning factor weights. */
@@ -54,7 +55,7 @@ function damageWeight(d: FightRound['damageTaken']): number {
   return { none: 0, light: 1, moderate: 2, heavy: 3 }[d];
 }
 
-export function analyzeFight(result: FightResult, kpis: CampKpis): FightAnalysis {
+export function analyzeFight(result: FightResult, kpis: CampKpis, unit: WeightUnit = 'lbs'): FightAnalysis {
   const rounds = [...result.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
   const outcomeScore = outcomeToScore(result);
   const cardio = cardioVerdict(rounds);
@@ -112,7 +113,7 @@ export function analyzeFight(result: FightResult, kpis: CampKpis): FightAnalysis
     campTakeaways.push(`Only ${kpis.sparringSessionsCount} sparring sessions — more varied partners needed to handle pressure.`);
   }
   if (weightCutImpact === 'severe') {
-    campTakeaways.push(`Weight-cut pace of ${kpis.weightCutPaceLbsPerWeek.toFixed(1)} lbs/wk was too aggressive — start cut earlier next camp.`);
+    campTakeaways.push(`Weight-cut pace of ${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk was too aggressive — start cut earlier next camp.`);
   }
   if (kpis.adherence < 0.7) {
     campTakeaways.push(`Only ${Math.round(kpis.adherence * 100)}% schedule adherence — missed sessions show up on fight night.`);

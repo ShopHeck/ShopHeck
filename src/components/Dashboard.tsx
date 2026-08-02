@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
+import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
 
@@ -36,6 +37,7 @@ interface Props {
 
 export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const { state } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults } = state;
 
   if (!activeCamp) return null;
@@ -54,9 +56,10 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
     .filter(e => e.campId === activeCamp.id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
-  const weightToGo = latestWeight
-    ? (latestWeight.weight - activeCamp.targetWeight).toFixed(1)
-    : (activeCamp.currentWeight - activeCamp.targetWeight).toFixed(1);
+  const weightToGo = toDisplayWeight(
+    (latestWeight ? latestWeight.weight : activeCamp.currentWeight) - activeCamp.targetWeight,
+    unit,
+  ).toFixed(1);
 
   const today = new Date();
   const todayDayOfWeek = today.getDay();
@@ -293,7 +296,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <button onClick={() => onNavigate('weight')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <TrendingDown size={16} className="text-brand-500" />
           <div className="text-xl font-black text-white">{weightToGo}</div>
-          <div className="text-xs text-gray-500">lbs to cut</div>
+          <div className="text-xs text-gray-500">{unit} to cut</div>
         </button>
         <button onClick={() => onNavigate('log')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <Activity size={16} className="text-green-500" />
@@ -433,7 +436,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           <div className="flex items-center justify-between">
             <div className="text-center">
               <div className="text-2xl font-black text-white">
-                {latestWeight ? latestWeight.weight : activeCamp.currentWeight}
+                {toDisplayWeight(latestWeight ? latestWeight.weight : activeCamp.currentWeight, unit)}
               </div>
               <div className="text-xs text-gray-500">current</div>
             </div>
@@ -453,12 +456,12 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                 })()}
               </div>
               <div className="flex justify-between text-xs text-gray-600 mt-1">
-                <span>{activeCamp.currentWeight} lbs</span>
-                <span>{activeCamp.targetWeight} lbs</span>
+                <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
+                <span>{formatWeight(activeCamp.targetWeight, unit)}</span>
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-black text-brand-400">{activeCamp.targetWeight}</div>
+              <div className="text-2xl font-black text-brand-400">{toDisplayWeight(activeCamp.targetWeight, unit)}</div>
               <div className="text-xs text-gray-500">target</div>
             </div>
           </div>

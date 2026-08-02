@@ -1,6 +1,7 @@
 import { addDays, differenceInDays, parseISO, subDays } from 'date-fns';
 import type { AppState, CampFactorWeights } from '../types';
 import { DEFAULT_FACTOR_WEIGHTS } from '../types';
+import { formatWeightDelta } from './units';
 
 export interface ReadinessBreakdownItem {
   label: string;
@@ -70,6 +71,9 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   // Each section computes a 0..1 ratio, then scales to its per-fighter max.
   const scale = (ratio: number, max: number) => Math.round(ratio * max);
 
+  // User-facing detail strings speak the display unit; all math stays lbs.
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
+
   // ── 1. Weight Cut (max = w.weightCut) ────────────────────────────────────
   const latestWeight = campWeights[campWeights.length - 1];
   const currentW = latestWeight ? latestWeight.weight : activeCamp.currentWeight;
@@ -86,11 +90,11 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     weightDetail = 'At or below fight weight ✓';
   } else {
     const pace = lbsToGo / daysUntilFight;
-    if (pace <= 0.3)      { weightRatio = 0.9;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — comfortable pace`; }
-    else if (pace <= 0.5) { weightRatio = 0.7;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — manageable`; }
-    else if (pace <= 0.8) { weightRatio = 0.45; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — tight timeline`; }
-    else if (pace <= 1.2) { weightRatio = 0.2;  weightDetail = `${lbsToGo.toFixed(1)} lbs to go — very difficult`; }
-    else                  { weightRatio = 0.05; weightDetail = `${lbsToGo.toFixed(1)} lbs to go — critical`; }
+    if (pace <= 0.3)      { weightRatio = 0.9;  weightDetail = `${formatWeightDelta(lbsToGo, unit)} to go — comfortable pace`; }
+    else if (pace <= 0.5) { weightRatio = 0.7;  weightDetail = `${formatWeightDelta(lbsToGo, unit)} to go — manageable`; }
+    else if (pace <= 0.8) { weightRatio = 0.45; weightDetail = `${formatWeightDelta(lbsToGo, unit)} to go — tight timeline`; }
+    else if (pace <= 1.2) { weightRatio = 0.2;  weightDetail = `${formatWeightDelta(lbsToGo, unit)} to go — very difficult`; }
+    else                  { weightRatio = 0.05; weightDetail = `${formatWeightDelta(lbsToGo, unit)} to go — critical`; }
   }
   const weightScore = scale(weightRatio, w.weightCut);
 
@@ -217,7 +221,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   for (const item of byRatio.slice(0, 3)) {
     if (item.score / item.max >= 0.75) continue;
     if (item.label === 'Weight Cut' && lbsToGo > 0) {
-      insights.push(`Log your weight daily — you need to cut ${lbsToGo.toFixed(1)} lbs in ${daysUntilFight} days.`);
+      insights.push(`Log your weight daily — you need to cut ${formatWeightDelta(lbsToGo, unit)} in ${daysUntilFight} days.`);
     } else if (item.label === 'Training Volume') {
       // gap can legitimately be 0 (nothing due yet, or logging is on pace but
       // the neutral no-data score still lands in the bottom three) — don't tell

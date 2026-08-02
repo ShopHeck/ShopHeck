@@ -10,7 +10,7 @@ import { PRICES } from '../utils/pricing';
 import { isPro } from '../utils/subscription';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
-import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
+import { parseWeightInput, weightRangeHint } from '../utils/validation';
 
 const OFF_SEASON_GOALS: { value: OffSeasonGoal; label: string; desc: string }[] = [
   { value: 'base-building', label: 'Base Building', desc: 'Aerobic engine, technical drilling, volume work' },
@@ -38,6 +38,7 @@ interface Props {
 
 export default function Onboarding({ campOnly = false, offSeasonOnly = false, onClose }: Props) {
   const { state, dispatch } = useApp();
+  const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { configured: authConfigured, user: authUser } = useAuth();
   const [step, setStep] = useState(campOnly ? 1 : 0);
   const [role, setRole] = useState<UserRole>('fighter');
@@ -90,8 +91,8 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
   // A fight camp's start/target weights drive the cut projection and the
   // unsafe-cut alert from day one, so they're required and range-checked. In
   // off-season mode both are optional (the fields say so) and simply omitted.
-  const parsedCurrentWeight = parseWeightLbs(currentWeight);
-  const parsedTargetWeight = parseWeightLbs(targetWeight);
+  const parsedCurrentWeight = parseWeightInput(currentWeight, unit);
+  const parsedTargetWeight = parseWeightInput(targetWeight, unit);
   const campWeightsOk = isOffSeason
     ? (!currentWeight.trim() || parsedCurrentWeight !== null) &&
       (!targetWeight.trim() || parsedTargetWeight !== null)
@@ -283,19 +284,19 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block">
-                      <span className="label">Current Weight (lbs){!isOffSeason && ' *'}</span>
+                      <span className="label">Current Weight ({unit}){!isOffSeason && ' *'}</span>
                       <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
                     </label>
                   </div>
                   <div>
                     <label className="block">
-                      <span className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</span>
+                      <span className="label">{isOffSeason ? `Goal Weight (${unit})` : `Target Weight (${unit}) *`}</span>
                       <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
                     </label>
                   </div>
                 </div>
                 {showWeightHint && (
-                  <p className="-mt-3 text-xs text-red-400">{WEIGHT_RANGE_HINT}</p>
+                  <p className="-mt-3 text-xs text-red-400">{weightRangeHint(unit)}</p>
                 )}
 
                 {/* Camp Length — fight camp only (off-season is always 12 weeks) */}
@@ -339,13 +340,13 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                       <div className="flex justify-between"><span className="text-gray-500 text-sm">Mode</span><span className="text-teal-400 font-bold text-sm">Off Season</span></div>
                       <div className="flex justify-between"><span className="text-gray-500 text-sm">Goal</span><span className="text-white font-semibold text-sm capitalize">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500 text-sm">Duration</span><span className="text-teal-400 font-bold text-sm">12 Weeks (3 cycles)</span></div>
-                      {currentWeight && <div className="flex justify-between"><span className="text-gray-500 text-sm">Starting Weight</span><span className="text-white font-semibold text-sm">{currentWeight} lbs</span></div>}
+                      {currentWeight && <div className="flex justify-between"><span className="text-gray-500 text-sm">Starting Weight</span><span className="text-white font-semibold text-sm">{currentWeight} {unit}</span></div>}
                     </>
                   ) : (
                     <>
                       <div className="flex justify-between"><span className="text-gray-500 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} {unit}</span></div>
                     </>
                   )}
                 </div>
@@ -641,19 +642,19 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block">
-                  <span className="label">Current Weight (lbs){!isOffSeason && ' *'}</span>
+                  <span className="label">Current Weight ({unit}){!isOffSeason && ' *'}</span>
                   <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 160'} value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
                 </label>
               </div>
               <div>
                 <label className="block">
-                  <span className="label">{isOffSeason ? 'Goal Weight (lbs)' : 'Target Weight (lbs) *'}</span>
+                  <span className="label">{isOffSeason ? `Goal Weight (${unit})` : `Target Weight (${unit}) *`}</span>
                   <input className="input" type="number" placeholder={isOffSeason ? 'optional' : 'e.g. 155'} value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
                 </label>
               </div>
             </div>
             {showWeightHint && (
-              <p className="-mt-3 text-xs text-red-400">{WEIGHT_RANGE_HINT}</p>
+              <p className="-mt-3 text-xs text-red-400">{weightRangeHint(unit)}</p>
             )}
 
             {/* Camp Length — fight camp only */}
@@ -744,7 +745,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 text-sm">Weight Cut</span>
-                    <span className="text-white font-semibold">{currentWeight} → {targetWeight} lbs</span>
+                    <span className="text-white font-semibold">{currentWeight} → {targetWeight} {unit}</span>
                   </div>
                 </>
               )}
@@ -886,7 +887,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                     {currentWeight && targetWeight && (
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500 text-sm">Weight Cut</span>
-                        <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} lbs</span>
+                        <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} {unit}</span>
                       </div>
                     )}
                   </>
