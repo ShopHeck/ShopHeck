@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
@@ -46,16 +46,6 @@ export default function WeightTracker() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
-
-  // Hitting fight weight is a P0-4 earned moment for the (self-throttled)
-  // native rating ask. Computed here — hooks must precede the early return —
-  // and cheap enough that the render-time projection below stays untouched.
-  const madeWeight = activeCamp
-    ? computeCutProjection(activeCamp, weightEntries).status === 'made'
-    : false;
-  useEffect(() => {
-    if (madeWeight) void maybeRequestReview('made_weight');
-  }, [madeWeight]);
 
   if (!activeCamp) return null;
 
@@ -133,6 +123,14 @@ export default function WeightTracker() {
   function logWeight() {
     if (parsedWeight === null) return;
     triggerHaptic(HAPTIC.sessionComplete);
+    // P0-4 earned moment: the rating ask fires only when THIS weigh-in takes
+    // the cut from not-made to made — never on merely opening the tab with an
+    // already-at-target camp, which would burn the 120-day throttle on a
+    // routine visit.
+    const wasMade = computeCutProjection(activeCamp!, weightEntries).status === 'made';
+    const entry = { id: 'pending', campId: activeCamp!.id, date, weight: parsedWeight, notes, createdAt: new Date().toISOString() };
+    const nowMade = computeCutProjection(activeCamp!, [...weightEntries, entry]).status === 'made';
+    if (!wasMade && nowMade) void maybeRequestReview('made_weight');
     dispatch({
       type: 'LOG_WEIGHT',
       payload: {

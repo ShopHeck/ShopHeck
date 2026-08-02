@@ -202,7 +202,10 @@ export async function syncWeeklyReport(stats: WeekReportStats): Promise<void> {
         {
           id: ID_WEEKLY_REPORT,
           title: 'Your week in the gym 🥊',
-          body: `${stats.sessions} session${stats.sessions === 1 ? '' : 's'}${hours}${streak}. Open your Fight Ready report.`,
+          // Tapping a local notification opens the app at the dashboard — the
+          // copy promises exactly that (progress lives one tap away there),
+          // not a dedicated report screen the app doesn't have yet.
+          body: `${stats.sessions} session${stats.sessions === 1 ? '' : 's'}${hours}${streak}. Check your progress and plan next week.`,
           schedule: { at: nextSundayEvening(new Date()), allowWhileIdle: true },
         },
       ],
