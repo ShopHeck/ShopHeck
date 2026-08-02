@@ -648,7 +648,7 @@ export default function RoundTimer() {
         <div className="card flex items-center justify-between">
           <div>
             <span className="text-sm font-medium text-white">Warning Bell</span>
-            <p className="text-xs text-gray-500">Clapper before round ends</p>
+            <p className="text-xs text-gray-500">Warning clap this many seconds before the round ends</p>
           </div>
           <div className="flex gap-1.5 flex-wrap justify-end">
             {[5, 10].map(v => (

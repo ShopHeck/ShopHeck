@@ -550,7 +550,7 @@ export default function CoachDashboard() {
               <div className="card text-center py-6">
                 <Users size={24} className="text-gray-600 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">No connected fighters yet</p>
-                <p className="text-xs text-gray-600 mt-1">Generate an invite code in Settings and share it with your fighters.</p>
+                <p className="text-xs text-gray-600 mt-1">Generate an invite code in Settings and share it — or enter a code a fighter sent you.</p>
               </div>
             ) : (
               <div className="space-y-3">

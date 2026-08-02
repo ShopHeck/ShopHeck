@@ -27,6 +27,49 @@ interface Props {
   onEdit: (fightId: string) => void;
 }
 
+// Raw engine values never reach the UI — every enum gets display copy.
+const CARDIO_LABELS = {
+  'held-up': 'Held up',
+  'faded-late': 'Faded late',
+  'faded-early': 'Faded early',
+  inconsistent: 'Inconsistent',
+} as const;
+
+const CUT_IMPACT_LABELS = {
+  none: 'No impact',
+  mild: 'Mild impact',
+  severe: 'Severe impact',
+} as const;
+
+const PRESSURE_LABELS = {
+  dominated: 'Dominated',
+  neutral: 'Held ground',
+  overwhelmed: 'Overwhelmed',
+} as const;
+
+const HRV_TREND_LABELS = {
+  improving: 'Improving',
+  stable: 'Stable',
+  declining: 'Declining',
+  'no-data': '—',
+} as const;
+
+const FACTOR_LABELS = {
+  weightCut: 'Weight cut',
+  trainingVolume: 'Training volume',
+  sessionQuality: 'Session quality',
+  sparring: 'Sparring',
+  conditioning: 'Conditioning',
+  nutrition: 'Nutrition',
+} as const;
+
+const OUTCOME_LABELS = {
+  win: 'Win',
+  loss: 'Loss',
+  draw: 'Draw',
+  'no-contest': 'No Contest',
+} as const;
+
 const OUTCOME_ICON = {
   win: Trophy,
   loss: XCircle,
@@ -139,7 +182,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
         </div>
         <div className="flex-1">
           <p className={`text-xs font-bold uppercase tracking-wider ${fight.outcome === 'win' ? 'text-green-400' : fight.outcome === 'loss' ? 'text-red-400' : 'text-yellow-400'}`}>
-            {fight.outcome}
+            {OUTCOME_LABELS[fight.outcome]}
           </p>
           <p className="text-white font-bold text-lg">{fight.method}{fight.roundStopped ? ` (R${fight.roundStopped})` : ''}</p>
           <p className="text-xs text-gray-500">
@@ -150,10 +193,10 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
 
       {/* Rules-engine verdict */}
       <div className="mx-4 mt-4 grid grid-cols-2 gap-2">
-        <VerdictTile icon={Activity} label="Cardio" value={analysis.cardioVerdict} accent={analysis.cardioVerdict === 'held-up' ? 'good' : 'bad'} />
-        <VerdictTile icon={Scale} label="Weight Cut" value={analysis.weightCutImpact} accent={analysis.weightCutImpact === 'none' ? 'good' : analysis.weightCutImpact === 'severe' ? 'bad' : 'warn'} />
+        <VerdictTile icon={Activity} label="Cardio" value={CARDIO_LABELS[analysis.cardioVerdict]} accent={analysis.cardioVerdict === 'held-up' ? 'good' : 'bad'} />
+        <VerdictTile icon={Scale} label="Weight Cut" value={CUT_IMPACT_LABELS[analysis.weightCutImpact]} accent={analysis.weightCutImpact === 'none' ? 'good' : analysis.weightCutImpact === 'severe' ? 'bad' : 'warn'} />
         <VerdictTile icon={Target} label="Gameplan" value={`${Math.round(analysis.gameplanAdherence * 100)}%`} accent={analysis.gameplanAdherence >= 0.7 ? 'good' : analysis.gameplanAdherence >= 0.5 ? 'warn' : 'bad'} />
-        <VerdictTile icon={Zap} label="Pressure" value={analysis.pressureHandling} accent={analysis.pressureHandling === 'dominated' ? 'good' : analysis.pressureHandling === 'overwhelmed' ? 'bad' : 'warn'} />
+        <VerdictTile icon={Zap} label="Pressure" value={PRESSURE_LABELS[analysis.pressureHandling]} accent={analysis.pressureHandling === 'dominated' ? 'good' : analysis.pressureHandling === 'overwhelmed' ? 'bad' : 'warn'} />
       </div>
 
       {/* Strengths */}
@@ -193,7 +236,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
           <KV label="Weight cut" value={formatWeightDelta(kpis.weightCutLbs, unit)} />
           <KV label="Cut pace" value={`${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk`} />
           <KV label="Conditioning" value={kpis.conditioningDelta === null ? '—' : `${kpis.conditioningDelta >= 0 ? '+' : ''}${kpis.conditioningDelta.toFixed(1)}%`} />
-          <KV label="HRV trend" value={kpis.hrvTrend} />
+          <KV label="HRV trend" value={HRV_TREND_LABELS[kpis.hrvTrend]} />
           <KV label="Nutrition" value={`${Math.round(kpis.nutritionAdherence * 100)}%`} />
           <KV label="Readiness at fight" value={kpis.readinessAtFight !== null ? `${kpis.readinessAtFight}/100` : '—'} />
         </div>
@@ -254,7 +297,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
                 if (d === 0) return null;
                 return (
                   <div key={k} className="flex items-center justify-between text-xs bg-dark-700 px-2.5 py-1.5 rounded-lg">
-                    <span className="text-gray-400">{k}</span>
+                    <span className="text-gray-400">{FACTOR_LABELS[k]}</span>
                     <span className={`font-bold ${d > 0 ? 'text-green-400' : 'text-red-400'}`}>{d > 0 ? '+' : ''}{d}</span>
                   </div>
                 );
