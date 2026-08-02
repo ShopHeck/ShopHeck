@@ -77,6 +77,29 @@ export async function checkNativeSubscription(): Promise<{ isPro: boolean; tier:
 }
 
 /**
+ * Ties this device's RevenueCat subscriber to the signed-in Supabase account
+ * (native iOS only) — the piece that makes App Store purchases attributable
+ * server-side, because webhook events then carry the Supabase user id. Pass
+ * null on sign-out to detach (a no-op when already anonymous).
+ *
+ * Returns the identified account's entitlements when signing in (so a
+ * subscription bought on another device under this account can be applied),
+ * or null on web / sign-out / error — callers leave state unchanged then.
+ */
+export async function identifyNativeSubscriber(
+  userId: string | null,
+): Promise<{ isPro: boolean; tier: string } | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    if (userId) return await RevenueCat.logIn({ appUserId: userId });
+    await RevenueCat.logOut();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Reads Stripe Payment Link return params from the URL, writes a 30-day soft
  * unlock to localStorage, and strips the params from the URL.
  * Returns the new subscription state if a valid return was detected, else null.

@@ -549,6 +549,40 @@ create policy "stripe_subscriptions_own_select" on public.stripe_subscriptions
   for select using (user_id = auth.uid());
 
 ------------------------------------------------------------
+-- revenuecat_subscriptions — server-authoritative App Store entitlements.
+-- Written ONLY by the RevenueCat webhook (netlify/functions/revenuecat-webhook)
+-- using the service-role key. Same trust model as stripe_subscriptions above:
+-- the owner may READ their row, nothing client-side can write it.
+--
+-- No status enum: every RevenueCat event carries the entitlement's current
+-- expiration, so "active" is simply expires_at null-or-future. A canceled
+-- subscription keeps access until it expires (RevenueCat sends CANCELLATION
+-- with the unchanged period end), and an expired one goes inactive on its own
+-- even if the EXPIRATION event is never delivered.
+------------------------------------------------------------
+create table if not exists public.revenuecat_subscriptions (
+  user_id         uuid primary key references auth.users(id) on delete cascade,
+  rc_app_user_id  text,           -- app_user_id on the event (Supabase uid once logIn ships)
+  tier            text not null check (tier in ('fighter_pro','coach_pro')),
+  product_id      text,
+  environment     text,           -- PRODUCTION | SANDBOX (TestFlight/dev builds)
+  expires_at      timestamptz,    -- entitlement valid through here; null = non-expiring
+  last_event_type text,           -- INITIAL_PURCHASE | RENEWAL | ... (observability)
+  last_event_at   timestamptz,    -- event timestamp — guards out-of-order redelivery
+  updated_at      timestamptz not null default now()
+);
+drop trigger if exists revenuecat_subscriptions_touch on public.revenuecat_subscriptions;
+create trigger revenuecat_subscriptions_touch before update on public.revenuecat_subscriptions
+  for each row execute function public.touch_updated_at();
+
+alter table public.revenuecat_subscriptions enable row level security;
+-- Owner may READ their entitlement; only the service role (bypassing RLS) may
+-- write — the missing insert/update/delete policies are the security model.
+drop policy if exists "revenuecat_subscriptions_own_select" on public.revenuecat_subscriptions;
+create policy "revenuecat_subscriptions_own_select" on public.revenuecat_subscriptions
+  for select using (user_id = auth.uid());
+
+------------------------------------------------------------
 -- Account deletion (App Store Guideline 5.1.1(v))
 -- A signed-in user can permanently delete their own account. Deleting the
 -- auth.users row cascades through every public table via the on-delete-cascade

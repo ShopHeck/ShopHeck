@@ -300,7 +300,7 @@ export interface SubscriptionState {
   tier: SubscriptionTier;
   /** ISO date string when the sub expires; null = free forever */
   expiresAt: string | null;
-  source: 'none' | 'stripe_payment_link' | 'stripe_jwt' | 'revenuecat' | 'comp' | 'stripe_server';
+  source: 'none' | 'stripe_payment_link' | 'stripe_jwt' | 'revenuecat' | 'comp' | 'stripe_server' | 'revenuecat_server';
 }
 
 // ─── Timer ───────────────────────────────────────────────────────────────

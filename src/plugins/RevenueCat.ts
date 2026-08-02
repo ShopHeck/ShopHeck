@@ -7,6 +7,14 @@ export interface RevenueCatPlugin {
   presentPaywall(): Promise<{ isPro: boolean; tier: string }>;
   presentCustomerCenter(): Promise<void>;
   restorePurchases(): Promise<{ isPro: boolean; tier: string }>;
+  /** Ties the RevenueCat subscriber to the signed-in Supabase account so webhook
+   *  events carry an attributable user id (server-verified entitlements).
+   *  Resolves with the identified account's entitlements — a subscription bought
+   *  on another device under this account surfaces here. */
+  logIn(options: { appUserId: string }): Promise<{ isPro: boolean; tier: string }>;
+  /** Detaches the account (returns to an anonymous subscriber). Safe to call
+   *  when already anonymous — it's a no-op then. */
+  logOut(): Promise<void>;
 }
 
 export const RevenueCat = registerPlugin<RevenueCatPlugin>('RevenueCat', {
@@ -15,5 +23,7 @@ export const RevenueCat = registerPlugin<RevenueCatPlugin>('RevenueCat', {
     presentPaywall: async () => ({ isPro: false, tier: 'free' }),
     presentCustomerCenter: async () => {},
     restorePurchases: async () => ({ isPro: false, tier: 'free' }),
+    logIn: async () => ({ isPro: false, tier: 'free' }),
+    logOut: async () => {},
   },
 });

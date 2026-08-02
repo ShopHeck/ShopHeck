@@ -618,6 +618,42 @@ export type Database = {
         }
         Relationships: []
       }
+      revenuecat_subscriptions: {
+        Row: {
+          environment: string | null
+          expires_at: string | null
+          last_event_at: string | null
+          last_event_type: string | null
+          product_id: string | null
+          rc_app_user_id: string | null
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          environment?: string | null
+          expires_at?: string | null
+          last_event_at?: string | null
+          last_event_type?: string | null
+          product_id?: string | null
+          rc_app_user_id?: string | null
+          tier: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          environment?: string | null
+          expires_at?: string | null
+          last_event_at?: string | null
+          last_event_type?: string | null
+          product_id?: string | null
+          rc_app_user_id?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stripe_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
