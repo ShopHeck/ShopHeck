@@ -134,7 +134,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
         weekNumber: getWeekNumberForDate(camp, parseISO(sDate)),
         rounds: parseInt(sRounds),
         roundDuration: parseInt(sRoundDur),
-        partnerName: sPartner.trim() || 'Unknown',
+        partnerName: sPartner.trim(),
         partnerLevel: sPartnerLevel,
         focus: sFocus.trim(),
         performance: sPerf,
@@ -263,13 +263,13 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       <span className={`badge text-xs text-white ${PERF_COLORS[log.performance]}`}>{PERF_LABELS[log.performance]}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      vs {log.partnerName} ({log.partnerLevel}) · {format(parseISO(log.date), 'MMM d')}
+                      {log.partnerName && log.partnerName !== 'Unknown' ? `vs ${log.partnerName} (${log.partnerLevel})` : `${log.partnerLevel}-level partner`} · {format(parseISO(log.date), 'MMM d')}
                     </p>
                     {log.focus && <p className="text-xs text-gray-400 mt-1">Focus: {log.focus}</p>}
                     {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
                   </div>
                   <button onClick={() => setDeleteSparConfirmId(log.id)}
-                    aria-label={`Delete sparring session with ${log.partnerName}`}
+                    aria-label={`Delete sparring session${log.partnerName && log.partnerName !== 'Unknown' ? ` with ${log.partnerName}` : ''}`}
                     className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                     <Trash2 size={14} />
                   </button>

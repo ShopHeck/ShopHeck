@@ -47,10 +47,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  /** Supabase's own auth copy ("Invalid login credentials") reads fine, but
+   *  transport failures surface as raw fetch errors — translate those. */
+  function friendlyAuthError(message: string): string {
+    if (/failed to fetch|network|fetch failed|load failed/i.test(message)) {
+      return "Can't reach the server — check your connection and try again.";
+    }
+    return message;
+  }
+
   async function signInEmail(email: string, password: string) {
     if (!supabase) return { error: 'Accounts are not available right now.' };
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    return error ? { error: error.message } : {};
+    return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
   async function signUpEmail(email: string, password: string, name?: string) {
@@ -60,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: { data: name ? { name } : undefined },
     });
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyAuthError(error.message) };
     // When email confirmation is on, there's no session until the link is clicked.
     return { needsConfirmation: !data.session };
   }

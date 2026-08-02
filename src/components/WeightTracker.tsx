@@ -395,7 +395,7 @@ export default function WeightTracker() {
                         {change > 0 ? '+' : ''}{formatWeightDelta(change, unit)}
                       </span>
                     )}
-                    <p className="text-xs text-gray-600 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>
+                    {hasCutTarget && <p className="text-xs text-gray-600 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>}
                   </div>
                   <button
                     onClick={() => setDeleteConfirmId(entry.id)}

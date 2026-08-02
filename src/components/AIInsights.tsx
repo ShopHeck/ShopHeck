@@ -90,7 +90,7 @@ ${campCond.slice(0, 6).length > 0
 
 ## Sparring (last 5)
 ${recentSpar.length > 0
-  ? recentSpar.map(s => `- ${format(parseISO(s.date), 'M/d')} ${s.rounds}×${s.roundDuration}min vs ${s.partnerName} (${s.partnerLevel}) ${s.performance}/5 — "${s.focus}"`).join('\n')
+  ? recentSpar.map(s => `- ${format(parseISO(s.date), 'M/d')} ${s.rounds}×${s.roundDuration}min ${s.partnerName && s.partnerName !== 'Unknown' ? `vs ${s.partnerName} ` : ''}(${s.partnerLevel} level) ${s.performance}/5 — "${s.focus}"`).join('\n')
   : '- None logged'}
 
 ---
