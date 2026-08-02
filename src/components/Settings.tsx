@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, AlertTriangle, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -19,6 +19,7 @@ import CoachConnect from './CoachConnect';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
+import ConfirmDialog from './shared/ConfirmDialog';
 
 const WEIGHT_CLASSES: WeightClass[] = [
   'Strawweight', 'Flyweight', 'Bantamweight', 'Featherweight',
@@ -27,39 +28,6 @@ const WEIGHT_CLASSES: WeightClass[] = [
 ];
 const SPORTS: Sport[] = ['Boxing', 'MMA', 'Muay Thai', 'Kickboxing', 'Wrestling', 'BJJ'];
 const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Beginner', 'Amateur', 'Semi-Pro', 'Professional'];
-
-interface ConfirmDialogProps {
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  danger?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }: ConfirmDialogProps) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${danger ? 'bg-red-900/40' : 'bg-brand-900/40'}`}>
-          <AlertTriangle size={22} className={danger ? 'text-red-400' : 'text-brand-400'} />
-        </div>
-        <h3 className="text-base font-bold text-white text-center mb-2">{title}</h3>
-        <p className="text-sm text-gray-400 text-center mb-6">{message}</p>
-        <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
-          <button
-            onClick={onConfirm}
-            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 ${danger ? 'bg-red-700 hover:bg-red-600 text-white' : 'btn-primary'}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 interface Props {
   onNewCamp: () => void;

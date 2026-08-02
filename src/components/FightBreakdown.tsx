@@ -9,6 +9,7 @@ import { proposeFactorWeights } from '../utils/factorTuner';
 import PostFightInsights from './PostFightInsights';
 import ProGate from './shared/ProGate';
 import ShareCard, { type MilestoneShare } from './ShareCard';
+import ConfirmDialog from './shared/ConfirmDialog';
 import { formatWeightDelta } from '../utils/units';
 
 // Fight results are the most shareable artifact in combat sports; the card
@@ -91,6 +92,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
   const camp = fight ? state.camps.find(c => c.id === fight.campId) : undefined;
   const fighter = fight ? (state.fighters.find(f => f.id === fight.fighterId) ?? state.currentUser) : state.currentUser;
   const [shareMilestone, setShareMilestone] = useState<MilestoneShare | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const { kpis, analysis, proposal } = useMemo(() => {
     if (!fight || !camp) return { kpis: null, analysis: null, proposal: null };
@@ -127,7 +129,6 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
   }
 
   function deleteResult() {
-    if (!confirm('Delete this fight result? This cannot be undone.')) return;
     dispatch({ type: 'DELETE_FIGHT_RESULT', payload: fightRef.id });
     onBack();
   }
@@ -146,6 +147,16 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
 
   return (
     <div className="pb-8">
+      {confirmingDelete && (
+        <ConfirmDialog
+          title="Delete fight result?"
+          message="The result, round scores and breakdown for this fight will be removed. This cannot be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => { setConfirmingDelete(false); deleteResult(); }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
       {shareMilestone && fighterRef && (
         <ShareCard
           content={{ kind: 'milestone', milestone: shareMilestone }}
@@ -170,7 +181,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
         <button onClick={() => onEdit(fight.id)} className="text-gray-400 hover:text-white p-1" aria-label="Edit">
           <Pencil size={18} />
         </button>
-        <button onClick={deleteResult} className="text-gray-400 hover:text-red-400 p-1" aria-label="Delete">
+        <button onClick={() => setConfirmingDelete(true)} className="text-gray-400 hover:text-red-400 p-1" aria-label="Delete">
           <Trash2 size={18} />
         </button>
       </div>

@@ -43,6 +43,24 @@ const ProgressScreen   = lazy(() => import('./components/gamification/ProgressSc
 
 import CelebrationToast from './components/gamification/CelebrationToast';
 
+// Camp-dependent tabs used to render a bare blank under the header when no
+// camp existed (their components return null) — a dead end with no cue. One
+// shared state; the button lands on the dashboard's mode chooser. Module-level
+// so its identity is stable across App re-renders.
+function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => void }) {
+  return (
+    <div className="mx-4 mt-10 card text-center py-12">
+      <p className="text-gray-400 font-semibold">No active camp</p>
+      <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+        {feature} works inside a fight camp or off-season block.
+      </p>
+      <button onClick={onSetUp} className="btn-primary mt-4 mx-auto text-sm py-2 px-4">
+        Set up training
+      </button>
+    </div>
+  );
+}
+
 type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements';
 
 export interface LogPrefill {
@@ -225,16 +243,18 @@ function AppShell() {
             )}
             {view === 'dashboard' && isCoach && <CoachDashboard />}
             {view === 'planner' && (
-              <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} />
+              camp ? <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} /> : <NoCampState feature="The weekly plan" onSetUp={() => setView('dashboard')} />
             )}
             {view === 'log' && (
-              <WorkoutLogger
-                prefill={logPrefill}
-                onPrefillConsumed={() => setLogPrefill(null)}
-              />
+              camp ? (
+                <WorkoutLogger
+                  prefill={logPrefill}
+                  onPrefillConsumed={() => setLogPrefill(null)}
+                />
+              ) : <NoCampState feature="Training logging" onSetUp={() => setView('dashboard')} />
             )}
             {view === 'timer'           && <RoundTimer />}
-            {view === 'weight'          && <WeightTracker />}
+            {view === 'weight'          && (camp ? <WeightTracker /> : <NoCampState feature="Weight tracking" onSetUp={() => setView('dashboard')} />)}
             {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut." bullets={['One-tap hydration & meal-quality tracking', 'Macro targets auto-suggested from your camp', 'Seven-day history at a glance']}><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
             {view === 'gameplan'        && <ProGate required="fighter_pro" page feature="Game Plan Builder" featureDescription="Build a round-by-round strategy for your opponent and keep it with your camp." bullets={['Opponent scouting & threat notes', 'Early / middle / late round game plans', 'Corner instructions for fight night']}><GamePlanBuilder /></ProGate>}
