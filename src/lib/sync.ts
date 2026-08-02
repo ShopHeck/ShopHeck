@@ -729,41 +729,91 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
   };
 }
 
-// ─── Server-verified Stripe entitlement (read-only) ─────────────────────────
+// ─── Server-verified entitlement (read-only) ────────────────────────────────
 
 /**
- * Reads the signed-in user's server-authoritative subscription from the
- * `stripe_subscriptions` table the Stripe webhook maintains. RLS lets a user
- * read only their own row, and nothing client-side can write it.
+ * Reads the signed-in user's server-authoritative subscription from the tables
+ * the payment webhooks maintain — `stripe_subscriptions` (web checkout) and
+ * `revenuecat_subscriptions` (App Store). RLS lets a user read only their own
+ * rows, and nothing client-side can write them. Checking both here is what
+ * makes an entitlement follow the account across platforms: an App Store
+ * subscriber who signs in on the web gets Pro there too.
  *
  * Returns:
  *   - `null` when Supabase is unconfigured, offline/errored, or there is no row
- *     (the caller should leave the current subscription unchanged).
- *   - an ACTIVE entitlement `{ tier, expiresAt, source: 'stripe_server' }` when
- *     the subscription is live (trialing / active / in grace) and unexpired.
- *   - a free sentinel `{ tier: 'free', ... }` when a row exists but is no longer
+ *     in either table (the caller should leave the subscription unchanged).
+ *   - the best ACTIVE entitlement (coach_pro outranks fighter_pro) with its
+ *     source (`'stripe_server'` / `'revenuecat_server'`).
+ *   - a free sentinel `{ tier: 'free', ... }` when rows exist but none is
  *     active, so the caller can downgrade a previously server-verified user.
  */
 export async function fetchServerSubscription(userId: string): Promise<SubscriptionState | null> {
   if (!supabase) return null;
   try {
-    const { data, error } = await supabase
-      .from('stripe_subscriptions')
-      .select('tier,status,current_period_end')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error || !data) return null;
+    const [stripeQ, rcQ] = await Promise.all([
+      supabase
+        .from('stripe_subscriptions')
+        .select('tier,status,current_period_end')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('revenuecat_subscriptions')
+        .select('tier,expires_at')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]);
+    // A failed read makes that source UNKNOWN, not "no row" — with one
+    // exception: the table not existing yet (schema migration not applied) is
+    // a conclusive "no row", or the whole function would go dark during
+    // rollout. The distinction matters below: the free sentinel (which lets
+    // the caller downgrade a server-verified user) is only returned when
+    // every source answered conclusively, so a transient error on one table
+    // can never read as "your subscription is gone".
+    const missingTable = (e: { code?: string } | null): boolean =>
+      e?.code === 'PGRST205' || e?.code === '42P01';
+    const stripeConclusive = !stripeQ.error || missingTable(stripeQ.error);
+    const rcConclusive = !rcQ.error || missingTable(rcQ.error);
+    const stripe = stripeQ.error ? null : stripeQ.data;
+    const rc = rcQ.error ? null : rcQ.data;
 
-    // Keep access through past_due (Stripe's dunning/retry grace) so a transient
-    // failed charge doesn't instantly lock a paying user out. The tier check is
-    // inline so TS narrows data.tier (typed `string`) to SubscriptionTier.
-    const activeStatus = data.status === 'active' || data.status === 'trialing' || data.status === 'past_due';
-    const unexpired = !data.current_period_end || new Date(data.current_period_end) > new Date();
+    const candidates: SubscriptionState[] = [];
 
-    if (activeStatus && unexpired && (data.tier === 'fighter_pro' || data.tier === 'coach_pro')) {
-      return { tier: data.tier, expiresAt: data.current_period_end, source: 'stripe_server' };
+    if (stripe) {
+      // Keep access through past_due (Stripe's dunning/retry grace) so a
+      // transient failed charge doesn't instantly lock a paying user out. The
+      // tier check is inline so TS narrows tier (typed `string`).
+      const activeStatus = stripe.status === 'active' || stripe.status === 'trialing' || stripe.status === 'past_due';
+      const unexpired = !stripe.current_period_end || new Date(stripe.current_period_end) > new Date();
+      if (activeStatus && unexpired && (stripe.tier === 'fighter_pro' || stripe.tier === 'coach_pro')) {
+        candidates.push({ tier: stripe.tier, expiresAt: stripe.current_period_end, source: 'stripe_server' });
+      }
     }
-    return { tier: 'free', expiresAt: null, source: 'stripe_server' };
+
+    if (rc) {
+      // RevenueCat rows carry no status — active is simply unexpired (a
+      // canceled sub keeps its future expires_at until it actually lapses,
+      // which is exactly App Store semantics).
+      const unexpired = !rc.expires_at || new Date(rc.expires_at) > new Date();
+      if (unexpired && (rc.tier === 'fighter_pro' || rc.tier === 'coach_pro')) {
+        candidates.push({ tier: rc.tier, expiresAt: rc.expires_at, source: 'revenuecat_server' });
+      }
+    }
+
+    if (candidates.length > 0) {
+      // coach_pro outranks fighter_pro; within a tier, the later-expiring
+      // (or non-expiring) grant wins.
+      candidates.sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier === 'coach_pro' ? -1 : 1;
+        if (!a.expiresAt || !b.expiresAt) return a.expiresAt ? 1 : -1;
+        return new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime();
+      });
+      return candidates[0];
+    }
+    // No active entitlement found. Downgrading is only safe when both sources
+    // actually answered — and only meaningful when a row exists to be expired.
+    if (!stripeConclusive || !rcConclusive) return null;
+    if (!stripe && !rc) return null;
+    return { tier: 'free', expiresAt: null, source: stripe ? 'stripe_server' : 'revenuecat_server' };
   } catch {
     return null;
   }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
-import { processStripeReturn, saveSubscription, checkNativeSubscription, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
+import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
   saveState,
@@ -300,10 +300,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             source: 'revenuecat',
           },
         });
-      } else if (currentSource === 'revenuecat' || currentSource === 'none') {
+      } else if (currentSource === 'revenuecat' || currentSource === 'revenuecat_server' || currentSource === 'none') {
         // RevenueCat confirmed no active entitlement. Only reset if the stored
         // subscription was from RevenueCat (not a Stripe web purchase or a comp
         // grant) so we don't accidentally revoke those opening the app on iOS.
+        // The SDK sees the device's real StoreKit state, so it may also
+        // downgrade a stale webhook-sourced ('revenuecat_server') grant.
         dispatch({
           type: 'SET_SUBSCRIPTION',
           payload: { tier: 'free', expiresAt: null, source: 'none' },
@@ -312,6 +314,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Native: tie this device's RevenueCat subscriber to the signed-in Supabase
+  // account (detach on sign-out). This is what makes App Store purchases
+  // attributable server-side — webhook events start carrying the Supabase user
+  // id — closing the "client-attested iOS entitlement" gap documented in
+  // docs/ai-coach.md. Upgrade-only on the client: logIn also returns the
+  // account's entitlements, so a subscription bought on another device under
+  // this account unlocks here immediately; the no-entitlement case is left to
+  // the launch sync above and the server check below, which know how to
+  // downgrade without clobbering comp/Stripe grants.
+  useEffect(() => {
+    if (authLoading) return;
+    identifyNativeSubscriber(user?.id ?? null).then(result => {
+      if (!result?.isPro) return;
+      dispatch({
+        type: 'SET_SUBSCRIPTION',
+        payload: {
+          tier: result.tier === 'coach_pro' ? 'coach_pro' : 'fighter_pro',
+          expiresAt: null,
+          source: 'revenuecat',
+        },
+      });
+    });
+  }, [authLoading, user?.id]);
 
   // Comp ("complimentary") access: founder / internal-test accounts (see
   // isCompEmail) get lifetime Coach Pro tied to the signed-in email. This follows
@@ -331,23 +357,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, user?.email, state.subscription]);
 
-  // Server-verified Stripe entitlement (web). Once the Stripe webhook records a
-  // subscription in Supabase, that row — not the client-side soft unlock — is the
-  // source of truth. After sign-in we fetch it and apply it. We only *downgrade*
-  // a subscription that was itself server-verified, so we never clobber the
-  // optimistic soft unlock from a checkout return before the webhook lands, nor a
-  // comp / RevenueCat grant. Comp accounts are skipped entirely (comp wins).
+  // Server-verified entitlement. Once a payment webhook records a subscription
+  // in Supabase (stripe_subscriptions from Stripe, revenuecat_subscriptions
+  // from the App Store), that row — not any client-side unlock — is the source
+  // of truth, and it follows the account onto every platform (an iOS
+  // subscriber gets Pro on the web too). After sign-in we fetch and apply it.
+  // We only *downgrade* a subscription that was itself server-verified, so we
+  // never clobber the optimistic soft unlock from a checkout return before the
+  // webhook lands, nor a comp / device-verified RevenueCat grant. Comp
+  // accounts are skipped entirely (comp wins).
   useEffect(() => {
     if (authLoading || !user?.id || isCompEmail(user.email)) return;
     let cancelled = false;
     fetchServerSubscription(user.id).then(server => {
       if (cancelled || !server) return; // null = no row / offline — leave as-is
       const cur = state.subscription;
+      const serverSourced = cur.source === 'stripe_server' || cur.source === 'revenuecat_server';
       if (server.tier !== 'free') {
-        if (cur.source !== 'stripe_server' || cur.tier !== server.tier || cur.expiresAt !== server.expiresAt) {
+        if (cur.source !== server.source || cur.tier !== server.tier || cur.expiresAt !== server.expiresAt) {
           dispatch({ type: 'SET_SUBSCRIPTION', payload: server });
         }
-      } else if (cur.source === 'stripe_server') {
+      } else if (serverSourced) {
         dispatch({ type: 'SET_SUBSCRIPTION', payload: DEFAULT_SUBSCRIPTION });
       }
     });

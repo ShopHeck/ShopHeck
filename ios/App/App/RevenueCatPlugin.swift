@@ -15,6 +15,8 @@ public class RevenueCatPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "presentPaywall",         returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "presentCustomerCenter",  returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logIn",                  returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logOut",                 returnType: CAPPluginReturnPromise),
     ]
 
     /// Maps active RevenueCat entitlements to the app's subscription tier string.
@@ -109,6 +111,47 @@ public class RevenueCatPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             topVC.present(centerVC, animated: true) {
                 call.resolve()
             }
+        }
+    }
+
+    /// Ties the RevenueCat subscriber to the signed-in Supabase account. From then
+    /// on, webhook events carry the Supabase user id (directly or as an alias), which
+    /// is what lets the server record App Store entitlements as verified. Resolves
+    /// with the identified account's entitlements so a subscription bought on another
+    /// device under the same account can be applied immediately.
+    @objc func logIn(_ call: CAPPluginCall) {
+        guard let appUserId = call.getString("appUserId"), !appUserId.isEmpty else {
+            call.reject("appUserId is required")
+            return
+        }
+        Purchases.shared.logIn(appUserId) { [weak self] customerInfo, _, error in
+            guard let self else { return }
+            if let error, customerInfo == nil {
+                call.reject(error.localizedDescription)
+                return
+            }
+            guard let info = customerInfo else {
+                call.resolve(["isPro": false, "tier": "free"])
+                return
+            }
+            let tier = self.tierFromEntitlements(info.entitlements)
+            call.resolve(["isPro": tier != "free", "tier": tier])
+        }
+    }
+
+    /// Detaches the signed-in account from this device's RevenueCat subscriber.
+    /// Guarded so it's a no-op while anonymous: the SDK errors on anonymous logOut,
+    /// and each logOut mints a fresh anonymous subscriber — calling it on every
+    /// signed-out launch would litter the RevenueCat dashboard with orphans.
+    @objc func logOut(_ call: CAPPluginCall) {
+        guard !Purchases.shared.isAnonymous else {
+            call.resolve()
+            return
+        }
+        Purchases.shared.logOut { _, _ in
+            // The goal (no account attached) holds even if the SDK reports an
+            // error, so this never rejects.
+            call.resolve()
         }
     }
 

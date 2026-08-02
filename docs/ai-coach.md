@@ -77,22 +77,22 @@ A call that fails before any output reaches the user is refunded
 (`refund_ai_usage`), so provider outages can't drain anyone's monthly
 allowance; once text has streamed, the unit stays spent.
 
-## Entitlement trust levels (and the RevenueCat gap)
+## Entitlement trust levels
 
 The function resolves Pro in this order:
 
 1. `COMP_PRO_EMAILS` (server env) — founder/reviewer accounts.
 2. `stripe_subscriptions` — server-authoritative (the Stripe webhook writes it).
-3. `user_state.subscription` — the client-synced mirror. **This is what admits
-   App Store (RevenueCat) subscribers**, because no RevenueCat→server bridge
-   exists yet. It is client-attested and technically forgeable; the monthly
-   quota caps the worst-case abuse at well under $1/user/month, which we accept
-   for now rather than lock paying iOS users out.
-
-**Follow-up to close the gap properly:** have the native app call RevenueCat
-`logIn(<supabase user id>)` on sign-in, add a RevenueCat webhook function that
-upserts verified entitlements (mirroring `stripe-webhook.ts`), and then drop
-source 3. Tracked as the remaining piece of audit item R1/P0-5.
+3. `revenuecat_subscriptions` — server-authoritative for the App Store (the
+   RevenueCat webhook writes it — see `docs/revenuecat-webhook.md`). Requires
+   the native app's `RevenueCat.logIn(<supabase user id>)`, which ships with
+   the same release, so webhook events are attributable to an account.
+4. `user_state.subscription` — the client-synced mirror, client-attested and
+   technically forgeable. Kept only as a **transition fallback** for iOS
+   subscribers still on builds that predate `logIn` (their webhook events are
+   anonymous, so source 3 has no row for them). The monthly quota caps
+   worst-case abuse at well under $1/user/month. Drop this source once
+   logIn-enabled builds are the oldest supported version.
 
 ## Related client pieces
 

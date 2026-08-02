@@ -16,12 +16,15 @@
 // Entitlement is resolved most-trusted-first:
 //   1. COMP_PRO_EMAILS      — server env allowlist (founder/reviewer accounts)
 //   2. stripe_subscriptions — server-authoritative (Stripe webhook writes it)
-//   3. user_state.subscription — the client-synced mirror. This is what lets an
-//      App Store (RevenueCat) subscriber through, because no RevenueCat→server
-//      bridge exists yet. It is client-attested and therefore forgeable — an
-//      accepted MVP tradeoff, because the monthly quota caps the worst-case
-//      abuse at well under a dollar. Replace with a RevenueCat webhook when the
-//      native app adds RevenueCat.logIn(<supabase user id>).
+//   3. revenuecat_subscriptions — server-authoritative for the App Store (the
+//      RevenueCat webhook writes it; requires the native app's
+//      RevenueCat.logIn(<supabase user id>) so events are attributable)
+//   4. user_state.subscription — the client-synced mirror, client-attested and
+//      therefore forgeable. Kept as a transition fallback for iOS subscribers
+//      still on builds that predate logIn (their webhook events are anonymous,
+//      so source 3 has no row for them). The monthly quota caps worst-case
+//      abuse at well under a dollar. Drop this source once logIn-enabled
+//      builds are the oldest supported version.
 //
 // Cost control (why this can't run away):
 //   - AI_MODEL defaults to claude-haiku-4-5 ($1/M in, $5/M out). A worst-case
@@ -144,7 +147,22 @@ export default async (req: Request): Promise<Response> => {
   }
 
   if (!isPro) {
-    // Client-attested fallback for App Store subscribers — see the header note.
+    // Server-verified App Store entitlement (the RevenueCat webhook writes it).
+    // Active = unexpired: a canceled sub keeps its future expires_at until it
+    // actually lapses, matching App Store semantics.
+    const { data: rc } = await supabase
+      .from('revenuecat_subscriptions')
+      .select('tier,expires_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (rc && (rc.tier === 'fighter_pro' || rc.tier === 'coach_pro')) {
+      isPro = !rc.expires_at || new Date(rc.expires_at) > new Date();
+    }
+  }
+
+  if (!isPro) {
+    // Client-attested fallback for App Store subscribers on builds that
+    // predate RevenueCat.logIn — see the header note; drop when those age out.
     const { data: st } = await supabase
       .from('user_state')
       .select('subscription')
