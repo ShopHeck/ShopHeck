@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle, Activity } from 'lucide-react';
+import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle, Activity, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getWeekNumberForDate } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -38,6 +38,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [deleteCondConfirmId, setDeleteCondConfirmId] = useState<string | null>(null);
   const [showSparModal, setShowSparModal] = useState(false);
   const [showCondModal, setShowCondModal] = useState(false);
+  // Sharing is explicit (the icon on each logged session) — the modal used to
+  // force-open after every log, which turns a brag into a chore. The object is
+  // held in state so ShareCard's canvas effect sees a stable reference.
   const [shareLog, setShareLog] = useState<WorkoutLog | null>(null);
 
   // Workout form
@@ -119,10 +122,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
     };
     dispatch({ type: 'LOG_WORKOUT', payload });
     void writeWorkoutToHealth(payload);
-    // Build a temp log object for the share card (id/createdAt not needed for display)
-    const tempLog: WorkoutLog = { ...payload, id: 'temp', createdAt: new Date().toISOString() };
     setWTitle(''); setWNotes(''); setShowModal(false);
-    setShareLog(tempLog);
   }
 
   function logSparring() {
@@ -168,8 +168,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
     <div className="space-y-4 pb-4">
       {shareLog && state.currentUser && (
         <ShareCard
-          log={shareLog}
-          camp={camp}
+          content={{ kind: 'session', log: shareLog, camp }}
           user={state.currentUser}
           onClose={() => setShareLog(null)}
         />
@@ -214,11 +213,18 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold text-white text-sm">{log.title}</p>
-                      <button onClick={() => setDeleteConfirmId(log.id)}
-                        aria-label={`Delete workout: ${log.title}`}
-                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center flex-shrink-0">
+                        <button onClick={() => setShareLog(log)}
+                          aria-label={`Share workout: ${log.title}`}
+                          className="text-gray-600 hover:text-brand-400 transition-colors -m-2 p-2">
+                          <Share2 size={14} />
+                        </button>
+                        <button onClick={() => setDeleteConfirmId(log.id)}
+                          aria-label={`Delete workout: ${log.title}`}
+                          className="text-gray-600 hover:text-red-400 transition-colors -m-2 p-2 ml-2">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                       <span className="flex items-center gap-1"><Clock size={11} /> {log.duration}min</span>

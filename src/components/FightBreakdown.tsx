@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { ChevronLeft, Trophy, XCircle, Minus, TrendingUp, TrendingDown, Target, Zap, Scale, Flame, Activity, Trash2, Pencil } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, Trophy, XCircle, Minus, TrendingUp, TrendingDown, Target, Zap, Scale, Flame, Activity, Trash2, Pencil, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { format, parseISO } from 'date-fns';
@@ -8,6 +8,17 @@ import { analyzeFight } from '../utils/fightAnalysis';
 import { proposeFactorWeights } from '../utils/factorTuner';
 import PostFightInsights from './PostFightInsights';
 import ProGate from './shared/ProGate';
+import ShareCard, { type MilestoneShare } from './ShareCard';
+
+// Fight results are the most shareable artifact in combat sports; the card
+// headline states the outcome plainly (a loss shared is a comeback story, not
+// a boast — the copy stays respectful).
+const SHARE_META = {
+  win: { emoji: '🏆', title: 'VICTORY' },
+  loss: { emoji: '🛡️', title: 'LESSONS TAKEN' },
+  draw: { emoji: '🤝', title: 'DRAW' },
+  'no-contest': { emoji: '⚖️', title: 'NO CONTEST' },
+} as const;
 
 interface Props {
   fightId: string;
@@ -34,6 +45,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
   const fight = state.fightResults.find(r => r.id === fightId);
   const camp = fight ? state.camps.find(c => c.id === fight.campId) : undefined;
   const fighter = fight ? (state.fighters.find(f => f.id === fight.fighterId) ?? state.currentUser) : state.currentUser;
+  const [shareMilestone, setShareMilestone] = useState<MilestoneShare | null>(null);
 
   const { kpis, analysis, proposal } = useMemo(() => {
     if (!fight || !camp) return { kpis: null, analysis: null, proposal: null };
@@ -77,8 +89,25 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
 
   const alreadyApplied = fighterRef?.factorWeights?.derivedFromFightId === fightRef.id;
 
+  function shareResult() {
+    const meta = SHARE_META[fightRef.outcome];
+    setShareMilestone({
+      title: meta.title,
+      subtitle: `${fightRef.method}${fightRef.roundStopped ? ` · R${fightRef.roundStopped}` : ''} · vs ${fightRef.opponent || 'Opponent'}`,
+      emoji: meta.emoji,
+      slug: `fight-${fightRef.outcome}`,
+    });
+  }
+
   return (
     <div className="pb-8">
+      {shareMilestone && fighterRef && (
+        <ShareCard
+          content={{ kind: 'milestone', milestone: shareMilestone }}
+          user={fighterRef}
+          onClose={() => setShareMilestone(null)}
+        />
+      )}
       {/* Header */}
       <div className="mx-4 mt-4 flex items-center gap-3">
         <button onClick={onBack} className="text-gray-400 hover:text-white p-1">
@@ -88,6 +117,11 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
           <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Fight Breakdown</p>
           <p className="text-white font-bold truncate">vs {fight.opponent || 'Opponent'} · {format(parseISO(fight.fightDate), 'MMM d, yyyy')}</p>
         </div>
+        {fighterRef && (
+          <button onClick={shareResult} className="text-gray-400 hover:text-brand-400 p-1" aria-label="Share result">
+            <Share2 size={18} />
+          </button>
+        )}
         <button onClick={() => onEdit(fight.id)} className="text-gray-400 hover:text-white p-1" aria-label="Edit">
           <Pencil size={18} />
         </button>

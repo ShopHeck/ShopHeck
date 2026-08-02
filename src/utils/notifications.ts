@@ -8,7 +8,12 @@ const ROUND_ALERTS_KEY = 'fightcamp_round_alerts';
 // stacking duplicates.
 const ID_CHECKIN = 1001;
 const ID_WEIGHIN = 1002;
+const ID_STREAK_RISK = 1003;
+// syncReminders owns only the repeating dailies; the streak alert is
+// reconciled separately (syncStreakRiskAlert) and must not be cancelled here
+// or the daily resync would silently eat it.
 const ALL_IDS = [{ id: ID_CHECKIN }, { id: ID_WEIGHIN }];
+const STREAK_IDS = [{ id: ID_STREAK_RISK }];
 
 // Round alerts get their own block so cancelling them never disturbs the daily
 // reminders above. 30 rounds is the timer's own maximum, and each round can
@@ -84,6 +89,77 @@ export async function syncReminders({ weighIn }: SyncOpts): Promise<void> {
     await LocalNotifications.schedule({ notifications });
   } catch {
     /* notifications are best-effort; never block the app */
+  }
+}
+
+// ─── Streak-at-risk alert ───────────────────────────────────────────────────
+//
+// The streak system computes an at-risk window (24–48h since the last logged
+// workout) but used to surface it only inside the app — the one place a user
+// who is about to lose their streak isn't. This schedules a single one-shot
+// push for the streak's final day. Unlike the static 7pm daily above, it is
+// derived from the actual last workout, renews itself on every log, and
+// disappears the moment the streak is safe, short, or already lost.
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+export interface StreakSnapshot {
+  current: number;
+  lastWorkoutAt: string | null;
+  expired: boolean;
+}
+
+/**
+ * Reconcile the scheduled streak alert with the live streak. Idempotent —
+ * cancels first, then reschedules when there is a streak worth defending.
+ * Shares the "Training reminders" preference and permission with the dailies.
+ */
+export async function syncStreakRiskAlert(streak: StreakSnapshot): Promise<void> {
+  if (!notificationsSupported()) return;
+  try {
+    await LocalNotifications.cancel({ notifications: STREAK_IDS });
+    if (!remindersEnabled()) return;
+    // A 1-day "streak" is just one workout — the generic daily reminder covers
+    // that; the targeted alert is reserved for a streak that took real work.
+    if (streak.expired || streak.current < 2 || !streak.lastWorkoutAt) return;
+
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') return;
+
+    const last = new Date(streak.lastWorkoutAt).getTime();
+    if (!Number.isFinite(last)) return;
+    const expiry = last + 48 * MS_PER_HOUR;
+
+    // 36h in: the morning-ish of the streak's final day, with ~12h left to
+    // act. Slide out of quiet hours (nobody trains off a 3 a.m. push), but
+    // never past the expiry itself.
+    let at = new Date(last + 36 * MS_PER_HOUR);
+    if (at.getHours() >= 22) {
+      at = new Date(at);
+      at.setDate(at.getDate() + 1);
+      at.setHours(9, 0, 0, 0);
+    } else if (at.getHours() < 8) {
+      at = new Date(at);
+      at.setHours(9, 0, 0, 0);
+    }
+    if (at.getTime() >= expiry) at = new Date(expiry - 2 * MS_PER_HOUR);
+    // Window already passed or is imminent — the app is open right now, and
+    // the dashboard's at-risk flame is the in-app cue. (iOS fires past-dated
+    // notifications immediately, which would ping a user mid-session.)
+    if (at.getTime() <= Date.now()) return;
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: ID_STREAK_RISK,
+          title: `🔥 Your ${streak.current}-day streak ends today`,
+          body: 'One session saves it. Get in the gym and log it.',
+          schedule: { at, allowWhileIdle: true },
+        },
+      ],
+    });
+  } catch {
+    /* best-effort; the dashboard flame remains the in-app cue */
   }
 }
 
@@ -169,12 +245,12 @@ export async function cancelRoundAlerts(): Promise<void> {
   }
 }
 
-/** Turn reminders off and clear anything scheduled. */
+/** Turn reminders off and clear anything scheduled (dailies + streak alert). */
 export async function disableReminders(): Promise<void> {
   setRemindersEnabled(false);
   if (!notificationsSupported()) return;
   try {
-    await LocalNotifications.cancel({ notifications: ALL_IDS });
+    await LocalNotifications.cancel({ notifications: [...ALL_IDS, ...STREAK_IDS] });
   } catch {
     /* noop */
   }

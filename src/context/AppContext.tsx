@@ -37,6 +37,7 @@ import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
 import { useAuth } from './AuthContext';
 import { fetchServerSubscription, clearIdMap } from '../lib/sync';
+import { syncStreakRiskAlert } from '../utils/notifications';
 import { seedDemoState } from '../utils/demoSeed';
 
 type Action =
@@ -396,6 +397,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const id = setInterval(() => dispatch({ type: 'RECOMPUTE_GAMIFICATION' }), 60 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Keep the scheduled streak-at-risk push in step with the live streak: every
+  // new workout renews it (new lastWorkoutAt), and a lost or too-short streak
+  // clears it. Platform/preference/permission checks all live in the util, so
+  // this is a no-op on web or with reminders off.
+  useEffect(() => {
+    const streak = state.gamification?.streak;
+    if (streak) void syncStreakRiskAlert(streak);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.gamification?.streak.lastWorkoutAt,
+    state.gamification?.streak.current,
+    state.gamification?.streak.expired,
+  ]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
