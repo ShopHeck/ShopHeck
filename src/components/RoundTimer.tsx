@@ -654,7 +654,7 @@ export default function RoundTimer() {
             {[5, 10].map(v => (
               <button
                 key={v}
-                onClick={() => setWarningSec(v)}
+                onClick={() => setWarningSec(v)} aria-pressed={warningSec === v}
                 disabled={isRunning}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40 ${
                   warningSec === v
@@ -669,7 +669,7 @@ export default function RoundTimer() {
               {[15, 20, 30].map(v => (
                 <button
                   key={v}
-                  onClick={() => setWarningSec(v)}
+                  onClick={() => setWarningSec(v)} aria-pressed={warningSec === v}
                   disabled={isRunning}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40 ${
                     warningSec === v

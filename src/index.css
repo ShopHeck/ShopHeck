@@ -127,6 +127,21 @@
   animation: celebrationSlide 4s ease-in-out forwards;
 }
 
+/* Motion is decoration here, never information — honor the OS setting.
+   .phase-flash must ALSO be forced transparent: its keyframes end at opacity
+   0 via `forwards`, so killing the animation alone would leave the flash
+   overlay parked at full opacity over the timer. */
+@media (prefers-reduced-motion: reduce) {
+  .phase-flash {
+    animation: none;
+    opacity: 0;
+  }
+  .celebration-slide,
+  .view-enter {
+    animation: none;
+  }
+}
+
 /* Prevent rubber-band bounce on non-scrollable containers */
 body {
   overscroll-behavior: none;

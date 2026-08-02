@@ -144,7 +144,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
             <h2 className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-white p-3 -m-2 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -154,12 +154,14 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
           <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
             <button
               onClick={() => setBilling('monthly')}
+              aria-pressed={billing === 'monthly'}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
             >
               Monthly
             </button>
             <button
               onClick={() => setBilling('annual')}
+              aria-pressed={billing === 'annual'}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
             >
               Annual <span className="text-brand-400">Save 37%</span>

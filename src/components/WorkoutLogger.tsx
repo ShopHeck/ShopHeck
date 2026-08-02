@@ -335,7 +335,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Session Type</label>
               <div role="group" aria-label="Session Type" className="grid grid-cols-3 gap-2">
                 {SESSION_TYPES.map(st => (
-                  <button key={st.value} onClick={() => setWType(st.value)}
+                  <button key={st.value} onClick={() => setWType(st.value)} aria-pressed={wType === st.value}
                     className={`py-2 px-2 rounded-xl text-xs font-medium border-2 transition-all ${wType === st.value ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
                     {st.emoji} {st.label}
                   </button>
@@ -428,7 +428,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label">Performance</label>
               <div role="group" aria-label="Performance" className="flex gap-2">
                 {([1,2,3,4,5] as const).map(n => (
-                  <button key={n} onClick={() => setSPerf(n)}
+                  <button key={n} onClick={() => setSPerf(n)} aria-pressed={sPerf === n}
                     className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${sPerf === n ? `border-transparent text-white ${PERF_COLORS[n]}` : 'border-dark-400 bg-dark-600 text-gray-500'}`}>
                     {n}
                   </button>
