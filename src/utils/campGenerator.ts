@@ -561,16 +561,19 @@ export function getDaysUntilFight(fightDate: string | undefined): number {
   return Math.max(0, diff);
 }
 
-export function getCurrentWeekNumber(camp: FightCamp): number {
-  const today = new Date();
-  // Schedule weeks are snapped to the Monday on/before the start date (see
-  // buildCampSchedule's startOfWeek). Measure the current week from that same
-  // Monday — otherwise a non-Monday start (the norm, since start = fight −
-  // weeks×7) puts "current week" one behind what the planner shows and mis-tags
-  // the weekNumber stamped on newly logged workouts.
+// Schedule weeks are snapped to the Monday on/before the start date (see
+// buildCampSchedule's startOfWeek). Measure weeks from that same Monday —
+// otherwise a non-Monday start (the norm, since start = fight − weeks×7) puts
+// the week one behind what the planner shows and mis-tags the weekNumber
+// stamped on logged workouts.
+export function getWeekNumberForDate(camp: FightCamp, date: Date): number {
   const start = startOfWeek(parseISO(camp.startDate), { weekStartsOn: 1 });
-  const diff = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 7));
+  const diff = Math.floor((date.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 7));
   return Math.max(1, Math.min(diff + 1, camp.campWeeks));
+}
+
+export function getCurrentWeekNumber(camp: FightCamp): number {
+  return getWeekNumberForDate(camp, new Date());
 }
 
 export function getCampProgress(camp: FightCamp): number {
