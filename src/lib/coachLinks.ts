@@ -77,9 +77,11 @@ export async function redeemInvite(code: string): Promise<{ coachId?: string; er
 //
 // The mirror of the coach flow above: the FIGHTER mints a code and shares it
 // out with the app link; the invited coach installs, signs up as a coach, and
-// redeems. Same link row either way.
+// redeems. Same link row either way. Fighter codes are SINGLE-USE (consumed
+// by redeem_fighter_invite) because they grant access to the minter's data —
+// so every share mints a fresh one.
 
-/** Fighter: mint a code to hand OUT to a coach (retries once on collision). */
+/** Fighter: mint a single-use code to hand OUT to a coach (retries once on collision). */
 export async function createFighterInvite(fighterId: string): Promise<{ code?: string; error?: string }> {
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -91,26 +93,26 @@ export async function createFighterInvite(fighterId: string): Promise<{ code?: s
   return { error: 'Could not generate a code, please try again.' };
 }
 
-/** Fighter: newest still-valid outgoing invite codes (reused across shares). */
-export async function listFighterInvites(fighterId: string): Promise<string[]> {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from('fighter_invites')
-    .select('code, expires_at')
-    .eq('fighter_id', fighterId)
-    .order('created_at', { ascending: false });
-  const now = Date.now();
-  return (data ?? [])
-    .filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now)
-    .map(r => r.code);
-}
-
 /** Coach: redeem a code a fighter shared. Returns the fighter's id on success. */
 export async function redeemFighterInvite(code: string): Promise<{ fighterId?: string; error?: string }> {
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   const { data, error } = await supabase.rpc('redeem_fighter_invite', { invite_code: code.trim().toUpperCase() });
   if (error) return { error: error.message };
   return { fighterId: data as string };
+}
+
+/** Fighter: is there an active coach link? Powers the linked/Unlink UI, which
+ *  must reflect the server (a coach can create the link from their side via a
+ *  shared fighter code — the fighter still needs the revoke button). */
+export async function hasActiveCoachLink(fighterId: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { data } = await supabase
+    .from('coach_fighter_links')
+    .select('coach_id')
+    .eq('fighter_id', fighterId)
+    .eq('status', 'active')
+    .limit(1);
+  return (data ?? []).length > 0;
 }
 
 /** Fighter: drop the current coach link(s). */

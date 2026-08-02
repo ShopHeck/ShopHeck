@@ -475,6 +475,13 @@ $$;
 -- coach-initiated path (redeem_coach_invite above), just created from the
 -- other side. Security definer so the coach doesn't need read access to the
 -- fighter's invite row.
+--
+-- SINGLE-USE, unlike coach codes: a fighter code is a bearer credential for
+-- read access to the FIGHTER's own data, shared over chat. Consuming it on
+-- redemption (same transaction) stops a second holder from linking too, and
+-- stops a formerly-linked coach from silently re-activating access after the
+-- fighter unlinks. (Coach codes stay multi-use on purpose — there the
+-- REDEEMER is the one granting access to their own data.)
 create or replace function public.redeem_fighter_invite(invite_code text)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare f uuid;
@@ -486,6 +493,7 @@ begin
   insert into public.coach_fighter_links (coach_id, fighter_id, status)
     values (auth.uid(), f, 'active')
     on conflict (coach_id, fighter_id) do update set status = 'active', updated_at = now();
+  delete from public.fighter_invites where code = invite_code;
   return f;
 end;
 $$;

@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
   createInvite, listInvites, redeemInvite, unlinkAllCoaches,
-  createFighterInvite, listFighterInvites, redeemFighterInvite,
+  createFighterInvite, redeemFighterInvite, hasActiveCoachLink,
 } from '../lib/coachLinks';
 
 const APP_URL = 'https://fightcamp.netlify.app';
@@ -29,7 +29,6 @@ export default function CoachConnect() {
   // Fighter side
   const [entry, setEntry] = useState('');
   const [linked, setLinked] = useState(false);
-  const [outCodes, setOutCodes] = useState<string[]>([]);
   const [shared, setShared] = useState(false);
 
   // Coach side: redeeming a code a fighter shared
@@ -38,8 +37,14 @@ export default function CoachConnect() {
 
   useEffect(() => {
     if (!configured || !user) return;
-    if (role === 'coach') listInvites(user.id).then(setCodes);
-    else listFighterInvites(user.id).then(setOutCodes);
+    if (role === 'coach') {
+      listInvites(user.id).then(setCodes);
+    } else {
+      // Linked state must come from the server: the link can be created from
+      // the COACH's side (redeeming a shared fighter code), and the Unlink
+      // button is the fighter's only way to revoke that access.
+      hasActiveCoachLink(user.id).then(setLinked);
+    }
   }, [configured, user, role]);
 
   if (!configured || !user) return null;
@@ -84,19 +89,16 @@ export default function CoachConnect() {
     if (!user) return;
     setBusy(true);
     setError('');
-    // Reuse the newest live code — every share of the same invite still lands
-    // on the same link row, and re-minting per tap would just litter the table.
-    let code = outCodes[0];
-    if (!code) {
-      const res = await createFighterInvite(user.id);
-      if (res.error || !res.code) {
-        setBusy(false);
-        setError(res.error ?? 'Could not create an invite.');
-        return;
-      }
-      code = res.code;
-      setOutCodes(prev => [code, ...prev]);
+    // Fresh code per share: fighter codes are single-use (consumed on
+    // redemption — they grant access to this fighter's data), so a reused
+    // code could already be spent by the time the second recipient tries it.
+    const res = await createFighterInvite(user.id);
+    if (res.error || !res.code) {
+      setBusy(false);
+      setError(res.error ?? 'Could not create an invite.');
+      return;
     }
+    const code = res.code;
     const message =
       `Be my coach on Fight Camp Training 🥊 Get the app at ${APP_URL}, ` +
       `create a coach account, then enter my code ${code} under Settings → Your Fighters ` +
