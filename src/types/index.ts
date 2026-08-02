@@ -406,6 +406,9 @@ export interface CelebrationEvent {
 export interface DashboardPrefs {
   progressWidgetCollapsed: boolean;
   progressWidgetHidden: boolean;
+  /** Display/input unit for body weight. Stored data stays lbs; this only
+   *  converts at the UI edge (see utils/units.ts). Default: lbs. */
+  weightUnit?: 'lbs' | 'kg';
 }
 
 export interface GamificationState {
