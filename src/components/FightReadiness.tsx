@@ -165,12 +165,24 @@ export default function FightReadiness() {
   if (!state.activeCamp) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-8 text-center gap-4">
-        <p className="text-gray-400 text-sm">No active fight camp. Set one up in Settings first.</p>
+        <p className="text-gray-400 text-sm">No active camp yet — start one from the dashboard to see your readiness score.</p>
       </div>
     );
   }
 
-  if (!result) return null;
+  // A camp exists but nothing to score against — off-season blocks have no
+  // fight date/countdown. This used to render a bare blank screen.
+  if (!result) {
+    return (
+      <div className="mx-4 mt-10 card text-center py-12">
+        <p className="text-gray-400 font-semibold">Readiness needs a fight to aim at</p>
+        <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+          The readiness score weighs your training, cut and recovery against a fight date.
+          Start a fight camp to see it — off-season blocks don't have a countdown to score against.
+        </p>
+      </div>
+    );
+  }
 
   const { status, statusColor, breakdown, insights, daysUntilFight } = result;
 
