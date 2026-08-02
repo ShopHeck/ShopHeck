@@ -170,9 +170,12 @@ export default function FightReadiness() {
     );
   }
 
-  // A camp exists but nothing to score against — off-season blocks have no
-  // fight date/countdown. This used to render a bare blank screen.
-  if (!result) {
+  // Nothing real to score against: off-season blocks (and camps without a
+  // fight date) get the block's end substituted inside computeReadiness so
+  // the math stays finite — meaning `result` is never null here, and the
+  // "fight readiness" number it produces is a countdown to nothing. Gate on
+  // the actual condition instead of the result.
+  if (state.activeCamp.isOffSeason || !state.activeCamp.fightDate) {
     return (
       <div className="mx-4 mt-10 card text-center py-12">
         <p className="text-gray-400 font-semibold">Readiness needs a fight to aim at</p>
@@ -183,6 +186,8 @@ export default function FightReadiness() {
       </div>
     );
   }
+
+  if (!result) return null;
 
   const { status, statusColor, breakdown, insights, daysUntilFight } = result;
 
