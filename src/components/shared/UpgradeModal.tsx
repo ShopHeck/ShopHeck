@@ -8,6 +8,12 @@ import { PRICES } from '../../utils/pricing';
 
 interface Props {
   onClose: () => void;
+  /**
+   * Called just before the web checkout navigates away to Stripe — the only
+   * purchase path that leaves the page. Lets callers with unsaved state
+   * (onboarding's draft profile/camp) persist it first.
+   */
+  onBeforeWebCheckout?: () => void;
 }
 
 // Every line here must describe something that actually ships — this list is
@@ -47,7 +53,7 @@ const LINKS = {
   },
 };
 
-export default function UpgradeModal({ onClose }: Props) {
+export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   const { dispatch } = useApp();
   const { user } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
@@ -97,7 +103,12 @@ export default function UpgradeModal({ onClose }: Props) {
         const url = new URL(base);
         if (user?.id) url.searchParams.set('client_reference_id', user.id);
         if (user?.email) url.searchParams.set('prefilled_email', user.email);
-        window.location.href = url.toString();
+        onBeforeWebCheckout?.();
+        // Defer the navigation a beat so React commits any state the callback
+        // dispatched and the persistence effect writes it to localStorage
+        // before the page unloads. Imperceptible next to Stripe's page load.
+        setLoading(true);
+        setTimeout(() => { window.location.href = url.toString(); }, 120);
       } else {
         setNotice('Payment links not yet configured — check back soon!');
       }

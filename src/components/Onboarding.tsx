@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Flame, ChevronRight, Shield, User, X, Check, CheckCircle, Zap, Dumbbell, Cloud } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../context/AppContext';
@@ -106,7 +106,17 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
     setStep(2);
   }
 
-  function handleFinish() {
+  // The profile/camp dispatches live in commitDraft (idempotent) rather than
+  // only in handleFinish: the web checkout on the offer step leaves the page
+  // via a Stripe redirect, and without committing first the paying user would
+  // return to a wiped, restarted onboarding. Once CREATE_PROFILE lands,
+  // AppShell switches to the main app, so the Stripe return loads a working
+  // dashboard whether the purchase completed or was abandoned.
+  const draftCommitted = useRef(false);
+
+  function commitDraft() {
+    if (draftCommitted.current) return;
+    draftCommitted.current = true;
     if (!campOnly) {
       dispatch({
         type: 'CREATE_PROFILE',
@@ -150,7 +160,10 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         },
       });
     }
+  }
 
+  function handleFinish() {
+    commitDraft();
     onClose?.();
   }
 
@@ -744,8 +757,12 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           </div>
         )}
 
-        {/* ── Step 3: Pro offer — one honest, skippable screen at peak intent ── */}
-        {step === 3 && (
+        {/* ── Step 3: Pro offer — one honest, skippable screen at peak intent.
+               Rendered from live subscription state, not step number alone:
+               the moment a purchase (native sheet, restore, comp) flips the
+               account Pro, this screen yields to the finish screen — no stale
+               callback deciding the advance. ── */}
+        {step === 3 && !alreadyPro && (
           <div className="flex flex-col gap-5 mt-4">
             <div>
               <h2 className="text-2xl font-black text-white">Your camp is built.</h2>
@@ -816,8 +833,8 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           </div>
         )}
 
-        {/* ── Step 4: All Set + Review ── */}
-        {step === 4 && (
+        {/* ── Step 4: All Set (also shown when the offer step resolves Pro) ── */}
+        {(step === 4 || (step === 3 && alreadyPro)) && (
           <div className="flex flex-col gap-6 mt-6 text-center">
             <div className="flex justify-center">
               <div className="w-20 h-20 bg-brand-600 rounded-2xl flex items-center justify-center shadow-xl shadow-brand-900/50">
@@ -896,13 +913,12 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         )}
       </div>
 
-      {/* Purchasing from the offer step advances past it on success. */}
+      {/* The offer's checkout: web navigation persists the draft first; a
+          native purchase advances via the alreadyPro render condition above. */}
       {showUpgrade && (
         <UpgradeModal
-          onClose={() => {
-            setShowUpgrade(false);
-            if (isPro(state.subscription)) setStep(4);
-          }}
+          onClose={() => setShowUpgrade(false)}
+          onBeforeWebCheckout={commitDraft}
         />
       )}
     </div>
