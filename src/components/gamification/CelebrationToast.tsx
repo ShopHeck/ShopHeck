@@ -35,14 +35,19 @@ export default function CelebrationToast() {
   // the share sheet is open.
   const [shareMilestone, setShareMilestone] = useState<MilestoneShare | null>(null);
 
+  // Paused while the share sheet is open: the toast renders above the sheet
+  // (z-70 vs z-50), so without this the rest of the queue would keep sliding
+  // in over the card, firing haptics, auto-advancing unseen — and a second
+  // Share tap would silently swap the card mid-share. The queued event resumes
+  // (haptic included — it was never shown) when the sheet closes.
   useEffect(() => {
-    if (!event) return;
+    if (!event || shareMilestone) return;
     triggerHaptic(HAPTIC.sessionComplete);
     const id = setTimeout(() => {
       dispatch({ type: 'DISMISS_CELEBRATION', payload: event.id });
     }, DISMISS_MS);
     return () => clearTimeout(id);
-  }, [event?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [event?.id, shareMilestone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shareable = !!event && event.kind in SHARE_EMOJI && !!state.currentUser;
 
@@ -61,7 +66,7 @@ export default function CelebrationToast() {
 
   return (
     <>
-      {event && (
+      {event && !shareMilestone && (
         <div className="fixed inset-x-0 top-4 z-[70] flex justify-center pointer-events-none px-4">
           <div className="pointer-events-auto max-w-sm w-full bg-gradient-to-br from-brand-700 to-purple-800 border border-brand-500 rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 celebration-slide">
             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
