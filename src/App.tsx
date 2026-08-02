@@ -235,11 +235,11 @@ function AppShell() {
             )}
             {view === 'timer'           && <RoundTimer />}
             {view === 'weight'          && <WeightTracker />}
-            {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut."><NutritionTracker /></ProGate>}
+            {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut." bullets={['One-tap hydration & meal-quality tracking', 'Macro targets auto-suggested from your camp', 'Seven-day history at a glance']}><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
-            {view === 'gameplan'        && <ProGate required="fighter_pro" page feature="Game Plan Builder" featureDescription="Build a round-by-round strategy for your opponent and keep it with your camp."><GamePlanBuilder /></ProGate>}
-            {view === 'aiinsights'      && <ProGate required="fighter_pro" page feature="AI Insights" featureDescription="Get a coach-style analysis of your training load, weight cut and readiness."><AIInsights /></ProGate>}
-            {view === 'health'          && <ProGate required="fighter_pro" page feature="Apple Health Sync" featureDescription="Import workouts and weight from Apple Health, and export your camp data."><AppleHealthSync /></ProGate>}
+            {view === 'gameplan'        && <ProGate required="fighter_pro" page feature="Game Plan Builder" featureDescription="Build a round-by-round strategy for your opponent and keep it with your camp." bullets={['Opponent scouting & threat notes', 'Early / middle / late round game plans', 'Corner instructions for fight night']}><GamePlanBuilder /></ProGate>}
+            {view === 'aiinsights'      && <ProGate required="fighter_pro" page feature="AI Insights" featureDescription="Get a coach-style analysis of your training load, weight cut and readiness — included with Pro, no setup." bullets={['Full camp analysis with 3 action items', 'AI Cut Coach on the weight screen', 'Post-fight breakdowns after every bout']}><AIInsights /></ProGate>}
+            {view === 'health'          && <ProGate required="fighter_pro" page feature="Apple Health Sync" featureDescription="Keep your training in one place across apps." bullets={['Import workouts & weight from Apple Health', 'Write logged sessions back to Health', 'Export your full camp data']}><AppleHealthSync /></ProGate>}
             {view === 'readiness'       && <FightReadiness />}
             {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
             {view === 'workout-library' && <WorkoutLibrary />}

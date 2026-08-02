@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Lock, Crown } from 'lucide-react';
+import { Lock, Crown, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { isPro, isCoachPro } from '../../utils/subscription';
 import type { SubscriptionTier } from '../../types';
@@ -21,6 +21,8 @@ interface ProGateProps {
   feature?: string;
   /** Short description of what the feature does, shown on the full-page upgrade screen. */
   featureDescription?: string;
+  /** What the feature includes — the gate sells specifics, not just a sentence. */
+  bullets?: string[];
   /** Optional callback when the locked area is tapped (overrides default modal) */
   onUpgrade?: () => void;
 }
@@ -38,6 +40,7 @@ export default function ProGate({
   page = false,
   feature,
   featureDescription,
+  bullets,
   onUpgrade,
 }: ProGateProps) {
   const { state } = useApp();
@@ -65,7 +68,17 @@ export default function ProGate({
           <span className="text-xs font-bold uppercase tracking-wider text-brand-400 mb-1">{tierLabel}</span>
           <h2 className="text-lg font-black text-white mb-2">{feature ?? 'This is a Pro feature'}</h2>
           {featureDescription && (
-            <p className="text-sm text-gray-400 max-w-xs mb-6 leading-relaxed">{featureDescription}</p>
+            <p className={`text-sm text-gray-400 max-w-xs leading-relaxed ${bullets?.length ? 'mb-4' : 'mb-6'}`}>{featureDescription}</p>
+          )}
+          {bullets && bullets.length > 0 && (
+            <ul className="text-left space-y-1.5 mb-6 max-w-xs w-full">
+              {bullets.map(b => (
+                <li key={b} className="flex items-start gap-2 text-sm text-gray-300">
+                  <Check size={13} className="text-brand-400 mt-0.5 flex-shrink-0" />
+                  {b}
+                </li>
+              ))}
+            </ul>
           )}
           <button onClick={handleTap} className="btn-primary px-6 py-3 text-sm font-semibold flex items-center gap-2">
             <Lock size={14} />

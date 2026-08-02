@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
-import { ChevronRight, Trophy, XCircle, Minus, History } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronRight, Trophy, XCircle, Minus, History, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { isPro } from '../utils/subscription';
+import UpgradeModal from './shared/UpgradeModal';
 import { format, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { computeCampKpis } from '../utils/campKpis';
@@ -18,6 +20,8 @@ const OUTCOME_META = {
 
 export default function CampComparison({ onOpenFight }: Props) {
   const { state } = useApp();
+  const pro = isPro(state.subscription);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const rows = useMemo(() => {
     // Join camps with their fight results (if any) and compute KPIs.
@@ -60,6 +64,26 @@ export default function CampComparison({ onOpenFight }: Props) {
         <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Camp History</p>
         <p className="text-white font-bold">Compare camps vs outcomes</p>
       </div>
+
+      {/* Free tier is capped at one camp, so comparison is structurally out of
+          reach — say what this screen becomes with Pro instead of showing an
+          unexplained one-row list forever. */}
+      {!pro && (
+        <div className="mx-4 mt-4 bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4">
+          <p className="text-sm font-bold text-white mb-1">Camps that learn from every fight</p>
+          <p className="text-xs text-gray-400 leading-relaxed mb-3">
+            With Fighter Pro, every camp you run lands here — sparring volume, adherence and
+            readiness charted side by side, and each fight's lessons carried into the next camp.
+            Free covers one camp; Pro removes the limit.
+          </p>
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="btn-primary w-full text-sm py-2.5 flex items-center justify-center gap-2"
+          >
+            <Zap size={14} /> Unlock with Fighter Pro
+          </button>
+        </div>
+      )}
 
       {chartData.length >= 2 && (
         <div className="mx-4 mt-4 card">
@@ -122,6 +146,8 @@ export default function CampComparison({ onOpenFight }: Props) {
           );
         })}
       </div>
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

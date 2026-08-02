@@ -1,5 +1,6 @@
 import { Activity, Brain, Bluetooth, ChevronRight, Clock, Dumbbell, Droplets, Flame, Target, UtensilsCrossed, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { isPro } from '../utils/subscription';
 import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
@@ -42,6 +43,14 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const cycle = getCurrentOffSeasonCycle(activeCamp);
   const currentWeek = trainingSchedule[currentWeekNum - 1];
   const goalLabel = GOAL_LABELS[activeCamp.offSeasonGoal ?? 'maintain'] ?? 'Off Season';
+  const pro = isPro(state.subscription);
+  // Same chip as the fight-camp dashboard: a gated tile announces its tier
+  // instead of ambushing the tap with a paywall.
+  const proChip = (
+    <span className="ml-auto flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-900/50 border border-brand-800/60 text-brand-400">
+      PRO
+    </span>
+  );
 
   // Week stats
   const weekLogs = workoutLogs.filter(l => l.campId === activeCamp.id && l.weekNumber === currentWeekNum);
@@ -371,6 +380,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
               <p className="text-sm font-semibold text-white">AI Insights</p>
               <p className="text-xs text-gray-500">Coach analysis</p>
             </div>
+            {!pro && proChip}
           </button>
           <button
             onClick={() => onNavigate('log')}
@@ -395,6 +405,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
               <p className="text-sm font-semibold text-white">Nutrition</p>
               <p className="text-xs text-gray-500">Water & meals</p>
             </div>
+            {!pro && proChip}
           </button>
           <button
             onClick={() => onNavigate('trackers')}

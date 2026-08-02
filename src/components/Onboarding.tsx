@@ -1,9 +1,13 @@
-import { useState } from 'react';
-import { Flame, ChevronRight, Shield, User, X, CheckCircle, Star, Dumbbell, Cloud } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Flame, ChevronRight, Shield, User, X, Check, CheckCircle, Zap, Dumbbell, Cloud } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import AuthScreen from './AuthScreen';
 import AppMark from './shared/AppMark';
+import UpgradeModal from './shared/UpgradeModal';
+import { PRICES } from '../utils/pricing';
+import { isPro } from '../utils/subscription';
 import type { Sport, WeightClass, ExperienceLevel, UserRole, OffSeasonGoal } from '../types';
 import { addDays, format } from 'date-fns';
 import { parseWeightLbs, WEIGHT_RANGE_HINT } from '../utils/validation';
@@ -14,9 +18,6 @@ const OFF_SEASON_GOALS: { value: OffSeasonGoal; label: string; desc: string }[] 
   { value: 'maintain',      label: 'Maintain & Sharpen', desc: 'Balanced training to stay competition-ready' },
   { value: 'recovery',      label: 'Active Recovery', desc: 'Light training, deload, coming back from injury' },
 ];
-
-// TODO: replace with the real App Store listing ID once published
-const APP_STORE_URL = 'https://apps.apple.com/app/id000000000';
 
 const WEIGHT_CLASSES: WeightClass[] = [
   'Strawweight', 'Flyweight', 'Bantamweight', 'Featherweight',
@@ -66,8 +67,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
   const [targetWeight, setTargetWeight] = useState('');
   const [campWeeks, setCampWeeks] = useState('8');
 
-  const minDate = format(addDays(new Date(), 42), 'yyyy-MM-dd');
+  // 7-day floor (matching the camp editor in Settings) — short-notice fights
+  // are exactly who downloads a fight-camp app; the generator clamps the
+  // current week, so a camp that starts "in the past" still renders correctly.
+  const minDate = format(addDays(new Date(), 7), 'yyyy-MM-dd');
   const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
+
+  // Pro offer step: shown once, after the camp is generated (peak intent) and
+  // never to accounts that already have Pro (comp sign-ins, restored users).
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const alreadyPro = isPro(state.subscription);
 
   function handleProfileNext() {
     if (!name.trim() || !age) return;
@@ -97,7 +106,17 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
     setStep(2);
   }
 
-  function handleFinish() {
+  // The profile/camp dispatches live in commitDraft (idempotent) rather than
+  // only in handleFinish: the web checkout on the offer step leaves the page
+  // via a Stripe redirect, and without committing first the paying user would
+  // return to a wiped, restarted onboarding. Once CREATE_PROFILE lands,
+  // AppShell switches to the main app, so the Stripe return loads a working
+  // dashboard whether the purchase completed or was abandoned.
+  const draftCommitted = useRef(false);
+
+  function commitDraft() {
+    if (draftCommitted.current) return;
+    draftCommitted.current = true;
     if (!campOnly) {
       dispatch({
         type: 'CREATE_PROFILE',
@@ -141,7 +160,10 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         },
       });
     }
+  }
 
+  function handleFinish() {
+    commitDraft();
     onClose?.();
   }
 
@@ -728,15 +750,91 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               )}
             </div>
 
-            <button onClick={() => setStep(4)} className={`flex items-center justify-center gap-2 text-lg py-4 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
+            <button onClick={() => setStep(alreadyPro ? 4 : 3)} className={`flex items-center justify-center gap-2 text-lg py-4 ${isOffSeason ? 'btn-secondary border-2 border-teal-700 !bg-teal-900/30 !text-teal-300' : 'btn-primary'}`}>
               Continue
               <ChevronRight size={20} />
             </button>
           </div>
         )}
 
-        {/* ── Step 4: All Set + Review ── */}
-        {step === 4 && (
+        {/* ── Step 3: Pro offer — one honest, skippable screen at peak intent.
+               Rendered from live subscription state, not step number alone:
+               the moment a purchase (native sheet, restore, comp) flips the
+               account Pro, this screen yields to the finish screen — no stale
+               callback deciding the advance. ── */}
+        {step === 3 && !alreadyPro && (
+          <div className="flex flex-col gap-5 mt-4">
+            <div>
+              <h2 className="text-2xl font-black text-white">Your camp is built.</h2>
+              <p className="text-gray-500 text-sm mt-1">
+                Everything below is free. Pro adds your corner team.
+              </p>
+            </div>
+
+            <div className="card">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Free — yours already</p>
+              <ul className="space-y-1.5">
+                {[
+                  'Periodized week-by-week camp plan',
+                  'Pro round timer with live heart-rate zones',
+                  'Training, sparring & weigh-in logging',
+                  'Progress charts & fight readiness',
+                ].map(f => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-gray-400">
+                    <Check size={13} className="text-gray-500 mt-0.5 flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap size={15} className="text-brand-400" />
+                <p className="text-sm font-bold text-white">Fighter Pro adds</p>
+                {Capacitor.isNativePlatform() && (
+                  <span className="ml-auto text-xs text-gray-400">7-day free trial</span>
+                )}
+              </div>
+              <ul className="space-y-1.5">
+                {[
+                  'Your AI corner — camp insights, cut guidance & post-fight breakdowns',
+                  'Nutrition tracking with macro targets',
+                  'Game plan builder for your opponent',
+                  'Unlimited camps that learn from every fight',
+                  'Gym Display big-screen timer',
+                ].map(f => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-gray-300">
+                    <Check size={13} className="text-brand-400 mt-0.5 flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500 mt-3">
+                {PRICES.fighter.monthly}/month or {PRICES.fighter.annual}/year · cancel anytime
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setShowUpgrade(true)}
+                className="btn-primary flex items-center justify-center gap-2"
+              >
+                <Zap size={16} />
+                {Capacitor.isNativePlatform() ? 'Start 7-day free trial' : 'See Pro plans'}
+              </button>
+              <button
+                onClick={() => setStep(4)}
+                className="text-sm text-gray-500 hover:text-gray-300 py-2 transition-colors"
+              >
+                Continue with the free app →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: All Set (also shown when the offer step resolves Pro) ── */}
+        {(step === 4 || (step === 3 && alreadyPro)) && (
           <div className="flex flex-col gap-6 mt-6 text-center">
             <div className="flex justify-center">
               <div className="w-20 h-20 bg-brand-600 rounded-2xl flex items-center justify-center shadow-xl shadow-brand-900/50">
@@ -811,26 +909,18 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Privacy Policy</a>.
             </p>
 
-            {/* Subtle review ask */}
-            <div className="pt-2 border-t border-dark-600">
-              <div className="flex justify-center gap-1 mb-2">
-                {[0, 1, 2, 3, 4].map(i => (
-                  <Star key={i} size={16} className="text-brand-500 fill-brand-500" />
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mb-3">
-                Loving Fight Camp? A quick App Store review helps other fighters find us.
-              </p>
-              <button
-                onClick={() => window.open(APP_STORE_URL, '_blank')}
-                className="w-full py-2.5 rounded-xl border border-dark-400 text-sm font-semibold text-gray-300 hover:border-brand-600 hover:text-brand-400 transition-all"
-              >
-                ⭐ Leave a Review
-              </button>
-            </div>
           </div>
         )}
       </div>
+
+      {/* The offer's checkout: web navigation persists the draft first; a
+          native purchase advances via the alreadyPro render condition above. */}
+      {showUpgrade && (
+        <UpgradeModal
+          onClose={() => setShowUpgrade(false)}
+          onBeforeWebCheckout={commitDraft}
+        />
+      )}
     </div>
   );
 }
