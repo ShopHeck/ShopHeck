@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Lock, Crown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { isPro, isCoachPro } from '../../utils/subscription';
@@ -70,7 +71,10 @@ export default function ProGate({
             <Lock size={14} />
             Unlock with {tierLabel}
           </button>
-          <p className="text-xs text-gray-600 mt-3">7-day free trial · cancel anytime</p>
+          {/* Trial exists only on the App Store (RevenueCat); web Stripe links have none. */}
+          <p className="text-xs text-gray-600 mt-3">
+            {Capacitor.isNativePlatform() ? '7-day free trial · cancel anytime' : 'Cancel anytime'}
+          </p>
         </div>
         {showModal && <UpgradeModal onClose={() => setShowModal(false)} />}
       </>

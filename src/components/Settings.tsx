@@ -519,7 +519,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <span className="text-sm font-bold text-white">Upgrade to Pro</span>
             </div>
             <p className="text-xs text-gray-400 mb-4">
-              Unlock Gym Display, custom presets, voice announcements, reaction training, session history, AI insights and more.
+              Unlock AI insights, nutrition tracking, game plans, unlimited camps, Gym Display and more.
             </p>
             <button onClick={() => setShowUpgrade(true)} className="btn-primary w-full text-sm py-2.5">
               View Plans

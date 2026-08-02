@@ -21,6 +21,13 @@ const METHODS_DRAW: FightMethod[] = ['Unanimous Decision', 'Split Decision', 'Ma
 
 const DAMAGE_LEVELS: DamageLevel[] = ['none', 'light', 'moderate', 'heavy'];
 
+function methodsFor(outcome: FightOutcome): FightMethod[] {
+  if (outcome === 'win') return METHODS_WIN;
+  if (outcome === 'loss') return METHODS_LOSS;
+  if (outcome === 'draw') return METHODS_DRAW;
+  return ['DQ' as FightMethod];
+}
+
 function emptyRound(n: number): FightRound {
   return {
     roundNumber: n,
@@ -55,19 +62,27 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   const [overallNotes, setOverallNotes] = useState(existing?.overallNotes ?? '');
   const [lessons, setLessons] = useState(existing?.lessons ?? '');
 
-  const methodOptions = useMemo(() => {
-    if (outcome === 'win') return METHODS_WIN;
-    if (outcome === 'loss') return METHODS_LOSS;
-    if (outcome === 'draw') return METHODS_DRAW;
-    return ['DQ' as FightMethod];
-  }, [outcome]);
+  const methodOptions = useMemo(() => methodsFor(outcome), [outcome]);
+
+  // Changing the outcome can invalidate the chosen method (a draw has no KO).
+  // The select would display the first option while state kept the stale
+  // value, so "KO" could be saved on a draw — snap method along with outcome.
+  function selectOutcome(o: FightOutcome) {
+    setOutcome(o);
+    const opts = methodsFor(o);
+    setMethod(m => (opts.includes(m) ? m : opts[0]));
+  }
 
   function setRoundField<K extends keyof FightRound>(idx: number, key: K, value: FightRound[K]) {
     setRounds(prev => prev.map((r, i) => i === idx ? { ...r, [key]: value } : r));
   }
 
-  function adjustTotalRounds(n: number) {
-    if (n < 1) return;
+  function adjustTotalRounds(raw: number) {
+    // Number('') is NaN, and NaN < 1 is false — without the finite check a
+    // cleared input would slice the rounds array to [] and destroy every
+    // round-by-round note the user has typed.
+    if (!Number.isFinite(raw) || raw < 1) return;
+    const n = Math.min(15, Math.round(raw));
     setTotalRounds(n);
     setRounds(prev => {
       if (prev.length === n) return prev;
@@ -82,7 +97,10 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
     const readiness = computeReadiness(state);
 
     const base: Omit<FightResult, 'id' | 'createdAt'> = {
-      campId: camp.id,
+      // Edits keep the fight on its original camp. The form always receives
+      // the ACTIVE camp, so editing an old fight from Camp History would
+      // otherwise silently re-parent it and corrupt every KPI join.
+      campId: existing?.campId ?? camp.id,
       fighterId: state.currentUser?.id ?? '',
       fightDate,
       opponent,
@@ -96,7 +114,9 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
       stylePlanFollowed,
       overallNotes,
       lessons,
-      readinessAtFight: readiness?.overall,
+      // Keep the original snapshot on edit — recomputing here would replace
+      // fight-time readiness with today's, weeks later.
+      readinessAtFight: existing ? existing.readinessAtFight : readiness?.overall,
     };
 
     triggerHaptic(HAPTIC.sessionComplete);
@@ -147,7 +167,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
               ]).map(opt => (
                 <button
                   key={opt.v}
-                  onClick={() => setOutcome(opt.v)}
+                  onClick={() => selectOutcome(opt.v)}
                   className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-xs font-bold ${
                     outcome === opt.v ? opt.color : 'bg-dark-700 border-dark-500 text-gray-400'
                   }`}

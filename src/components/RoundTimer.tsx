@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
 import { loadCustomPresets, saveCustomPresets, generateId } from '../utils/storage';
 import { useApp } from '../context/AppContext';
+import { isPro as hasProAccess } from '../utils/subscription';
 import { writeWorkoutToHealth } from '../utils/healthSync';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import type { CustomTimerPreset } from '../types';
@@ -152,9 +153,10 @@ export default function RoundTimer() {
   // Load custom presets on mount
   useEffect(() => { setCustomPresets(loadCustomPresets()); }, []);
 
-  // Sync fullscreen state
+  // Exit the takeover when the browser leaves real fullscreen (Esc on web).
+  // Entering is driven by state alone — see toggleFullscreen.
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const onFsChange = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
@@ -228,14 +230,23 @@ export default function RoundTimer() {
   }, [customPresets]);
 
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen();
-    }
-  }, []);
+    // The takeover is state-driven: GymDisplay renders off isFullscreen alone.
+    // The Fullscreen API is progressive enhancement for desktop web browser
+    // chrome — iOS WKWebView has no Element.requestFullscreen for page
+    // elements (calling it throws synchronously), so it must never gate the
+    // feature.
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+    try {
+      if (next) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      } else if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    } catch { /* no Fullscreen API — the takeover view stands on its own */ }
+  }, [isFullscreen]);
 
-  const isPro = state.subscription && (state.subscription.tier !== 'free');
+  const isPro = hasProAccess(state.subscription);
   const FREE_PRESET_LIMIT = 2;
 
   // ── Gym Display (fullscreen) ─────────────────────────────────────────────
@@ -247,6 +258,11 @@ export default function RoundTimer() {
         rounds={rounds}
         timeLeft={timeLeft}
         isRunning={isRunning}
+        workColor={workColor}
+        restColor={restColor}
+        hrBpm={hr.connected ? hr.hr : null}
+        hrColor={ZONE_COLORS[hr.zone]}
+        mep={hr.connected ? mep : 0}
         onStartPause={handleStartPause}
         onReset={reset}
         onExitFullscreen={toggleFullscreen}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle, Activity } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getCurrentWeekNumber } from '../utils/campGenerator';
+import { getWeekNumberForDate } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
 import ShareCard from './ShareCard';
@@ -101,14 +101,14 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
     conditioning: campCond.length,
   };
 
-  const currentWeekNum = getCurrentWeekNumber(camp);
-
   function logWorkout() {
     if (!wTitle.trim()) return;
     const payload: Omit<WorkoutLog, 'id' | 'createdAt'> = {
       campId: camp.id,
       date: wDate,
-      weekNumber: currentWeekNum,
+      // Week of the log's own date — a back-dated entry files under the week
+      // it happened in, not the week it was typed in.
+      weekNumber: getWeekNumberForDate(camp, parseISO(wDate)),
       dayLabel: format(parseISO(wDate), 'EEEE'),
       sessionType: wType,
       title: wTitle.trim(),
@@ -131,7 +131,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       payload: {
         campId: camp.id,
         date: sDate,
-        weekNumber: currentWeekNum,
+        weekNumber: getWeekNumberForDate(camp, parseISO(sDate)),
         rounds: parseInt(sRounds),
         roundDuration: parseInt(sRoundDur),
         partnerName: sPartner.trim() || 'Unknown',
@@ -151,7 +151,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       payload: {
         campId: camp.id,
         date: cDate,
-        weekNumber: currentWeekNum,
+        weekNumber: getWeekNumberForDate(camp, parseISO(cDate)),
         testType: cType,
         value: parseFloat(cValue),
         unit: cUnit,

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import { ChevronDown, ChevronUp, UtensilsCrossed, Sparkles, BookOpen } from 'lucide-react';
 import { MEAL_PLANS, FOOD_ITEMS, type MealPlan, type MealGoal, type Macros, type FoodItem } from '../data/mealLibrary';
 import { useApp } from '../context/AppContext';
@@ -259,15 +260,22 @@ function MacroGenerator() {
 
   function handleSave() {
     if (!result || !state.activeCamp) return;
-    const today = new Date().toISOString().slice(0, 10);
+    // Local calendar date — toISOString() is UTC and files an evening save
+    // under tomorrow for users west of UTC (every other screen uses local).
+    const today = format(new Date(), 'yyyy-MM-dd');
+    // The reducer replaces the day's log wholesale, so carry today's existing
+    // water/meals/notes through — otherwise saving macros silently wipes them.
+    const existing = state.nutritionLogs.find(
+      n => n.campId === state.activeCamp!.id && n.date === today,
+    );
     dispatch({
       type: 'LOG_NUTRITION',
       payload: {
         campId: state.activeCamp.id,
         date: today,
-        waterOz: 0,
-        mealRatings: {},
-        notes: `Generated for ${mealTime}`,
+        waterOz: existing?.waterOz ?? 0,
+        mealRatings: existing?.mealRatings ?? {},
+        notes: existing?.notes || `Generated for ${mealTime}`,
         macros: {
           calories: Math.round(result.totalMacros.calories),
           protein:  Math.round(result.totalMacros.protein),

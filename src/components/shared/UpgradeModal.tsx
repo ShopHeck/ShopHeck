@@ -9,24 +9,25 @@ interface Props {
   onClose: () => void;
 }
 
+// Every line here must describe something that actually ships — this list is
+// App Store metadata in spirit (Guideline 2.3.1) and drifts silently if it
+// isn't checked against the real ProGate call sites when features change.
 const FIGHTER_PRO_FEATURES = [
-  'Gym Display — fullscreen big-screen mode',
-  '8 saved custom timer presets',
-  'Warning bell > 10 seconds',
-  'Sport-specific reaction prompts',
-  'Timer session history',
-  'AI Insights & coach analysis',
+  'AI Insights & AI Cut Coach (uses your Anthropic API key)',
+  'Nutrition tracker — hydration, meals & macros',
+  'Game Plan Builder for fight strategy',
+  'Unlimited fight camps & camp comparison',
+  'Gym Display — fullscreen big-screen timer',
   'Apple Health sync',
-  'Game Plan Builder',
-  'Nutrition tracker',
-  'Unlimited fight camps',
+  'Unlimited custom timer presets',
+  'Sport-specific reaction prompts',
+  'Extended warning bells (15–30s)',
 ];
 
 const COACH_PRO_FEATURES = [
   'Everything in Fighter Pro',
-  'Coach dashboard & fighter notes',
-  'Unlimited linked fighters',
-  'Team analytics overview',
+  'Coach dashboard — every linked fighter at a glance',
+  'Fighter detail views: training, weight cut & readiness',
 ];
 
 // Stripe Payment Link URLs. Env vars (set in the host, e.g. Netlify) take
@@ -165,7 +166,9 @@ export default function UpgradeModal({ onClose }: Props) {
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-brand-400" />
               <span className="text-sm font-bold text-white">Fighter Pro</span>
-              <span className="ml-auto text-xs text-gray-400">7-day free trial</span>
+              {/* The 7-day trial is configured in RevenueCat (App Store);
+                  the web Stripe Payment Links have no trial — don't claim one. */}
+              <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
             </div>
             <ul className="space-y-1.5">
               {FIGHTER_PRO_FEATURES.slice(0, 5).map(f => (
@@ -196,7 +199,7 @@ export default function UpgradeModal({ onClose }: Props) {
                 disabled={loading}
                 className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
               >
-                {loading ? '...' : 'Start Free Trial'}
+                {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
               </button>
             </div>
           </div>
@@ -206,7 +209,7 @@ export default function UpgradeModal({ onClose }: Props) {
             <div className="flex items-center gap-2">
               <Trophy size={16} className="text-purple-400" />
               <span className="text-sm font-bold text-white">Coach Pro</span>
-              <span className="ml-auto text-xs text-gray-400">7-day free trial</span>
+              <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
             </div>
             <ul className="space-y-1.5">
               {COACH_PRO_FEATURES.map(f => (
@@ -236,7 +239,7 @@ export default function UpgradeModal({ onClose }: Props) {
                 disabled={loading}
                 className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
               >
-                {loading ? '...' : 'Start Free Trial'}
+                {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
               </button>
             </div>
           </div>
