@@ -194,7 +194,7 @@ export default function CoachDashboard() {
                   {[...campSparring].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map(s => (
                     <div key={s.id} className="card flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-white">{s.rounds} rounds vs {s.partner_name}</p>
+                        <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partner_name && s.partner_name !== 'Unknown' ? ` vs ${s.partner_name}` : ''}</p>
                         <p className="text-xs text-gray-500">{format(parseISO(s.date), 'MMM d')} · Week {s.week_number}</p>
                       </div>
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
@@ -478,7 +478,7 @@ export default function CoachDashboard() {
               {campSparring.slice(0, 5).map(s => (
                 <div key={s.id} className="card flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-white">{s.rounds} rounds vs {s.partnerName}</p>
+                    <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partnerName && s.partnerName !== 'Unknown' ? ` vs ${s.partnerName}` : ''}</p>
                     <p className="text-xs text-gray-500">{format(parseISO(s.date), 'MMM d')} · Week {s.weekNumber}</p>
                     {s.focus && <p className="text-xs text-gray-600 mt-0.5">Focus: {s.focus}</p>}
                   </div>
