@@ -430,6 +430,19 @@ create table if not exists public.coach_invites (
 );
 create index if not exists coach_invites_coach_idx on public.coach_invites(coach_id);
 
+-- fighter_invites — the mirror of coach_invites, pointing the other way: a
+-- FIGHTER mints a code and shares it out (app link + code in one message);
+-- the invited coach installs, creates a coach account, and redeems it. This
+-- is the app's viral loop — every invited coach is a potential Coach Pro
+-- subscription and brings their other fighters with them.
+create table if not exists public.fighter_invites (
+  code        text primary key,
+  fighter_id  uuid not null references public.profiles(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null default (now() + interval '30 days')
+);
+create index if not exists fighter_invites_fighter_idx on public.fighter_invites(fighter_id);
+
 -- Helper: is the current user an active coach of `fighter`?
 create or replace function public.is_coach_of(fighter uuid)
 returns boolean language sql security definer stable set search_path = public as $$
@@ -458,9 +471,37 @@ begin
 end;
 $$;
 
+-- Coach redeems a fighter's shared invite → the SAME link row as the
+-- coach-initiated path (redeem_coach_invite above), just created from the
+-- other side. Security definer so the coach doesn't need read access to the
+-- fighter's invite row.
+--
+-- SINGLE-USE, unlike coach codes: a fighter code is a bearer credential for
+-- read access to the FIGHTER's own data, shared over chat. Consuming it on
+-- redemption (same transaction) stops a second holder from linking too, and
+-- stops a formerly-linked coach from silently re-activating access after the
+-- fighter unlinks. (Coach codes stay multi-use on purpose — there the
+-- REDEEMER is the one granting access to their own data.)
+create or replace function public.redeem_fighter_invite(invite_code text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare f uuid;
+begin
+  select fighter_id into f from public.fighter_invites
+    where code = invite_code and (expires_at is null or expires_at > now());
+  if f is null then raise exception 'Invalid or expired invite code'; end if;
+  if f = auth.uid() then raise exception 'You cannot link to yourself'; end if;
+  insert into public.coach_fighter_links (coach_id, fighter_id, status)
+    values (auth.uid(), f, 'active')
+    on conflict (coach_id, fighter_id) do update set status = 'active', updated_at = now();
+  delete from public.fighter_invites where code = invite_code;
+  return f;
+end;
+$$;
+
 -- RLS for the linking tables.
 alter table public.coach_fighter_links enable row level security;
 alter table public.coach_invites       enable row level security;
+alter table public.fighter_invites     enable row level security;
 
 drop policy if exists "cfl_select" on public.coach_fighter_links;
 create policy "cfl_select" on public.coach_fighter_links
@@ -477,6 +518,10 @@ create policy "cfl_update" on public.coach_fighter_links
 drop policy if exists "coach_invites_own" on public.coach_invites;
 create policy "coach_invites_own" on public.coach_invites
   for all using (coach_id = auth.uid()) with check (coach_id = auth.uid());
+
+drop policy if exists "fighter_invites_own" on public.fighter_invites;
+create policy "fighter_invites_own" on public.fighter_invites
+  for all using (fighter_id = auth.uid()) with check (fighter_id = auth.uid());
 
 -- Coach READ access to linked fighters' data. These are additive SELECT
 -- policies (RLS OR-combines), so they don't weaken the owner-only policies.

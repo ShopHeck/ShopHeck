@@ -38,8 +38,10 @@ Set them in **three** places:
 - **Auth** — optional email/password + Sign in with Apple (`src/context/AuthContext.tsx`).
 - **Push sync** — device → cloud, debounced + on sign-in (`src/lib/sync.ts`,
   `src/context/SyncContext.tsx`). Never mutates local state.
-- **Coach linking** — invite codes (`redeem_coach_invite`) + `is_coach_of()` RLS so a
-  linked coach can read a fighter's data.
+- **Coach linking** — invite codes in both directions (`redeem_coach_invite` for
+  coach-minted codes, `redeem_fighter_invite` for fighter-minted ones shared out
+  via the invite-your-coach loop) + `is_coach_of()` RLS so a linked coach can
+  read a fighter's data.
 
 ## Roadmap
 
