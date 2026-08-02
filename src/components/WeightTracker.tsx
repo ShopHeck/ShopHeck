@@ -188,21 +188,21 @@ export default function WeightTracker() {
           <div className="stat-card">
             <Scale size={16} className="text-blue-400" />
             <div className="text-xl font-black text-white">{d(currentW)}</div>
-            <div className="text-xs text-gray-500">current ({unit})</div>
+            <div className="text-xs text-gray-400">current ({unit})</div>
           </div>
           <div className="stat-card">
             <TrendingDown size={16} className="text-brand-500" />
             <div className={`text-xl font-black ${toGo > 0 ? 'text-brand-400' : 'text-green-400'}`}>
               {toGo > 0 ? d(toGo).toFixed(1) : '✓'}
             </div>
-            <div className="text-xs text-gray-500">{unit} to cut</div>
+            <div className="text-xs text-gray-400">{unit} to cut</div>
           </div>
           <div className="stat-card">
             <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
             <div className={`text-xl font-black ${cutChip.text}`}>
               {Math.round(cutProgress)}%
             </div>
-            <div className="text-xs text-gray-500">cut done</div>
+            <div className="text-xs text-gray-400">cut done</div>
           </div>
         </div>
       ) : (
@@ -214,7 +214,7 @@ export default function WeightTracker() {
             <p className="text-xl font-black text-white">
               {latestEntry ? formatWeight(currentW, unit) : 'No weigh-ins yet'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5">
               {latestEntry
                 ? `Last weigh-in ${format(parseISO(latestEntry.date), 'MMM d')} · set a goal weight in Settings to track a cut`
                 : 'Log your bodyweight to start a trend. Set a goal weight in Settings to track a cut.'}
@@ -244,7 +244,7 @@ export default function WeightTracker() {
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs text-gray-500 mb-0.5">Weight Cut Progress</p>
+              <p className="text-xs text-gray-400 mb-0.5">Weight Cut Progress</p>
               <p className="text-sm text-white font-semibold">{d(startW)} → {formatWeight(targetW, unit)}</p>
             </div>
             <div className="text-right">
@@ -253,7 +253,7 @@ export default function WeightTracker() {
                   {weightTrend > 0 ? '↑' : '↓'} {formatWeightDelta(weightTrend, unit)}
                 </span>
               )}
-              {daysUntilFight !== null && <p className="text-xs text-gray-500 mt-1">{daysUntilFight} days out</p>}
+              {daysUntilFight !== null && <p className="text-xs text-gray-400 mt-1">{daysUntilFight} days out</p>}
             </div>
           </div>
           <div className="h-3 bg-dark-500 rounded-full overflow-hidden">
@@ -262,7 +262,7 @@ export default function WeightTracker() {
               style={{ width: `${cutProgress}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-600 mt-1.5">
+          <div className="flex justify-between text-xs text-gray-500 mt-1.5">
             <span>Start: {formatWeight(startW, unit)}</span>
             <span>Target: {formatWeight(targetW, unit)}</span>
           </div>
@@ -276,29 +276,29 @@ export default function WeightTracker() {
           <div className={`card border ${paceUi.border}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500">Cut Pace</p>
+                <p className="text-xs text-gray-400">Cut Pace</p>
                 <p className={`text-lg font-black ${paceUi.text}`}>{paceUi.label}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500">Projected weigh-in</p>
+                <p className="text-xs text-gray-400">Projected weigh-in</p>
                 <p className="text-lg font-black text-white">
                   {proj.trendEstablished
-                    ? <>{d(proj.projectedWeighIn)}<span className="text-xs text-gray-500"> {unit}</span></>
+                    ? <>{d(proj.projectedWeighIn)}<span className="text-xs text-gray-400"> {unit}</span></>
                     : '—'}
                 </p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="bg-dark-600 rounded-lg px-3 py-2">
-                <p className="text-xs text-gray-500">Need / day</p>
+                <p className="text-xs text-gray-400">Need / day</p>
                 <p className="text-sm text-white font-semibold">{d(proj.lbsPerDayNeeded)} {unit}</p>
               </div>
               <div className="bg-dark-600 rounded-lg px-3 py-2">
-                <p className="text-xs text-gray-500">Avg so far / day</p>
+                <p className="text-xs text-gray-400">Avg so far / day</p>
                 <p className="text-sm text-white font-semibold">{proj.trendEstablished ? `${d(proj.lbsPerDayActual)} ${unit}` : '—'}</p>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2.5">
+            <p className="text-xs text-gray-400 mt-2.5">
               {!proj.trendEstablished
                 ? 'Log weigh-ins on a few different days and your projected weigh-in weight will appear here.'
                 : proj.projectedMiss > 0
@@ -314,7 +314,7 @@ export default function WeightTracker() {
       {/* Chart */}
       {chartData.length > 1 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weight Over Camp</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight Over Camp</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -377,7 +377,7 @@ export default function WeightTracker() {
       {/* History */}
       {campEntries.length > 0 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weight Log</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight Log</p>
           <div className="space-y-2">
             {[...campEntries].reverse().map((entry, i) => {
               const prev = [...campEntries].reverse()[i + 1];
@@ -386,21 +386,21 @@ export default function WeightTracker() {
                 <div key={entry.id} className="card flex items-center gap-3">
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-white">{formatWeight(entry.weight, unit)}</p>
-                    <p className="text-xs text-gray-500">{format(parseISO(entry.date), 'EEEE, MMM d')}</p>
-                    {entry.notes && <p className="text-xs text-gray-600 italic mt-0.5">{entry.notes}</p>}
+                    <p className="text-xs text-gray-400">{format(parseISO(entry.date), 'EEEE, MMM d')}</p>
+                    {entry.notes && <p className="text-xs text-gray-500 italic mt-0.5">{entry.notes}</p>}
                   </div>
                   <div className="text-right">
                     {change !== null && (
-                      <span className={`badge text-xs ${change < 0 ? 'bg-green-900/40 text-green-400' : change > 0 ? 'bg-red-900/40 text-red-400' : 'bg-dark-500 text-gray-500'}`}>
+                      <span className={`badge text-xs ${change < 0 ? 'bg-green-900/40 text-green-400' : change > 0 ? 'bg-red-900/40 text-red-400' : 'bg-dark-500 text-gray-400'}`}>
                         {change > 0 ? '+' : ''}{formatWeightDelta(change, unit)}
                       </span>
                     )}
-                    {hasCutTarget && <p className="text-xs text-gray-600 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>}
+                    {hasCutTarget && <p className="text-xs text-gray-500 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>}
                   </div>
                   <button
                     onClick={() => setDeleteConfirmId(entry.id)}
                     aria-label={`Delete weigh-in: ${formatWeight(entry.weight, unit)} on ${format(parseISO(entry.date), 'MMM d')}`}
-                    className="text-gray-600 hover:text-red-400 transition-colors -m-2 p-2"
+                    className="text-gray-500 hover:text-red-400 transition-colors -m-2 p-2"
                   >
                     <Trash2 size={14} />
                   </button>

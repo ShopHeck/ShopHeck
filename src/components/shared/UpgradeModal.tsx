@@ -144,7 +144,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
             <h2 className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-white p-3 -m-2 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -155,14 +155,14 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             <button
               onClick={() => setBilling('monthly')}
               aria-pressed={billing === 'monthly'}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
             >
               Monthly
             </button>
             <button
               onClick={() => setBilling('annual')}
               aria-pressed={billing === 'annual'}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
             >
               Annual <span className="text-brand-400">Save 37%</span>
             </button>
@@ -186,7 +186,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
                   {f}
                 </li>
               ))}
-              <li className="text-xs text-gray-500">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
+              <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
             </ul>
             <div className="flex items-center justify-between pt-1">
               <div>
@@ -257,13 +257,13 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
           )}
 
-          <p className="text-center text-[11px] leading-relaxed text-gray-600">
+          <p className="text-center text-[11px] leading-relaxed text-gray-500">
             {showNativeFooter
               ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
               : 'Cancel anytime. No commitment required.'}
           </p>
 
-          <p className="text-center text-[11px] text-gray-500">
+          <p className="text-center text-[11px] text-gray-400">
             <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use (EULA)</a>
             <span className="mx-1.5">·</span>
             <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
@@ -273,7 +273,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             <button
               onClick={handleRestore}
               disabled={loading}
-              className="text-xs text-gray-500 underline block mx-auto disabled:opacity-50"
+              className="text-xs text-gray-400 underline block mx-auto disabled:opacity-50"
             >
               Restore Purchases
             </button>

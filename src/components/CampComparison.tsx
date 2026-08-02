@@ -51,9 +51,9 @@ export default function CampComparison({ onOpenFight }: Props) {
   if (rows.length === 0) {
     return (
       <div className="mx-4 mt-10 text-center">
-        <History size={40} className="text-gray-600 mx-auto mb-3" />
+        <History size={40} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No camps yet</p>
-        <p className="text-xs text-gray-500 mt-1">Your past camps will appear here for comparison.</p>
+        <p className="text-xs text-gray-400 mt-1">Your past camps will appear here for comparison.</p>
       </div>
     );
   }
@@ -61,7 +61,7 @@ export default function CampComparison({ onOpenFight }: Props) {
   return (
     <div className="pb-8">
       <div className="mx-4 mt-4">
-        <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Camp History</p>
+        <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">Camp History</p>
         <p className="text-white font-bold">Compare camps vs outcomes</p>
       </div>
 
@@ -103,7 +103,7 @@ export default function CampComparison({ onOpenFight }: Props) {
               <Bar dataKey="Readiness" fill="#a855f7" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="text-[11px] text-gray-500 mt-2">Labels on x-axis use the outcome letter (W/L/D) for quick scan.</p>
+          <p className="text-[11px] text-gray-400 mt-2">Labels on x-axis use the outcome letter (W/L/D) for quick scan.</p>
         </div>
       )}
 
@@ -123,7 +123,7 @@ export default function CampComparison({ onOpenFight }: Props) {
                   <OutcomeIcon size={18} />
                 </div>
               ) : (
-                <div className="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center text-xs text-gray-500">
+                <div className="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center text-xs text-gray-400">
                   —
                 </div>
               )}
@@ -131,7 +131,7 @@ export default function CampComparison({ onOpenFight }: Props) {
                 <p className="text-white font-semibold truncate">
                   {camp.opponent || 'No opponent'} · {camp.weightClass}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d, yyyy') : 'No fight date'} · {camp.campWeeks}wk · {kpis.sparringRoundsTotal} spar rds · {Math.round(kpis.adherence * 100)}% adherence
                 </p>
                 {fight && (
@@ -141,7 +141,7 @@ export default function CampComparison({ onOpenFight }: Props) {
                   <p className="text-[11px] text-brand-400 mt-0.5">Log fight result →</p>
                 )}
               </div>
-              {fight && <ChevronRight size={18} className="text-gray-500 flex-shrink-0" />}
+              {fight && <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />}
             </button>
           );
         })}

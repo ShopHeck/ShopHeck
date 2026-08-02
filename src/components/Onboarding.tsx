@@ -221,7 +221,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                           <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
                           <div>
                             <p className={`text-sm font-bold ${offSeasonGoal === g.value ? 'text-teal-300' : 'text-white'}`}>{g.label}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{g.desc}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{g.desc}</p>
                           </div>
                         </button>
                       ))}
@@ -337,16 +337,16 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 <div className="bg-dark-600 rounded-xl border border-dark-400 p-4 text-left space-y-2">
                   {isOffSeason ? (
                     <>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Mode</span><span className="text-teal-400 font-bold text-sm">Off Season</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Goal</span><span className="text-white font-semibold text-sm capitalize">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Duration</span><span className="text-teal-400 font-bold text-sm">12 Weeks (3 cycles)</span></div>
-                      {currentWeight && <div className="flex justify-between"><span className="text-gray-500 text-sm">Starting Weight</span><span className="text-white font-semibold text-sm">{currentWeight} {unit}</span></div>}
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Mode</span><span className="text-teal-400 font-bold text-sm">Off Season</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Goal</span><span className="text-white font-semibold text-sm capitalize">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Duration</span><span className="text-teal-400 font-bold text-sm">12 Weeks (3 cycles)</span></div>
+                      {currentWeight && <div className="flex justify-between"><span className="text-gray-400 text-sm">Starting Weight</span><span className="text-white font-semibold text-sm">{currentWeight} {unit}</span></div>}
                     </>
                   ) : (
                     <>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} {unit}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Fight Date</span><span className="text-white font-semibold text-sm">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Camp Length</span><span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400 text-sm">Weight Cut</span><span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} {unit}</span></div>
                     </>
                   )}
                 </div>
@@ -446,7 +446,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
         {step === 0 && (
           <div className="flex flex-col gap-5 mt-2">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">I am a...</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">I am a...</p>
               <div className="grid grid-cols-2 gap-3">
                 {(['fighter', 'coach'] as UserRole[]).map(r => (
                   <button
@@ -542,7 +542,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               <h2 className="text-xl font-black text-white">
                 {isOffSeason ? 'Off Season Setup' : 'Fight Camp Setup'}
               </h2>
-              <p className="text-gray-500 text-sm mt-1">
+              <p className="text-gray-400 text-sm mt-1">
                 {isOffSeason ? 'Set your goal and start training' : 'Tell us about your upcoming fight'}
               </p>
             </div>
@@ -577,7 +577,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                       <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
                       <div>
                         <p className={`text-sm font-bold ${offSeasonGoal === g.value ? 'text-teal-300' : 'text-white'}`}>{g.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{g.desc}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{g.desc}</p>
                       </div>
                     </button>
                   ))}
@@ -711,40 +711,40 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
 
             <div className="bg-dark-700 rounded-xl border border-dark-500 p-4 text-left space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">{isOffSeason ? 'Athlete' : 'Fighter'}</span>
+                <span className="text-gray-400 text-sm">{isOffSeason ? 'Athlete' : 'Fighter'}</span>
                 <span className="text-white font-semibold">{name}</span>
               </div>
               {isOffSeason ? (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Mode</span>
+                    <span className="text-gray-400 text-sm">Mode</span>
                     <span className="text-teal-400 font-bold">Off Season</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Goal</span>
+                    <span className="text-gray-400 text-sm">Goal</span>
                     <span className="text-white font-semibold">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Duration</span>
+                    <span className="text-gray-400 text-sm">Duration</span>
                     <span className="text-teal-400 font-bold">12 Weeks · 3 Cycles</span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Fight Date</span>
+                    <span className="text-gray-400 text-sm">Fight Date</span>
                     <span className="text-white font-semibold">{new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Weight Class</span>
+                    <span className="text-gray-400 text-sm">Weight Class</span>
                     <span className="text-white font-semibold">{weightClass}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Camp Duration</span>
+                    <span className="text-gray-400 text-sm">Camp Duration</span>
                     <span className="text-brand-400 font-bold">{campWeeks} Weeks</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Weight Cut</span>
+                    <span className="text-gray-400 text-sm">Weight Cut</span>
                     <span className="text-white font-semibold">{currentWeight} → {targetWeight} {unit}</span>
                   </div>
                 </>
@@ -767,13 +767,13 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           <div className="flex flex-col gap-5 mt-4">
             <div>
               <h2 className="text-2xl font-black text-white">Your camp is built.</h2>
-              <p className="text-gray-500 text-sm mt-1">
+              <p className="text-gray-400 text-sm mt-1">
                 Everything below is free. Pro adds your corner team.
               </p>
             </div>
 
             <div className="card">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Free — yours already</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Free — yours already</p>
               <ul className="space-y-1.5">
                 {[
                   'Periodized week-by-week camp plan',
@@ -782,7 +782,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                   'Progress charts & fight readiness',
                 ].map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-gray-400">
-                    <Check size={13} className="text-gray-500 mt-0.5 flex-shrink-0" />
+                    <Check size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     {f}
                   </li>
                 ))}
@@ -811,7 +811,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-xs text-gray-400 mt-3">
                 {PRICES.fighter.monthly}/month or {PRICES.fighter.annual}/year · cancel anytime
               </p>
             </div>
@@ -826,7 +826,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               </button>
               <button
                 onClick={() => setStep(4)}
-                className="text-sm text-gray-500 hover:text-gray-300 py-2 transition-colors"
+                className="text-sm text-gray-400 hover:text-gray-300 py-2 transition-colors"
               >
                 Continue with the free app →
               </button>
@@ -860,33 +860,33 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 {isOffSeason ? (
                   <>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Mode</span>
+                      <span className="text-gray-400 text-sm">Mode</span>
                       <span className="text-teal-400 font-bold text-sm">Off Season</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Goal</span>
+                      <span className="text-gray-400 text-sm">Goal</span>
                       <span className="text-white font-semibold text-sm">{OFF_SEASON_GOALS.find(g => g.value === offSeasonGoal)?.label}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Duration</span>
+                      <span className="text-gray-400 text-sm">Duration</span>
                       <span className="text-teal-400 font-bold text-sm">12 Weeks</span>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Fight Date</span>
+                      <span className="text-gray-400 text-sm">Fight Date</span>
                       <span className="text-white font-semibold text-sm">
                         {new Date(fightDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Camp Length</span>
+                      <span className="text-gray-400 text-sm">Camp Length</span>
                       <span className="text-brand-400 font-bold text-sm">{campWeeks} Weeks</span>
                     </div>
                     {currentWeight && targetWeight && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500 text-sm">Weight Cut</span>
+                        <span className="text-gray-400 text-sm">Weight Cut</span>
                         <span className="text-white font-semibold text-sm">{currentWeight} → {targetWeight} {unit}</span>
                       </div>
                     )}
@@ -903,11 +903,11 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               <ChevronRight size={20} />
             </button>
 
-            <p className="text-xs text-gray-600 -mt-2">
+            <p className="text-xs text-gray-500 -mt-2">
               By continuing you agree to our{' '}
-              <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Terms of Service</a>
+              <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-400 underline hover:text-gray-400">Terms of Service</a>
               {' '}and{' '}
-              <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-500 underline hover:text-gray-400">Privacy Policy</a>.
+              <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="text-gray-400 underline hover:text-gray-400">Privacy Policy</a>.
             </p>
 
           </div>

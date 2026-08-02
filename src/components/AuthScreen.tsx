@@ -59,11 +59,11 @@ export default function AuthScreen({ onClose }: Props) {
               {mode === 'signin' ? 'Sign in' : 'Create account'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1 transition-colors"><X size={20} /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-1 transition-colors"><X size={20} /></button>
         </div>
 
         <div className="px-5 pb-5 space-y-3">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             Sync your camps across devices{mode === 'signin' ? '' : ' and connect with your coach'}. Optional — the app works fine without an account.
           </p>
 
@@ -71,7 +71,7 @@ export default function AuthScreen({ onClose }: Props) {
 
           <div className="flex items-center gap-3 py-1">
             <div className="flex-1 h-px bg-dark-500" />
-            <span className="text-xs text-gray-600">or</span>
+            <span className="text-xs text-gray-500">or</span>
             <div className="flex-1 h-px bg-dark-500" />
           </div>
 
@@ -79,11 +79,11 @@ export default function AuthScreen({ onClose }: Props) {
             <input className="input" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)} autoComplete="name" />
           )}
           <div className="relative">
-            <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="input pl-9" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" />
           </div>
           <div className="relative">
-            <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="input pl-9" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
           </div>
 
@@ -96,7 +96,7 @@ export default function AuthScreen({ onClose }: Props) {
 
           <button
             onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setNotice(''); }}
-            className="text-xs text-gray-500 hover:text-gray-300 block mx-auto"
+            className="text-xs text-gray-400 hover:text-gray-300 block mx-auto"
           >
             {mode === 'signin' ? "New here? Create an account" : 'Have an account? Sign in'}
           </button>

@@ -120,7 +120,7 @@ function BreakdownCard({ item }: { item: ReadinessBreakdownItem }) {
           <span className="text-xs font-semibold text-gray-300 truncate">{item.label}</span>
         </div>
         <span className="text-sm font-black text-white flex-shrink-0">
-          {item.score}<span className="text-xs font-normal text-gray-500">/{item.max}</span>
+          {item.score}<span className="text-xs font-normal text-gray-400">/{item.max}</span>
         </span>
       </div>
 
@@ -132,7 +132,7 @@ function BreakdownCard({ item }: { item: ReadinessBreakdownItem }) {
         />
       </div>
 
-      <p className="text-xs text-gray-500 leading-tight">{item.detail}</p>
+      <p className="text-xs text-gray-400 leading-tight">{item.detail}</p>
     </div>
   );
 }
@@ -181,12 +181,12 @@ export default function FightReadiness() {
       <div className="mx-4 card">
         <div className="flex items-start justify-between mb-1">
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fight Readiness</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fight Readiness</p>
             <p className="text-sm font-bold mt-0.5" style={{ color: statusColor }}>{status}</p>
           </div>
           <div className="text-right">
             <p className="text-lg font-black text-white">{daysUntilFight}</p>
-            <p className="text-xs text-gray-500 -mt-0.5">days out</p>
+            <p className="text-xs text-gray-400 -mt-0.5">days out</p>
           </div>
         </div>
 
@@ -203,7 +203,7 @@ export default function FightReadiness() {
           ].map(z => (
             <div key={z.label} className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: z.color }} />
-              <span className="text-xs text-gray-600">{z.range}</span>
+              <span className="text-xs text-gray-500">{z.range}</span>
             </div>
           ))}
         </div>
@@ -212,7 +212,7 @@ export default function FightReadiness() {
       {/* Key focus areas */}
       {insights.length > 0 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Focus Areas</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Focus Areas</p>
           <div className="card space-y-3">
             {insights.map((insight, i) => (
               <div key={i} className="flex items-start gap-2.5">
@@ -226,7 +226,7 @@ export default function FightReadiness() {
 
       {/* Score breakdown grid */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Score Breakdown</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Score Breakdown</p>
         <div className="grid grid-cols-2 gap-3">
           {breakdown.map(item => (
             <BreakdownCard key={item.label} item={item} />

@@ -195,7 +195,7 @@ function AppShell() {
               <div className="mx-4 mt-8 flex flex-col gap-4">
                 <div className="text-center mb-2">
                   <h2 className="text-xl font-black text-white">What are you training for?</h2>
-                  <p className="text-gray-500 text-sm mt-1">Choose your mode to get started</p>
+                  <p className="text-gray-400 text-sm mt-1">Choose your mode to get started</p>
                 </div>
                 <button
                   onClick={() => requestNewCamp(false)}
@@ -206,7 +206,7 @@ function AppShell() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold text-white">Fight Camp</p>
-                    <p className="text-xs text-gray-500 mt-0.5">I have a fight scheduled — build a camp around it</p>
+                    <p className="text-xs text-gray-400 mt-0.5">I have a fight scheduled — build a camp around it</p>
                   </div>
                 </button>
                 <button
@@ -218,7 +218,7 @@ function AppShell() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold text-white">Off Season Training</p>
-                    <p className="text-xs text-gray-500 mt-0.5">No fight scheduled — just training, tracking progress</p>
+                    <p className="text-xs text-gray-400 mt-0.5">No fight scheduled — just training, tracking progress</p>
                   </div>
                 </button>
               </div>

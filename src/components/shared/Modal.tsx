@@ -16,9 +16,12 @@ export default function Modal({ title, onClose, children, footer }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   // Latest onClose without re-running the mount effect (which owns body scroll
-  // lock and focus restore, and must run exactly once per open).
+  // lock and focus restore, and must run exactly once per open). Synced in an
+  // effect — writing a ref during render breaks the compiler's purity rules.
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Use JS-computed pixel height instead of dvh/vh CSS units.
   // visualViewport shrinks when keyboard opens (works with resize:'native' in Capacitor).

@@ -85,7 +85,7 @@ export default function ProGate({
             Unlock with {tierLabel}
           </button>
           {/* Trial exists only on the App Store (RevenueCat); web Stripe links have none. */}
-          <p className="text-xs text-gray-600 mt-3">
+          <p className="text-xs text-gray-500 mt-3">
             {Capacitor.isNativePlatform() ? '7-day free trial · cancel anytime' : 'Cancel anytime'}
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function ProGate({
       <>
         <button
           onClick={handleTap}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-600 border border-dark-400 text-gray-500 text-sm cursor-pointer hover:border-brand-600 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-600 border border-dark-400 text-gray-400 text-sm cursor-pointer hover:border-brand-600 transition-colors"
         >
           <Lock size={13} className="text-brand-500" />
           <span>PRO</span>

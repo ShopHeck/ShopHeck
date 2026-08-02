@@ -45,9 +45,9 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
             </span>
           </div>
           <p className="text-sm font-semibold text-white">{ex.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{ex.setsReps}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{ex.setsReps}</p>
         </div>
-        <div className="text-gray-500 flex-shrink-0 mt-1">
+        <div className="text-gray-400 flex-shrink-0 mt-1">
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
@@ -63,7 +63,7 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-400">
             {ex.muscleGroups.length > 0 && (
               <div>
                 <span className="font-semibold text-gray-400">Muscles: </span>
@@ -119,7 +119,7 @@ export default function WorkoutLibrary() {
       {/* Search */}
       <div className="mx-4 mt-4">
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9 text-sm"
             aria-label="Search the workout library"
@@ -170,7 +170,7 @@ export default function WorkoutLibrary() {
 
       {/* Results count */}
       <div className="mx-4 mt-3 mb-2">
-        <p className="text-xs text-gray-500">{filtered.length} exercise{filtered.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-gray-400">{filtered.length} exercise{filtered.length !== 1 ? 's' : ''}</p>
       </div>
 
       {/* Exercise list */}
@@ -178,7 +178,7 @@ export default function WorkoutLibrary() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <div className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center">
-              <Dumbbell size={22} className="text-gray-500" />
+              <Dumbbell size={22} className="text-gray-400" />
             </div>
             <p className="text-sm text-gray-400">No exercises match your search.</p>
             <button

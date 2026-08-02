@@ -146,7 +146,7 @@ export default function PostFightInsights(props: Props) {
           </div>
           <div className="flex-1">
             <p className="text-white font-bold">AI Post-Fight Breakdown</p>
-            <p className="text-xs text-gray-500">The AI writes the narrative. Weights above are rules-based.</p>
+            <p className="text-xs text-gray-400">The AI writes the narrative. Weights above are rules-based.</p>
           </div>
           <Sparkles size={16} className="text-purple-400" />
         </div>

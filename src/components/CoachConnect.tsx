@@ -131,7 +131,7 @@ export default function CoachConnect() {
 
   return (
     <div className="mx-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
         {role === 'coach' ? 'Your Fighters' : 'Your Coach'}
       </p>
       <div className="card space-y-3">
@@ -143,7 +143,7 @@ export default function CoachConnect() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Invite a fighter</p>
-                <p className="text-xs text-gray-500">Share a code — once they enter it, you'll see their training.</p>
+                <p className="text-xs text-gray-400">Share a code — once they enter it, you'll see their training.</p>
               </div>
             </div>
 
@@ -166,7 +166,7 @@ export default function CoachConnect() {
 
             {/* The other direction: a fighter shared THEIR code with this coach. */}
             <div className="border-t border-dark-600 pt-3">
-              <p className="text-xs text-gray-500 mb-2">Got a code from a fighter? Enter it to add them to your roster.</p>
+              <p className="text-xs text-gray-400 mb-2">Got a code from a fighter? Enter it to add them to your roster.</p>
               {fighterLinked ? (
                 <div className="flex items-center gap-2 bg-green-900/20 border border-green-800/40 rounded-xl px-3 py-2.5 text-sm text-green-400">
                   <Check size={16} /> Fighter linked — they're on your dashboard.
@@ -195,7 +195,7 @@ export default function CoachConnect() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Connect your coach</p>
-                <p className="text-xs text-gray-500">Enter the invite code your coach gave you.</p>
+                <p className="text-xs text-gray-400">Enter the invite code your coach gave you.</p>
               </div>
             </div>
 
@@ -224,7 +224,7 @@ export default function CoachConnect() {
             {/* The outbound loop: coach isn't on the app yet, so send them the
                 app + a code in one message instead of waiting for one. */}
             <div className="border-t border-dark-600 pt-3">
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-gray-400 mb-2">
                 Coach not on the app yet? Send them the app and your code in one message — when they
                 join, they'll see your whole camp.
               </p>

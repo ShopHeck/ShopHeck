@@ -23,7 +23,7 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
     ? 'text-red-400 animate-pulse'
     : streak.current > 0
     ? 'text-orange-400'
-    : 'text-gray-500';
+    : 'text-gray-400';
 
   function toggleCollapsed(e: React.MouseEvent) {
     e.stopPropagation();
@@ -57,7 +57,7 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
           </div>
           <button
             onClick={toggleCollapsed}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-gray-400 hover:text-gray-300 transition-colors"
             aria-label="Expand progress widget"
           >
             <ChevronDown size={14} />
@@ -71,18 +71,18 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
     <div className="mx-4">
       <div className="bg-gradient-to-br from-dark-700 to-dark-800 border border-dark-500 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Your Progress</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Your Progress</p>
           <div className="flex items-center gap-1">
             <button
               onClick={toggleCollapsed}
-              className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+              className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
               aria-label="Collapse progress widget"
             >
               <ChevronUp size={14} />
             </button>
             <button
               onClick={hide}
-              className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+              className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
               aria-label="Hide progress widget"
             >
               <X size={14} />
@@ -98,11 +98,11 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">{BELT_LABELS[belt.current]}</p>
               {belt.nextTier ? (
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <p className="text-[11px] text-gray-400 mt-0.5">
                   {belt.workoutsToNext} workouts or {belt.winsToNext} win{belt.winsToNext === 1 ? '' : 's'} to {BELT_LABELS[belt.nextTier]}
                 </p>
               ) : (
-                <p className="text-[11px] text-gray-500 mt-0.5">Highest rank achieved.</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Highest rank achieved.</p>
               )}
             </div>
           </div>
@@ -122,16 +122,16 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
               <div>
                 <div className="text-base font-black text-white leading-tight">
                   {streak.current}
-                  <span className="text-[10px] text-gray-500 font-medium ml-1">day{streak.current === 1 ? '' : 's'}</span>
+                  <span className="text-[10px] text-gray-400 font-medium ml-1">day{streak.current === 1 ? '' : 's'}</span>
                 </div>
-                <div className="text-[10px] text-gray-500">
+                <div className="text-[10px] text-gray-400">
                   {streak.atRisk ? 'Streak at risk!' : streak.expired ? 'Streak ended' : streak.best > streak.current ? `Best ${streak.best}` : 'Current streak'}
                 </div>
               </div>
             </div>
             {activeChallenge && (
               <div className="min-w-0">
-                <div className="text-[10px] text-gray-500 truncate">{activeChallenge.title}</div>
+                <div className="text-[10px] text-gray-400 truncate">{activeChallenge.title}</div>
                 <div className="mt-1 h-1 bg-dark-500 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-teal-500 transition-all"

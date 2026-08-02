@@ -199,9 +199,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campWorkouts.length === 0 ? (
             <div className="card text-center py-10">
-              <Dumbbell size={32} className="text-gray-600 mx-auto mb-3" />
+              <Dumbbell size={32} className="text-gray-500 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No workouts logged yet</p>
-              <p className="text-sm text-gray-600 mt-1">Tap "Log Workout" to record your first session</p>
+              <p className="text-sm text-gray-500 mt-1">Tap "Log Workout" to record your first session</p>
             </div>
           ) : (
             campWorkouts.map(log => (
@@ -216,22 +216,22 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       <div className="flex items-center flex-shrink-0">
                         <button onClick={() => setShareLog(log)}
                           aria-label={`Share workout: ${log.title}`}
-                          className="text-gray-600 hover:text-brand-400 transition-colors -m-2 p-2">
+                          className="text-gray-500 hover:text-brand-400 transition-colors -m-2 p-2">
                           <Share2 size={14} />
                         </button>
                         <button onClick={() => setDeleteConfirmId(log.id)}
                           aria-label={`Delete workout: ${log.title}`}
-                          className="text-gray-600 hover:text-red-400 transition-colors -m-2 p-2 ml-2">
+                          className="text-gray-500 hover:text-red-400 transition-colors -m-2 p-2 ml-2">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Clock size={11} /> {log.duration}min</span>
                       <span className="flex items-center gap-1"><Zap size={11} /> RPE {log.rpe}/10</span>
                       <span>{format(parseISO(log.date), 'MMM d')}</span>
                     </div>
-                    {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
+                    {log.notes && <p className="text-xs text-gray-500 mt-1 italic">{log.notes}</p>}
                   </div>
                 </div>
               </div>
@@ -248,9 +248,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campSparring.length === 0 ? (
             <div className="card text-center py-10">
-              <Zap size={32} className="text-gray-600 mx-auto mb-3" />
+              <Zap size={32} className="text-gray-500 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No sparring logged yet</p>
-              <p className="text-sm text-gray-600 mt-1">Log rounds to track your progress</p>
+              <p className="text-sm text-gray-500 mt-1">Log rounds to track your progress</p>
             </div>
           ) : (
             campSparring.map(log => (
@@ -259,18 +259,18 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-white">{log.rounds} rounds</span>
-                      <span className="text-xs text-gray-500">×{log.roundDuration}min</span>
+                      <span className="text-xs text-gray-400">×{log.roundDuration}min</span>
                       <span className={`badge text-xs text-white ${PERF_COLORS[log.performance]}`}>{PERF_LABELS[log.performance]}</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-400 mt-0.5">
                       {log.partnerName && log.partnerName !== 'Unknown' ? `vs ${log.partnerName} (${log.partnerLevel})` : `${log.partnerLevel}-level partner`} · {format(parseISO(log.date), 'MMM d')}
                     </p>
                     {log.focus && <p className="text-xs text-gray-400 mt-1">Focus: {log.focus}</p>}
-                    {log.notes && <p className="text-xs text-gray-600 mt-1 italic">{log.notes}</p>}
+                    {log.notes && <p className="text-xs text-gray-500 mt-1 italic">{log.notes}</p>}
                   </div>
                   <button onClick={() => setDeleteSparConfirmId(log.id)}
                     aria-label={`Delete sparring session${log.partnerName && log.partnerName !== 'Unknown' ? ` with ${log.partnerName}` : ''}`}
-                    className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
+                    className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -288,9 +288,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campCond.length === 0 ? (
             <div className="card text-center py-10">
-              <Clock size={32} className="text-gray-600 mx-auto mb-3" />
+              <Clock size={32} className="text-gray-500 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No conditioning tests yet</p>
-              <p className="text-sm text-gray-600 mt-1">Track benchmark tests throughout camp</p>
+              <p className="text-sm text-gray-500 mt-1">Track benchmark tests throughout camp</p>
             </div>
           ) : (
             campCond.map(test => (
@@ -298,17 +298,17 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-sm">{test.testType}</p>
-                    <p className="text-xs text-gray-500">{format(parseISO(test.date), 'MMM d')} · Week {test.weekNumber}</p>
-                    {test.notes && <p className="text-xs text-gray-600 mt-1 italic">{test.notes}</p>}
+                    <p className="text-xs text-gray-400">{format(parseISO(test.date), 'MMM d')} · Week {test.weekNumber}</p>
+                    {test.notes && <p className="text-xs text-gray-500 mt-1 italic">{test.notes}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <p className="text-2xl font-black text-brand-400">{test.value}</p>
-                      <p className="text-xs text-gray-500">{test.unit}</p>
+                      <p className="text-xs text-gray-400">{test.unit}</p>
                     </div>
                     <button onClick={() => setDeleteCondConfirmId(test.id)}
                       aria-label={`Delete ${test.testType} test result`}
-                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
+                      className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -429,12 +429,12 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <div role="group" aria-label="Performance" className="flex gap-2">
                 {([1,2,3,4,5] as const).map(n => (
                   <button key={n} onClick={() => setSPerf(n)} aria-pressed={sPerf === n}
-                    className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${sPerf === n ? `border-transparent text-white ${PERF_COLORS[n]}` : 'border-dark-400 bg-dark-600 text-gray-500'}`}>
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${sPerf === n ? `border-transparent text-white ${PERF_COLORS[n]}` : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
                     {n}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-center text-gray-500 mt-1">{PERF_LABELS[sPerf]}</p>
+              <p className="text-xs text-center text-gray-400 mt-1">{PERF_LABELS[sPerf]}</p>
             </div>
             <div>
               <label className="block">
