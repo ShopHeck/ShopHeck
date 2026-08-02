@@ -73,6 +73,46 @@ export async function redeemInvite(code: string): Promise<{ coachId?: string; er
   return { coachId: data as string };
 }
 
+// ── Fighter-initiated invites (the outbound viral loop) ──────────────────────
+//
+// The mirror of the coach flow above: the FIGHTER mints a code and shares it
+// out with the app link; the invited coach installs, signs up as a coach, and
+// redeems. Same link row either way.
+
+/** Fighter: mint a code to hand OUT to a coach (retries once on collision). */
+export async function createFighterInvite(fighterId: string): Promise<{ code?: string; error?: string }> {
+  if (!supabase) return { error: 'Cloud sync is not configured.' };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const code = generateCode();
+    const { error } = await supabase.from('fighter_invites').insert({ code, fighter_id: fighterId });
+    if (!error) return { code };
+    if (error.code !== '23505') return { error: error.message }; // not a uniqueness clash
+  }
+  return { error: 'Could not generate a code, please try again.' };
+}
+
+/** Fighter: newest still-valid outgoing invite codes (reused across shares). */
+export async function listFighterInvites(fighterId: string): Promise<string[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('fighter_invites')
+    .select('code, expires_at')
+    .eq('fighter_id', fighterId)
+    .order('created_at', { ascending: false });
+  const now = Date.now();
+  return (data ?? [])
+    .filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now)
+    .map(r => r.code);
+}
+
+/** Coach: redeem a code a fighter shared. Returns the fighter's id on success. */
+export async function redeemFighterInvite(code: string): Promise<{ fighterId?: string; error?: string }> {
+  if (!supabase) return { error: 'Cloud sync is not configured.' };
+  const { data, error } = await supabase.rpc('redeem_fighter_invite', { invite_code: code.trim().toUpperCase() });
+  if (error) return { error: error.message };
+  return { fighterId: data as string };
+}
+
 /** Fighter: drop the current coach link(s). */
 export async function unlinkAllCoaches(fighterId: string): Promise<void> {
   if (!supabase) return;

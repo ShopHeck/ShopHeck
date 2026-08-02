@@ -161,6 +161,35 @@ export type Database = {
           },
         ]
       }
+      fighter_invites: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          fighter_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at?: string
+          fighter_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          fighter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fighter_invites_fighter_id_fkey"
+            columns: ["fighter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_notes: {
         Row: {
           camp_id: string
@@ -831,6 +860,7 @@ export type Database = {
       delete_account: { Args: Record<string, never>; Returns: undefined }
       is_coach_of: { Args: { fighter: string }; Returns: boolean }
       redeem_coach_invite: { Args: { invite_code: string }; Returns: string }
+      redeem_fighter_invite: { Args: { invite_code: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
