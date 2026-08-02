@@ -3,6 +3,7 @@ import * as LucideIcons from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../../hooks/useHaptics';
 import ShareCard, { type MilestoneShare } from '../ShareCard';
+import { maybeRequestReview } from '../../utils/appReview';
 import type { CelebrationEvent } from '../../types';
 
 const DISMISS_MS = 4000;
@@ -45,6 +46,10 @@ export default function CelebrationToast() {
     triggerHaptic(HAPTIC.sessionComplete);
     const id = setTimeout(() => {
       dispatch({ type: 'DISMISS_CELEBRATION', payload: event.id });
+      // A belt promotion is the app's strongest earned moment — ask for a
+      // rating as the toast slides away, not over it. Only on the passive
+      // auto-dismiss: a user busy tapping Share or X shouldn't get a sheet.
+      if (event.kind === 'belt') void maybeRequestReview('belt');
     }, DISMISS_MS);
     return () => clearTimeout(id);
   }, [event?.id, shareMilestone]); // eslint-disable-line react-hooks/exhaustive-deps

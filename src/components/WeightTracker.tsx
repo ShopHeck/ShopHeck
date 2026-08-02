@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, TrendingDown, Scale, AlertTriangle, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { writeWeightToHealth } from '../utils/healthSync';
+import { maybeRequestReview } from '../utils/appReview';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import {
   LineChart,
@@ -45,6 +46,16 @@ export default function WeightTracker() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Hitting fight weight is a P0-4 earned moment for the (self-throttled)
+  // native rating ask. Computed here — hooks must precede the early return —
+  // and cheap enough that the render-time projection below stays untouched.
+  const madeWeight = activeCamp
+    ? computeCutProjection(activeCamp, weightEntries).status === 'made'
+    : false;
+  useEffect(() => {
+    if (madeWeight) void maybeRequestReview('made_weight');
+  }, [madeWeight]);
 
   if (!activeCamp) return null;
 
