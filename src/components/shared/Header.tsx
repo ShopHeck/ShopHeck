@@ -37,7 +37,7 @@ export default function Header({ title, showBack, onBack, onSettings, subtitle, 
 
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-bold text-white truncate">{title}</h1>
-          {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-gray-400 truncate">{subtitle}</p>}
         </div>
 
         {showTimerPill && (

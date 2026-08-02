@@ -48,7 +48,7 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
         {/* Fixed header */}
         <div className="flex items-center justify-between p-5 flex-shrink-0 border-b border-dark-600">
           <h3 className="text-base font-bold text-white">New Preset</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-white p-1"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-1"><X size={18} /></button>
         </div>
 
         {/* Scrollable body */}
@@ -350,13 +350,13 @@ export default function RoundTimer() {
           <button
             onClick={() => setShowPresetModal(true)}
             aria-label="Create a custom timer preset"
-            className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dark-500 border-dashed text-gray-500 hover:text-white hover:border-dark-300 flex items-center justify-center transition-all"
+            className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dark-500 border-dashed text-gray-400 hover:text-white hover:border-dark-300 flex items-center justify-center transition-all"
           >
             <Plus size={16} />
           </button>
         ) : (
           <ProGate required="fighter_pro" inline={false}>
-            <button aria-label="Create a custom timer preset (Fighter Pro)" className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-500 flex items-center justify-center">
+            <button aria-label="Create a custom timer preset (Fighter Pro)" className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-400 flex items-center justify-center">
               <Plus size={16} />
             </button>
           </ProGate>
@@ -368,13 +368,13 @@ export default function RoundTimer() {
         {/* Large round number */}
         {phase !== 'idle' && phase !== 'done' && (
           <div className="text-center mb-3">
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-gray-600 uppercase">
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-gray-500 uppercase">
               {phase === 'prep' ? 'Get Ready' : 'Round'}
             </p>
             <p className="text-6xl font-black text-white leading-none">
               {phase === 'prep' ? '!' : currentRound}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">of {rounds}</p>
+            <p className="text-xs text-gray-400 mt-0.5">of {rounds}</p>
           </div>
         )}
 
@@ -425,10 +425,10 @@ export default function RoundTimer() {
             <span className="text-sm font-bold tabular-nums" style={{ color: ZONE_COLORS[hr.zone] }}>
               {hr.hr} bpm
             </span>
-            <span className="text-xs text-gray-500">{ZONE_LABELS[hr.zone]}</span>
+            <span className="text-xs text-gray-400">{ZONE_LABELS[hr.zone]}</span>
             {mep > 0 && (
               <>
-                <span className="text-gray-600">·</span>
+                <span className="text-gray-500">·</span>
                 <span className="text-xs font-semibold text-gray-300">{mep} MEP</span>
               </>
             )}
@@ -522,7 +522,7 @@ export default function RoundTimer() {
 
       {/* Settings */}
       <div className="mx-4 mt-6 space-y-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Timer Settings</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Timer Settings</p>
 
         {/* Rounds */}
         <div className="card flex items-center justify-between">
@@ -546,7 +546,7 @@ export default function RoundTimer() {
         <div className="card flex items-center justify-between">
           <div>
             <span className="text-sm font-medium text-white">Work Time</span>
-            <p className="text-xs text-gray-500">{fmt(workSec)} per round</p>
+            <p className="text-xs text-gray-400">{fmt(workSec)} per round</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => adj(setWorkSec, workSec, -15, 15, 1800)} disabled={isRunning}
@@ -567,7 +567,7 @@ export default function RoundTimer() {
         <div className="card flex items-center justify-between">
           <div>
             <span className="text-sm font-medium text-white">Rest Time</span>
-            <p className="text-xs text-gray-500">{fmt(restSec)} between rounds</p>
+            <p className="text-xs text-gray-400">{fmt(restSec)} between rounds</p>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => adj(setRestSec, restSec, -5, 5, 600)} disabled={isRunning}
@@ -588,7 +588,7 @@ export default function RoundTimer() {
         <div className="card flex items-center justify-between">
           <div>
             <span className="text-sm font-medium text-white">Get Ready</span>
-            <p className="text-xs text-gray-500">Countdown before round 1</p>
+            <p className="text-xs text-gray-400">Countdown before round 1</p>
           </div>
           <div className="flex gap-1.5">
             {[0, 5, 10].map(v => (
@@ -610,7 +610,7 @@ export default function RoundTimer() {
 
         {/* Ring Colors */}
         <div className="card space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ring Colors</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ring Colors</p>
           {[
             {
               label: 'Work',
@@ -648,13 +648,13 @@ export default function RoundTimer() {
         <div className="card flex items-center justify-between">
           <div>
             <span className="text-sm font-medium text-white">Warning Bell</span>
-            <p className="text-xs text-gray-500">Warning clap this many seconds before the round ends</p>
+            <p className="text-xs text-gray-400">Warning clap this many seconds before the round ends</p>
           </div>
           <div className="flex gap-1.5 flex-wrap justify-end">
             {[5, 10].map(v => (
               <button
                 key={v}
-                onClick={() => setWarningSec(v)}
+                onClick={() => setWarningSec(v)} aria-pressed={warningSec === v}
                 disabled={isRunning}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40 ${
                   warningSec === v
@@ -669,7 +669,7 @@ export default function RoundTimer() {
               {[15, 20, 30].map(v => (
                 <button
                   key={v}
-                  onClick={() => setWarningSec(v)}
+                  onClick={() => setWarningSec(v)} aria-pressed={warningSec === v}
                   disabled={isRunning}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all disabled:opacity-40 ${
                     warningSec === v
@@ -688,10 +688,10 @@ export default function RoundTimer() {
         <div className="card space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {voiceEnabled ? <Volume2 size={16} className="text-brand-400" /> : <VolumeX size={16} className="text-gray-500" />}
+              {voiceEnabled ? <Volume2 size={16} className="text-brand-400" /> : <VolumeX size={16} className="text-gray-400" />}
               <div>
                 <span className="text-sm font-medium text-white">Voice Announcements</span>
-                <p className="text-xs text-gray-500">Round & rest callouts</p>
+                <p className="text-xs text-gray-400">Round & rest callouts</p>
               </div>
             </div>
             <button
@@ -707,10 +707,10 @@ export default function RoundTimer() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Smartphone size={16} className={hapticEnabled ? 'text-brand-400' : 'text-gray-500'} />
+              <Smartphone size={16} className={hapticEnabled ? 'text-brand-400' : 'text-gray-400'} />
               <div>
                 <span className="text-sm font-medium text-white">Vibration</span>
-                <p className="text-xs text-gray-500">Haptic feedback on transitions</p>
+                <p className="text-xs text-gray-400">Haptic feedback on transitions</p>
               </div>
             </div>
             <button
@@ -727,10 +727,10 @@ export default function RoundTimer() {
           {bgAlertsSupported && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell size={16} className={bgAlerts ? 'text-brand-400' : 'text-gray-500'} />
+                <Bell size={16} className={bgAlerts ? 'text-brand-400' : 'text-gray-400'} />
                 <div>
                   <span className="text-sm font-medium text-white">Background Alerts</span>
-                  <p className="text-xs text-gray-500">Ring rounds with the app closed</p>
+                  <p className="text-xs text-gray-400">Ring rounds with the app closed</p>
                 </div>
               </div>
               <button
@@ -747,10 +747,10 @@ export default function RoundTimer() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Shuffle size={16} className={reactionMode ? 'text-brand-400' : 'text-gray-500'} />
+              <Shuffle size={16} className={reactionMode ? 'text-brand-400' : 'text-gray-400'} />
               <div>
                 <span className="text-sm font-medium text-white">Reaction Training</span>
-                <p className="text-xs text-gray-500">Technique prompts during rest</p>
+                <p className="text-xs text-gray-400">Technique prompts during rest</p>
               </div>
             </div>
             <button

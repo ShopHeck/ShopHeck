@@ -333,7 +333,7 @@ export default function ShareCard({ content, user, onClose }: Props) {
           <p className="text-sm font-semibold text-white">
             {content.kind === 'session' ? 'Share Session' : 'Share the Win'}
           </p>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white transition-colors w-11 h-11 flex items-center justify-center -m-2">
             <X size={18} />
           </button>
         </div>
@@ -348,7 +348,7 @@ export default function ShareCard({ content, user, onClose }: Props) {
           />
         ) : (
           <div className="flex-1 min-h-0 bg-dark-700 rounded-xl flex items-center justify-center" style={{ maxHeight: '60dvh' }}>
-            <p className="text-gray-500 text-sm">Generating…</p>
+            <p className="text-gray-400 text-sm">Generating…</p>
           </div>
         )}
 
@@ -371,7 +371,7 @@ export default function ShareCard({ content, user, onClose }: Props) {
           </button>
         </div>
 
-        <button onClick={onClose} className="text-center text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
+        <button onClick={onClose} className="text-center text-xs text-gray-400 hover:text-gray-300 transition-colors flex-shrink-0">
           Skip
         </button>
       </div>

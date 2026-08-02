@@ -85,9 +85,9 @@ export default function GamePlanBuilder() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Shield size={40} className="text-gray-600 mx-auto mb-3" />
+        <Shield size={40} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
-        <p className="text-sm text-gray-600 mt-1">Set up a fight camp to build your game plan</p>
+        <p className="text-sm text-gray-500 mt-1">Set up a fight camp to build your game plan</p>
       </div>
     );
   }
@@ -100,14 +100,14 @@ export default function GamePlanBuilder() {
       <div className="mx-4 mt-4 bg-gradient-to-br from-red-900/30 to-dark-700 rounded-2xl border border-red-900/40 p-4">
         <p className="text-xs font-semibold text-red-400 uppercase tracking-widest mb-1">Fight Game Plan</p>
         <p className="text-white font-bold text-lg">vs {opponentDisplay}</p>
-        <p className="text-gray-500 text-sm">{activeCamp.rounds}R · {activeCamp.roundDuration}min · {activeCamp.weightClass}</p>
+        <p className="text-gray-400 text-sm">{activeCamp.rounds}R · {activeCamp.roundDuration}min · {activeCamp.weightClass}</p>
       </div>
 
       {/* Opponent Info */}
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
-          <User size={14} className="text-gray-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Opponent Intel</p>
+          <User size={14} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Opponent Intel</p>
         </div>
         <div className="card space-y-3">
           <div>
@@ -134,7 +134,7 @@ export default function GamePlanBuilder() {
                   <option value="">–</option>
                   {STANCES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             </div>
             <div>
@@ -178,8 +178,8 @@ export default function GamePlanBuilder() {
       {/* Round-by-Round Plan */}
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
-          <Target size={14} className="text-gray-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Round-by-Round Strategy</p>
+          <Target size={14} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Round-by-Round Strategy</p>
         </div>
         <div className="card space-y-4">
           <div>
@@ -226,8 +226,8 @@ export default function GamePlanBuilder() {
       {/* Weapons & Threats */}
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle size={14} className="text-gray-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Weapons & Threats</p>
+          <AlertTriangle size={14} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Weapons & Threats</p>
         </div>
         <div className="card space-y-4">
           <div>
@@ -260,8 +260,8 @@ export default function GamePlanBuilder() {
       {/* Corner Instructions */}
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
-          <MessageSquare size={14} className="text-gray-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Corner Instructions</p>
+          <MessageSquare size={14} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Corner Instructions</p>
         </div>
         <div className="card">
           <label className="block">
@@ -290,7 +290,7 @@ export default function GamePlanBuilder() {
           {saved ? '✓ Game Plan Saved' : 'Save Game Plan'}
         </button>
         {existing && (
-          <p className="text-center text-xs text-gray-600 mt-2">
+          <p className="text-center text-xs text-gray-500 mt-2">
             Last updated {new Date(existing.updatedAt).toLocaleDateString()}
           </p>
         )}

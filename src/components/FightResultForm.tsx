@@ -145,7 +145,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
-          <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Step {step + 1} of 4</p>
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">Step {step + 1} of 4</p>
           <p className="text-white font-bold">{stepLabels[step]}</p>
         </div>
       </div>
@@ -159,7 +159,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
       {step === 0 && (
         <div className="mx-4 mt-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Result</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Result</label>
             <div role="group" aria-label="Result" className="grid grid-cols-4 gap-2">
               {([
                 { v: 'win' as const, icon: Trophy, label: 'Win', color: 'bg-green-900/40 border-green-700 text-green-300' },
@@ -183,7 +183,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
 
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Method</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Method</span>
               <select
               value={method}
               onChange={e => setMethod(e.target.value as FightMethod)}
@@ -197,7 +197,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block">
-                <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Total Rounds</span>
+                <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Total Rounds</span>
                 <input
                 type="number"
                 min={1}
@@ -210,7 +210,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
             </div>
             <div>
               <label className="block">
-                <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Stopped Round</span>
+                <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Stopped Round</span>
                 <input
                 type="number"
                 min={1}
@@ -226,14 +226,14 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
 
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Opponent</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Opponent</span>
               <input type="text" value={opponent} onChange={e => setOpponent(e.target.value)} className="input" />
             </label>
           </div>
 
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Fight Date</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fight Date</span>
               <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} className="input" />
             </label>
           </div>
@@ -243,7 +243,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
       {/* Step 1 — Rounds */}
       {step === 1 && (
         <div className="mx-4 mt-6 space-y-4">
-          <p className="text-xs text-gray-500">Rate each round. Used to correlate camp KPIs with in-fight performance.</p>
+          <p className="text-xs text-gray-400">Rate each round. Used to correlate camp KPIs with in-fight performance.</p>
           {rounds.slice(0, roundStopped ?? totalRounds).map((r, idx) => (
             <div key={idx} className="card space-y-3">
               <p className="text-white font-bold">Round {r.roundNumber}</p>
@@ -258,7 +258,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">What worked</label>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">What worked</label>
                 <input
                   type="text"
                   value={r.workedWell}
@@ -268,7 +268,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">What didn't</label>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">What didn't</label>
                 <input
                   type="text"
                   value={r.didntWork}
@@ -287,7 +287,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
         <div className="mx-4 mt-6 space-y-4">
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Weigh-in weight ({unit})</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Weigh-in weight ({unit})</span>
               <input
               type="number"
               step="0.1"
@@ -300,7 +300,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           </div>
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Fight-night weight ({unit})</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fight-night weight ({unit})</span>
               <input
               type="number"
               step="0.1"
@@ -313,7 +313,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           </div>
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
               Style plan followed: {stylePlanFollowed}/5
             </span>
               <input
@@ -325,7 +325,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
               className="w-full accent-brand-500"
             />
             </label>
-            <p className="text-xs text-gray-500 mt-1">1 = abandoned it · 5 = executed perfectly</p>
+            <p className="text-xs text-gray-400 mt-1">1 = abandoned it · 5 = executed perfectly</p>
           </div>
         </div>
       )}
@@ -335,7 +335,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
         <div className="mx-4 mt-6 space-y-4">
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Overall notes</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Overall notes</span>
               <textarea
               value={overallNotes}
               onChange={e => setOverallNotes(e.target.value)}
@@ -347,7 +347,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           </div>
           <div>
             <label className="block">
-              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Lessons for next camp</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Lessons for next camp</span>
               <textarea
               value={lessons}
               onChange={e => setLessons(e.target.value)}
@@ -408,7 +408,7 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
 function DamageSelect({ label, value, onChange }: { label: string; value: DamageLevel; onChange: (v: DamageLevel) => void }) {
   return (
     <div>
-      <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">{label}</label>
+      <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value as DamageLevel)} className="input text-sm">
         {DAMAGE_LEVELS.map(d => <option key={d} value={d}>{d}</option>)}
       </select>

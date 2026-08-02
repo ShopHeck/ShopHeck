@@ -159,7 +159,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
-          <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Fight Breakdown</p>
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">Fight Breakdown</p>
           <p className="text-white font-bold truncate">vs {fight.opponent || 'Opponent'} · {format(parseISO(fight.fightDate), 'MMM d, yyyy')}</p>
         </div>
         {fighterRef && (
@@ -185,7 +185,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
             {OUTCOME_LABELS[fight.outcome]}
           </p>
           <p className="text-white font-bold text-lg">{fight.method}{fight.roundStopped ? ` (R${fight.roundStopped})` : ''}</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             {fight.totalRounds} rounds planned · style plan {fight.stylePlanFollowed}/5
           </p>
         </div>
@@ -360,7 +360,7 @@ function VerdictTile({ icon: Icon, label, value, accent }: { icon: React.Compone
 function KV({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <span className="text-gray-500 text-xs">{label}</span>
+      <span className="text-gray-400 text-xs">{label}</span>
       <span className="text-white text-sm font-semibold text-right">{value}</span>
     </>
   );

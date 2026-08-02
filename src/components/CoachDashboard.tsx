@@ -148,9 +148,9 @@ export default function CoachDashboard() {
         </div>
 
         {loadingDetail ? (
-          <div className="mx-4 card text-center py-10 text-sm text-gray-500">Loading…</div>
+          <div className="mx-4 card text-center py-10 text-sm text-gray-400">Loading…</div>
         ) : !camp ? (
-          <div className="mx-4 card text-center py-10 text-sm text-gray-500">This fighter hasn't started a camp yet.</div>
+          <div className="mx-4 card text-center py-10 text-sm text-gray-400">This fighter hasn't started a camp yet.</div>
         ) : (
           <>
             <div className="mx-4">
@@ -159,11 +159,11 @@ export default function CoachDashboard() {
                   <div>
                     <p className="text-xs text-brand-400 font-semibold uppercase tracking-wider">{camp.is_off_season ? 'Off Season' : 'Active Camp'}</p>
                     <p className="text-2xl font-black text-white mt-1">{camp.fight_date ? `${getDaysUntilFight(camp.fight_date)} days out` : 'Training'}</p>
-                    {camp.fight_date && <p className="text-xs text-gray-500">{format(parseISO(camp.fight_date), 'MMM d, yyyy')}</p>}
+                    {camp.fight_date && <p className="text-xs text-gray-400">{format(parseISO(camp.fight_date), 'MMM d, yyyy')}</p>}
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-white">{camp.rounds}R</p>
-                    <p className="text-xs text-gray-500">{camp.round_duration}min</p>
+                    <p className="text-xs text-gray-400">{camp.round_duration}min</p>
                   </div>
                 </div>
               </div>
@@ -173,29 +173,29 @@ export default function CoachDashboard() {
               <div className="stat-card">
                 <Activity size={14} className="text-brand-500" />
                 <div className="text-lg font-black text-white">{campWorkouts.length}</div>
-                <div className="text-xs text-gray-500">sessions</div>
+                <div className="text-xs text-gray-400">sessions</div>
               </div>
               <div className="stat-card">
                 <Zap size={14} className="text-yellow-400" />
                 <div className="text-lg font-black text-white">{campSparring.reduce((s, l) => s + l.rounds, 0)}</div>
-                <div className="text-xs text-gray-500">spar rounds</div>
+                <div className="text-xs text-gray-400">spar rounds</div>
               </div>
               <div className="stat-card">
                 <Scale size={14} className="text-blue-400" />
                 <div className="text-lg font-black text-white">{toDisplayWeight(latestW, unit)}</div>
-                <div className="text-xs text-gray-500">{unit} now</div>
+                <div className="text-xs text-gray-400">{unit} now</div>
               </div>
             </div>
 
             {campSparring.length > 0 && (
               <div className="mx-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Sparring</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Recent Sparring</p>
                 <div className="space-y-2">
                   {[...campSparring].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map(s => (
                     <div key={s.id} className="card flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partner_name && s.partner_name !== 'Unknown' ? ` vs ${s.partner_name}` : ''}</p>
-                        <p className="text-xs text-gray-500">{format(parseISO(s.date), 'MMM d')} · Week {s.week_number}</p>
+                        <p className="text-xs text-gray-400">{format(parseISO(s.date), 'MMM d')} · Week {s.week_number}</p>
                       </div>
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
                         s.performance >= 4 ? 'bg-green-900/40 text-green-400' :
@@ -209,15 +209,15 @@ export default function CoachDashboard() {
 
             {campWorkouts.length > 0 && (
               <div className="mx-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Sessions</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Recent Sessions</p>
                 <div className="space-y-2">
                   {[...campWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map(w => (
                     <div key={w.id} className="card flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-white">{w.title}</p>
-                        <p className="text-xs text-gray-500">{format(parseISO(w.date), 'MMM d')} · RPE {w.rpe}</p>
+                        <p className="text-xs text-gray-400">{format(parseISO(w.date), 'MMM d')} · RPE {w.rpe}</p>
                       </div>
-                      <span className="text-xs text-gray-500">{w.duration}min</span>
+                      <span className="text-xs text-gray-400">{w.duration}min</span>
                     </div>
                   ))}
                 </div>
@@ -277,7 +277,7 @@ export default function CoachDashboard() {
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.sport}</span>
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.weightClass}</span>
                 <span className="badge bg-dark-500 text-gray-400 text-xs">{fighter?.experienceLevel}</span>
-                {fighter?.gym && <span className="text-xs text-gray-600">{fighter.gym}</span>}
+                {fighter?.gym && <span className="text-xs text-gray-500">{fighter.gym}</span>}
               </div>
             </div>
           </div>
@@ -290,15 +290,15 @@ export default function CoachDashboard() {
               <div>
                 <p className="text-xs text-brand-400 font-semibold uppercase tracking-wider">Active Camp</p>
                 <p className="text-2xl font-black text-white mt-1">{activeCamp.fightDate ? `${daysUntil} days out` : 'Off-season'}</p>
-                <p className="text-xs text-gray-500">{activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMM d, yyyy') : 'No fight scheduled'}</p>
+                <p className="text-xs text-gray-400">{activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMM d, yyyy') : 'No fight scheduled'}</p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-bold text-white">{activeCamp.rounds}R</p>
-                <p className="text-xs text-gray-500">{activeCamp.roundDuration}min</p>
+                <p className="text-xs text-gray-400">{activeCamp.roundDuration}min</p>
               </div>
             </div>
             <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
                 <span>Camp Progress</span>
                 <span>{progress}%</span>
               </div>
@@ -314,24 +314,24 @@ export default function CoachDashboard() {
           <div className="stat-card">
             <Activity size={14} className="text-brand-500" />
             <div className="text-lg font-black text-white">{campWorkouts.length}</div>
-            <div className="text-xs text-gray-500">sessions</div>
+            <div className="text-xs text-gray-400">sessions</div>
           </div>
           <div className="stat-card">
             <Zap size={14} className="text-yellow-400" />
             <div className="text-lg font-black text-white">{campSparring.reduce((s, l) => s + l.rounds, 0)}</div>
-            <div className="text-xs text-gray-500">spar rounds</div>
+            <div className="text-xs text-gray-400">spar rounds</div>
           </div>
           <div className="stat-card">
             <Scale size={14} className="text-blue-400" />
             <div className="text-lg font-black text-white">{toDisplayWeight(currentW, unit)}</div>
-            <div className="text-xs text-gray-500">{unit} now</div>
+            <div className="text-xs text-gray-400">{unit} now</div>
           </div>
         </div>
 
         {/* Coach Notes Section */}
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Coach Notes</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coach Notes</p>
             <button
               onClick={() => setShowNoteForm(v => !v)}
               className="flex items-center gap-1.5 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors"
@@ -353,7 +353,7 @@ export default function CoachDashboard() {
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
                       noteCategory === cat
                         ? `${CATEGORY_STYLES[cat].cls} border-current`
-                        : 'bg-dark-600 text-gray-500 border-dark-500 hover:border-dark-300'
+                        : 'bg-dark-600 text-gray-400 border-dark-500 hover:border-dark-300'
                     }`}
                   >
                     {CATEGORY_STYLES[cat].label}
@@ -387,9 +387,9 @@ export default function CoachDashboard() {
           {/* Notes List */}
           {fighterNotes.length === 0 ? (
             <div className="card text-center py-6">
-              <MessageSquarePlus size={24} className="text-gray-600 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No notes yet</p>
-              <p className="text-xs text-gray-600 mt-1">Add coaching feedback to keep your fighter on track</p>
+              <MessageSquarePlus size={24} className="text-gray-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No notes yet</p>
+              <p className="text-xs text-gray-500 mt-1">Add coaching feedback to keep your fighter on track</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -401,7 +401,7 @@ export default function CoachDashboard() {
                         <span className={`badge text-xs font-semibold ${CATEGORY_STYLES[note.category].cls}`}>
                           {CATEGORY_STYLES[note.category].label}
                         </span>
-                        <span className="text-xs text-gray-600">
+                        <span className="text-xs text-gray-500">
                           {format(parseISO(note.createdAt), 'MMM d, h:mm a')}
                         </span>
                       </div>
@@ -409,7 +409,7 @@ export default function CoachDashboard() {
                     </div>
                     <button
                       onClick={() => dispatch({ type: 'DELETE_COACH_NOTE', payload: note.id })}
-                      className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                      className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -419,7 +419,7 @@ export default function CoachDashboard() {
               {fighterNotes.length > 3 && (
                 <button
                   onClick={() => setShowAllNotes(v => !v)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-gray-400 hover:text-gray-300 transition-colors"
                 >
                   <ChevronDown size={14} className={`transition-transform ${showAllNotes ? 'rotate-180' : ''}`} />
                   {showAllNotes ? 'Show less' : `Show ${fighterNotes.length - 3} more notes`}
@@ -432,7 +432,7 @@ export default function CoachDashboard() {
         {/* Weekly Sessions Chart */}
         {weeklyData.some(w => w.sessions > 0) && (
           <div className="mx-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weekly Activity</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Activity</p>
             <div className="card p-2">
               <ResponsiveContainer width="100%" height={140}>
                 <LineChart data={weeklyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -451,9 +451,9 @@ export default function CoachDashboard() {
         {/* Weight Trend */}
         {weightChartData.length > 1 && (
           <div className="mx-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weight Trend</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight Trend</p>
             <div className="card p-2">
-              <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
+              <div className="flex justify-between text-xs text-gray-400 mb-2 px-1">
                 <span>Current: {formatWeight(currentW, unit)}</span>
                 <span>Target: {formatWeight(activeCamp.targetWeight, unit)}</span>
               </div>
@@ -473,14 +473,14 @@ export default function CoachDashboard() {
         {/* Recent Sparring */}
         {campSparring.length > 0 && (
           <div className="mx-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Sparring</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Recent Sparring</p>
             <div className="space-y-2">
               {campSparring.slice(0, 5).map(s => (
                 <div key={s.id} className="card flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partnerName && s.partnerName !== 'Unknown' ? ` vs ${s.partnerName}` : ''}</p>
-                    <p className="text-xs text-gray-500">{format(parseISO(s.date), 'MMM d')} · Week {s.weekNumber}</p>
-                    {s.focus && <p className="text-xs text-gray-600 mt-0.5">Focus: {s.focus}</p>}
+                    <p className="text-xs text-gray-400">{format(parseISO(s.date), 'MMM d')} · Week {s.weekNumber}</p>
+                    {s.focus && <p className="text-xs text-gray-500 mt-0.5">Focus: {s.focus}</p>}
                   </div>
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
                     s.performance >= 4 ? 'bg-green-900/40 text-green-400' :
@@ -504,7 +504,7 @@ export default function CoachDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-black text-white">Coach View</h2>
-            <p className="text-sm text-gray-500">{activeFighters.length} fighter{activeFighters.length !== 1 ? 's' : ''} in system</p>
+            <p className="text-sm text-gray-400">{activeFighters.length} fighter{activeFighters.length !== 1 ? 's' : ''} in system</p>
           </div>
           <div className="w-10 h-10 bg-brand-900/40 rounded-xl flex items-center justify-center">
             <Users size={18} className="text-brand-400" />
@@ -513,7 +513,7 @@ export default function CoachDashboard() {
 
         {/* Search */}
         <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             className="input pl-9"
             placeholder="Search fighters..."
@@ -548,9 +548,9 @@ export default function CoachDashboard() {
             </div>
             {linked.length === 0 ? (
               <div className="card text-center py-6">
-                <Users size={24} className="text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No connected fighters yet</p>
-                <p className="text-xs text-gray-600 mt-1">Generate an invite code in Settings and share it — or enter a code a fighter sent you.</p>
+                <Users size={24} className="text-gray-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No connected fighters yet</p>
+                <p className="text-xs text-gray-500 mt-1">Generate an invite code in Settings and share it — or enter a code a fighter sent you.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -565,17 +565,17 @@ export default function CoachDashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-bold text-white">{f.name}</p>
-                            {f.gym && <span className="text-xs text-gray-600">· {f.gym}</span>}
+                            {f.gym && <span className="text-xs text-gray-500">· {f.gym}</span>}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="badge bg-dark-500 text-gray-500 text-xs">{f.sport}</span>
-                            <span className="badge bg-dark-500 text-gray-500 text-xs">{f.weightClass}</span>
+                            <span className="badge bg-dark-500 text-gray-400 text-xs">{f.sport}</span>
+                            <span className="badge bg-dark-500 text-gray-400 text-xs">{f.weightClass}</span>
                             {f.latestCamp?.fight_date && (
                               <span className="text-xs text-brand-400">{getDaysUntilFight(f.latestCamp.fight_date)}d to fight</span>
                             )}
                           </div>
                         </div>
-                        {coachPro ? <ChevronRight size={16} className="text-gray-600" /> : <Lock size={14} className="text-brand-500" />}
+                        {coachPro ? <ChevronRight size={16} className="text-gray-500" /> : <Lock size={14} className="text-brand-500" />}
                       </div>
                     </button>
                   ))}
@@ -587,19 +587,19 @@ export default function CoachDashboard() {
         {/* Camp Overview */}
         {activeCamp && (
           <div className="bg-gradient-to-br from-dark-700 to-dark-600 border border-dark-400 rounded-xl p-4 mb-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Active Camp Overview</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Active Camp Overview</p>
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center">
                 <div className="text-2xl font-black text-white">{getDaysUntilFight(activeCamp.fightDate)}</div>
-                <div className="text-xs text-gray-500">days out</div>
+                <div className="text-xs text-gray-400">days out</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-black text-white">{workoutLogs.filter(l => l.campId === activeCamp.id).length}</div>
-                <div className="text-xs text-gray-500">sessions logged</div>
+                <div className="text-xs text-gray-400">sessions logged</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-black text-brand-400">{getCampProgress(activeCamp)}%</div>
-                <div className="text-xs text-gray-500">camp progress</div>
+                <div className="text-xs text-gray-400">camp progress</div>
               </div>
             </div>
           </div>
@@ -627,18 +627,18 @@ export default function CoachDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-white">{f.name}</p>
-                        {f.gym && <span className="text-xs text-gray-600">· {f.gym}</span>}
+                        {f.gym && <span className="text-xs text-gray-500">· {f.gym}</span>}
                         {unreadNotes > 0 && (
                           <span className="ml-auto badge bg-brand-700 text-white text-xs px-2">{unreadNotes} note{unreadNotes !== 1 ? 's' : ''}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="badge bg-dark-500 text-gray-500 text-xs">{f.sport}</span>
-                        <span className="badge bg-dark-500 text-gray-500 text-xs">{f.weightClass}</span>
+                        <span className="badge bg-dark-500 text-gray-400 text-xs">{f.sport}</span>
+                        <span className="badge bg-dark-500 text-gray-400 text-xs">{f.weightClass}</span>
                       </div>
                     </div>
                     {coachPro
-                      ? <ChevronRight size={16} className="text-gray-600" />
+                      ? <ChevronRight size={16} className="text-gray-500" />
                       : <Lock size={14} className="text-brand-500" />}
                   </div>
 
@@ -646,15 +646,15 @@ export default function CoachDashboard() {
                     <div className="mt-3 pt-3 border-t border-dark-500 grid grid-cols-3 gap-2">
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{fWorkouts.length}</p>
-                        <p className="text-xs text-gray-600">sessions</p>
+                        <p className="text-xs text-gray-500">sessions</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{fSparring.reduce((s, l) => s + l.rounds, 0)}</p>
-                        <p className="text-xs text-gray-600">spar rds</p>
+                        <p className="text-xs text-gray-500">spar rds</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-brand-400">{getDaysUntilFight(fCamp.fightDate)}d</p>
-                        <p className="text-xs text-gray-600">to fight</p>
+                        <p className="text-xs text-gray-500">to fight</p>
                       </div>
                     </div>
                   )}
@@ -668,7 +668,7 @@ export default function CoachDashboard() {
       {/* Local-mode hint — only when offline (cloud coaches use Connected Fighters) */}
       {!authUser && activeFighters.length === 0 && (
         <div className="mx-4 card text-center py-8">
-          <User size={32} className="text-gray-600 mx-auto mb-3" />
+          <User size={32} className="text-gray-500 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">Fighters will appear here once they create accounts and link you as their coach in their Settings.</p>
         </div>
       )}

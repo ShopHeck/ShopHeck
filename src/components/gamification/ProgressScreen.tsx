@@ -29,14 +29,14 @@ export default function ProgressScreen() {
           <BeltBadge tier={gam.belt.current} size="lg" />
           <div className="min-w-0">
             <p className="text-base font-black text-white">{BELT_LABELS[gam.belt.current]}</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               {gam.belt.workoutCount} workouts · {gam.belt.effectiveWinCredit.toFixed(1)} win credits
             </p>
           </div>
         </div>
         <div className="text-right flex-shrink-0">
           <div className="text-xl font-black text-white">{gam.totalXp}</div>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider">XP</div>
+          <div className="text-[10px] text-gray-400 uppercase tracking-wider">XP</div>
         </div>
       </div>
 
@@ -78,7 +78,7 @@ function BeltTab({ achievedAt, current }: { achievedAt: Partial<Record<BeltTier,
             <BeltBadge tier={tier} size="lg" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">{BELT_LABELS[tier]}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400">
                 {tier === 'white'
                   ? 'Starting rank'
                   : `${thr.workouts} workouts or ${thr.wins} win${thr.wins === 1 ? '' : 's'}`}
@@ -87,12 +87,12 @@ function BeltTab({ achievedAt, current }: { achievedAt: Partial<Record<BeltTier,
             {earned ? (
               <div className="text-right flex-shrink-0">
                 <Award size={14} className="text-brand-400 inline" />
-                <p className="text-[10px] text-gray-500 mt-0.5">
+                <p className="text-[10px] text-gray-400 mt-0.5">
                   {achievedAt[tier] ? format(parseISO(achievedAt[tier] as string), 'MMM d, yyyy') : ''}
                 </p>
               </div>
             ) : (
-              <Lock size={16} className="text-gray-600 flex-shrink-0" />
+              <Lock size={16} className="text-gray-500 flex-shrink-0" />
             )}
           </div>
         );
@@ -120,11 +120,11 @@ function AchievementsTab({ unlocked }: { unlocked: { id: string; unlockedAt: str
               {earned ? (
                 <IconComponent size={22} className="text-brand-400" />
               ) : (
-                <Lock size={18} className="text-gray-600" />
+                <Lock size={18} className="text-gray-500" />
               )}
             </div>
             <p className="text-xs font-bold text-white">{def.name}</p>
-            <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{def.description}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{def.description}</p>
             {earned && earnedAt && (
               <p className="text-[9px] text-brand-500 mt-1">{format(parseISO(earnedAt), 'MMM d, yyyy')}</p>
             )}
@@ -149,19 +149,19 @@ function PRsTab({ records }: { records: Partial<Record<PRType, { value: number; 
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">{PR_LABELS[type]}</p>
               {r ? (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {format(parseISO(r.achievedAt), 'MMM d, yyyy')}
                   {r.previousValue != null && (
-                    <span className="text-gray-600"> · prev {r.previousValue} {PR_UNITS[type]}</span>
+                    <span className="text-gray-500"> · prev {r.previousValue} {PR_UNITS[type]}</span>
                   )}
                 </p>
               ) : (
-                <p className="text-xs text-gray-500">No record yet</p>
+                <p className="text-xs text-gray-400">No record yet</p>
               )}
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-lg font-black text-white">{r ? r.value : '—'}</div>
-              <div className="text-[10px] text-gray-500">{PR_UNITS[type]}</div>
+              <div className="text-[10px] text-gray-400">{PR_UNITS[type]}</div>
             </div>
           </div>
         );
@@ -183,11 +183,11 @@ function ChallengesTab({ challenges }: { challenges: { id: string; weekKey: stri
   return (
     <div className="space-y-4">
       {weeks.length === 0 && (
-        <p className="text-sm text-gray-500 text-center py-8">Log a workout to start this week's challenges.</p>
+        <p className="text-sm text-gray-400 text-center py-8">Log a workout to start this week's challenges.</p>
       )}
       {weeks.map(wk => (
         <div key={wk}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
             Week of {format(parseISO(wk), 'MMM d')}
           </p>
           <div className="space-y-2">
@@ -199,7 +199,7 @@ function ChallengesTab({ challenges }: { challenges: { id: string; weekKey: stri
                     {c.completed ? (
                       <CheckCircle2 size={18} className="text-teal-400 flex-shrink-0" />
                     ) : (
-                      <Flame size={18} className="text-gray-500 flex-shrink-0" />
+                      <Flame size={18} className="text-gray-400 flex-shrink-0" />
                     )}
                     <p className="text-sm font-semibold text-white flex-1">{c.title}</p>
                     <span className="text-xs font-bold text-brand-400">+{c.xpReward} XP</span>
@@ -210,7 +210,7 @@ function ChallengesTab({ challenges }: { challenges: { id: string; weekKey: stri
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-500 mt-1">
+                  <div className="text-[10px] text-gray-400 mt-1">
                     {Math.min(c.progress, c.target)}/{c.target}
                   </div>
                 </div>

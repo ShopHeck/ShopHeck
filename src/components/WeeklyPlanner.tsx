@@ -13,7 +13,7 @@ const SESSION_CONFIG: Record<SessionType, { color: string; doneColor: string; ic
   sparring:     { color: 'bg-red-900/50 border-red-800/50 text-red-400',     doneColor: 'bg-red-950/30 border-red-900/30 text-red-700',       icon: ({ size, className }) => <Zap size={size} className={className} />,      label: 'Sparring' },
   strength:     { color: 'bg-yellow-900/50 border-yellow-800/50 text-yellow-400', doneColor: 'bg-yellow-950/30 border-yellow-900/30 text-yellow-700', icon: ({ size, className }) => <Activity size={size} className={className} />, label: 'Strength' },
   recovery:     { color: 'bg-green-900/50 border-green-800/50 text-green-400', doneColor: 'bg-green-950/30 border-green-900/30 text-green-700', icon: ({ size, className }) => <Clock size={size} className={className} />,    label: 'Recovery' },
-  rest:         { color: 'bg-gray-900/50 border-gray-700/50 text-gray-500',   doneColor: 'bg-gray-900/30 border-gray-800/30 text-gray-700',   icon: ({ size, className }) => <Star size={size} className={className} />,      label: 'Rest' },
+  rest:         { color: 'bg-gray-900/50 border-gray-700/50 text-gray-400',   doneColor: 'bg-gray-900/30 border-gray-800/30 text-gray-700',   icon: ({ size, className }) => <Star size={size} className={className} />,      label: 'Rest' },
 };
 
 const PHASE_COLORS: Record<string, string> = {
@@ -103,14 +103,14 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             <p className="text-white font-bold">
               {isOffSeason ? `Off Season — Week ${selectedWeek}` : `Week ${selectedWeek}`}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               {format(parseISO(week.startDate), 'MMM d')} – {format(parseISO(week.endDate), 'MMM d')}
               {selectedWeek === currentWeekNum && (
                 <span className={`ml-1 ${isOffSeason ? 'text-teal-400' : 'text-brand-400'}`}>(This Week)</span>
               )}
             </p>
             {isOffSeason && selectedCycle !== null && selectedCyclePhase !== null && (
-              <p className="text-[11px] text-gray-600 mt-0.5">
+              <p className="text-[11px] text-gray-500 mt-0.5">
                 Cycle {selectedCycle} · Phase {selectedCyclePhase} of 4
               </p>
             )}
@@ -130,7 +130,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <span className={`text-sm font-bold ${PHASE_COLORS[week.phase] || 'text-white'}`}>{week.phase}</span>
-              <p className="text-xs text-gray-500 mt-0.5 leading-tight">{week.focus}</p>
+              <p className="text-xs text-gray-400 mt-0.5 leading-tight">{week.focus}</p>
             </div>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <span className={`badge text-xs ${
@@ -210,13 +210,13 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
               >
                 <span className={`text-xs font-medium ${
                   isSelected ? (isOffSeason ? 'text-teal-400' : 'text-brand-400') :
-                  isToday ? (isOffSeason ? 'text-teal-300' : 'text-brand-300') : 'text-gray-500'
+                  isToday ? (isOffSeason ? 'text-teal-300' : 'text-brand-300') : 'text-gray-400'
                 }`}>
                   {label}
                 </span>
                 <span className={`text-[10px] leading-none ${
                   isSelected ? (isOffSeason ? 'text-teal-500' : 'text-brand-500') :
-                  isToday ? (isOffSeason ? 'text-teal-600' : 'text-brand-600') : 'text-gray-600'
+                  isToday ? (isOffSeason ? 'text-teal-600' : 'text-brand-600') : 'text-gray-500'
                 }`}>
                   {format(dayDate, 'd')}
                 </span>
@@ -245,7 +245,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
               {!selectedDayData.isRestDay && (
                 <button
                   onClick={() => toggleDayRest(selectedDay)}
-                  className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+                  className="text-[11px] text-gray-400 hover:text-gray-300 transition-colors"
                 >
                   {isRestOverride ? 'Restore training' : 'Mark as rest'}
                 </button>
@@ -257,7 +257,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
             <div className="card text-center py-8">
               <div className="text-4xl mb-3">🛌</div>
               <p className="font-semibold text-white">{isRestOverride ? 'Rest Day (Override)' : 'Full Rest Day'}</p>
-              <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
+              <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">
                 Recovery is part of training. Sleep 8+ hours, hydrate, and eat well.
               </p>
             </div>
@@ -288,13 +288,13 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                       >
                         {isDone
                           ? <CheckCircle2 size={22} className="text-green-400" />
-                          : <Circle size={22} className="text-gray-600 hover:text-gray-400 transition-colors" />
+                          : <Circle size={22} className="text-gray-500 hover:text-gray-400 transition-colors" />
                         }
                       </button>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-sm font-bold transition-all ${isDone ? 'line-through text-gray-500' : 'text-white'}`}>
+                          <span className={`text-sm font-bold transition-all ${isDone ? 'line-through text-gray-400' : 'text-white'}`}>
                             {session.title}
                           </span>
                           <span className="badge bg-black/20 text-xs">{config.label}</span>
@@ -303,12 +303,12 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-gray-400">{session.duration} min</span>
-                          {matchingLog && <span className="text-xs text-gray-500">{matchingLog.duration} min logged</span>}
+                          {matchingLog && <span className="text-xs text-gray-400">{matchingLog.duration} min logged</span>}
                         </div>
                         {!isDone && (
                           <>
                             <p className="text-xs text-gray-400 mt-2 leading-relaxed">{session.description}</p>
-                            {session.notes && <p className="text-xs text-gray-500 mt-1 italic">{session.notes}</p>}
+                            {session.notes && <p className="text-xs text-gray-400 mt-1 italic">{session.notes}</p>}
                             <button
                               onClick={() => onLogSession({
                                 sessionType: session.type === 'rest' ? 'recovery' : session.type,
@@ -338,7 +338,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
 
       {/* Week at a Glance */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Week at a Glance</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Week at a Glance</p>
         <div className="card">
           <div className="space-y-2">
             {[...week.days].sort((a, b) => {
@@ -356,11 +356,11 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                   className="flex items-center gap-3 cursor-pointer"
                   onClick={() => setSelectedDay(day.dayOfWeek)}
                 >
-                  <span className={`text-xs w-8 font-medium ${day.dayOfWeek === todayDayOfWeek && selectedWeek === currentWeekNum ? 'text-brand-400' : 'text-gray-500'}`}>
+                  <span className={`text-xs w-8 font-medium ${day.dayOfWeek === todayDayOfWeek && selectedWeek === currentWeekNum ? 'text-brand-400' : 'text-gray-400'}`}>
                     {DAY_LABELS[day.dayOfWeek]}
                   </span>
                   {day.isRestDay ? (
-                    <span className="text-xs text-gray-600 italic">Rest Day</span>
+                    <span className="text-xs text-gray-500 italic">Rest Day</span>
                   ) : (
                     <div className="flex gap-1.5 flex-wrap flex-1">
                       {day.sessions.map((s, i) => {
@@ -375,7 +375,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                     </div>
                   )}
                   {daySessions.length > 0 && (
-                    <span className={`text-xs font-medium flex-shrink-0 ${doneCount === daySessions.length ? 'text-green-400' : 'text-gray-600'}`}>
+                    <span className={`text-xs font-medium flex-shrink-0 ${doneCount === daySessions.length ? 'text-green-400' : 'text-gray-500'}`}>
                       {doneCount}/{daySessions.length}
                     </span>
                   )}

@@ -231,7 +231,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
       {/* ── Recovery Score ── */}
       {recovery && (
         <div className="mx-4 card">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">HRV Recovery</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">HRV Recovery</p>
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16 flex-shrink-0">
               <svg viewBox="0 0 40 40" className="w-full h-full -rotate-90">
@@ -256,7 +256,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               <div className="mt-2">
                 <HRVSparkline values={rmssdValues} />
               </div>
-              <p className="text-xs text-gray-600 mt-0.5">7-day RMSSD trend</p>
+              <p className="text-xs text-gray-500 mt-0.5">7-day RMSSD trend</p>
             </div>
           </div>
         </div>
@@ -264,25 +264,25 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
 
       {!recovery && campEntries.length === 0 && (
         <div className="mx-4 card flex items-center gap-3">
-          <Info size={16} className="text-gray-500 flex-shrink-0" />
+          <Info size={16} className="text-gray-400 flex-shrink-0" />
           <p className="text-sm text-gray-400">Connect a device or log your morning HRV to track recovery.</p>
         </div>
       )}
 
       {/* ── Bluetooth HRM ── */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Bluetooth HRM</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Bluetooth HRM</p>
         <div className="card space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${hr.connected ? 'bg-green-900/30' : 'bg-dark-600'}`}>
-                <Bluetooth size={18} className={hr.connected ? 'text-green-400' : 'text-gray-500'} />
+                <Bluetooth size={18} className={hr.connected ? 'text-green-400' : 'text-gray-400'} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">
                   {hr.connected ? hr.deviceName : 'Not connected'}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {isIOS ? 'Not available on iOS — see note below' : 'Polar H10 · MyZone · Garmin · any BLE HRM'}
                 </p>
               </div>
@@ -294,7 +294,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               </button>
             )}
             {hr.connected && (
-              <button onClick={hr.disconnect} className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
+              <button onClick={hr.disconnect} className="text-xs text-gray-400 hover:text-gray-300 transition-colors flex-shrink-0">
                 Disconnect
               </button>
             )}
@@ -328,19 +328,19 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                   <div className="text-2xl font-black" style={{ color: hr.hr ? ZONE_COLORS[hr.zone] : '#6b7280' }}>
                     {hr.hr ?? '—'}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">bpm</div>
+                  <div className="text-xs text-gray-400 mt-0.5">bpm</div>
                 </div>
                 <div className="bg-dark-600 rounded-xl p-3 text-center">
                   <div className="text-2xl font-black text-white">
                     {hr.hrv ?? '—'}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">RMSSD ms</div>
+                  <div className="text-xs text-gray-400 mt-0.5">RMSSD ms</div>
                 </div>
                 <div className="bg-dark-600 rounded-xl p-3 text-center">
                   <div className="text-base font-bold" style={{ color: ZONE_COLORS[hr.zone] }}>
                     {ZONE_LABELS[hr.zone]}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">HR Zone</div>
+                  <div className="text-xs text-gray-400 mt-0.5">HR Zone</div>
                 </div>
               </div>
 
@@ -352,7 +352,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                 </button>
               )}
               {!hr.hrv && (
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-gray-400 text-center">
                   Waiting for RR interval data… (Polar H10 and most chest straps broadcast this automatically)
                 </p>
               )}
@@ -363,7 +363,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
 
       {/* ── Apple Watch ── */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Apple Watch</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Apple Watch</p>
         <button
           onClick={() => onNavigate('health')}
           className="card w-full text-left flex items-center gap-3 hover:border-dark-300 transition-colors group"
@@ -373,25 +373,25 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white">Apple Health Import</p>
-            <p className="text-xs text-gray-500">Import workouts, weight + HRV from Health export</p>
+            <p className="text-xs text-gray-400">Import workouts, weight + HRV from Health export</p>
           </div>
-          <ChevronRight size={16} className="text-gray-600 group-hover:text-gray-400 transition-colors flex-shrink-0" />
+          <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-400 transition-colors flex-shrink-0" />
         </button>
       </div>
 
       {/* ── Fitbit ── */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Fitbit</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Fitbit</p>
         <div className="card space-y-3">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${fitbitConnected ? 'bg-teal-900/30' : 'bg-dark-600'}`}>
-              <Activity size={18} className={fitbitConnected ? 'text-teal-400' : 'text-gray-500'} />
+              <Activity size={18} className={fitbitConnected ? 'text-teal-400' : 'text-gray-400'} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">
                 {fitbitConnected ? `Fitbit — Connected` : 'Fitbit — Not connected'}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400">
                 {fitbitConnected && fitbitConfig?.lastSync
                   ? `Last sync: ${format(parseISO(fitbitConfig.lastSync), 'MMM d, h:mm a')}`
                   : 'Charge 5 · Sense · Versa 3+ · Luxe · Inspire 3'}
@@ -415,7 +415,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           {!fitbitConnected && (
             <div className="space-y-2.5">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block" htmlFor="fitbit-client-id">Fitbit App Client ID</label>
+                <label className="text-xs text-gray-400 mb-1 block" htmlFor="fitbit-client-id">Fitbit App Client ID</label>
                 <input
                   id="fitbit-client-id"
                   type="text"
@@ -440,7 +440,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               </button>
               <div className="bg-dark-600 rounded-xl p-3 space-y-1">
                 <p className="text-xs font-semibold text-gray-400">Setup (one-time)</p>
-                <ol className="text-xs text-gray-500 space-y-0.5 list-decimal list-inside">
+                <ol className="text-xs text-gray-400 space-y-0.5 list-decimal list-inside">
                   <li>Go to <span className="text-brand-400">dev.fitbit.com/apps/new</span></li>
                   <li>Create a "Personal" app, OAuth 2.0 type: Personal</li>
                   <li>Set Redirect URI to this page's URL</li>
@@ -459,7 +459,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               </button>
               <button
                 onClick={() => dispatch({ type: 'SET_FITBIT_CONFIG', payload: null })}
-                className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-3"
+                className="text-xs text-gray-500 hover:text-gray-400 transition-colors px-3"
               >
                 Disconnect
               </button>
@@ -470,7 +470,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
 
       {/* ── Polar / Garmin / Whoop note ── */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Other Devices</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Other Devices</p>
         <div className="card space-y-2">
           {[
             { name: 'Polar H10 / OH1',     tip: 'Connect via Bluetooth above — broadcasts RMSSD automatically.' },
@@ -479,10 +479,10 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
             { name: 'Polar Flow / Vantage', tip: 'View Nightly Recharge HRV in Polar Flow, log manually below.' },
           ].map(d => (
             <div key={d.name} className="flex items-start gap-2.5">
-              <CheckCircle size={13} className="text-gray-600 flex-shrink-0 mt-0.5" />
+              <CheckCircle size={13} className="text-gray-500 flex-shrink-0 mt-0.5" />
               <div>
                 <span className="text-xs font-semibold text-gray-300">{d.name}</span>
-                <span className="text-xs text-gray-500"> — {d.tip}</span>
+                <span className="text-xs text-gray-400"> — {d.tip}</span>
               </div>
             </div>
           ))}
@@ -492,7 +492,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
       {/* ── Manual log ── */}
       <div className="mx-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Log HRV Manually</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Log HRV Manually</p>
           <button onClick={() => setShowLogForm(v => !v)} className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors">
             {showLogForm ? 'Cancel' : '+ Add'}
           </button>
@@ -502,23 +502,23 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           <div className="card space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Date</label>
+                <label className="text-xs text-gray-400 mb-1 block">Date</label>
                 <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="input text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">RMSSD (ms)</label>
+                <label className="text-xs text-gray-400 mb-1 block">RMSSD (ms)</label>
                 <input type="number" value={manualRmssd} onChange={e => setManualRmssd(e.target.value)}
                   placeholder="e.g. 55" className="input text-sm w-full" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Resting HR (bpm)</label>
+                <label className="text-xs text-gray-400 mb-1 block">Resting HR (bpm)</label>
                 <input type="number" value={manualHR} onChange={e => setManualHR(e.target.value)}
                   placeholder="optional" className="input text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Source</label>
+                <label className="text-xs text-gray-400 mb-1 block">Source</label>
                 <select value={manualSource} onChange={e => setManualSource(e.target.value as HRVSource)}
                   className="input text-sm w-full">
                   <option value="garmin">Garmin</option>
@@ -543,7 +543,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
       {/* ── HRV History ── */}
       {campEntries.length > 0 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">HRV History</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">HRV History</p>
           <div className="space-y-2">
             {[...campEntries].reverse().slice(0, 10).map(entry => (
               <div key={entry.id} className="card flex items-center gap-3">
@@ -553,9 +553,9 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-bold text-white">{entry.rmssd}ms</span>
-                    {entry.restingHR && <span className="text-xs text-gray-500">{entry.restingHR} bpm</span>}
+                    {entry.restingHR && <span className="text-xs text-gray-400">{entry.restingHR} bpm</span>}
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-400">
                     {format(parseISO(entry.date), 'MMM d')} · {SOURCE_LABELS[entry.source]}
                     {entry.notes && ` · ${entry.notes}`}
                   </p>

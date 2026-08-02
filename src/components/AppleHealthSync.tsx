@@ -230,7 +230,7 @@ export default function AppleHealthSync() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Heart size={40} className="text-gray-600 mx-auto mb-3" />
+        <Heart size={40} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
       </div>
     );
@@ -246,7 +246,7 @@ export default function AppleHealthSync() {
           </div>
           <div>
             <p className="text-white font-bold">Apple Health Sync</p>
-            <p className="text-xs text-gray-500">Import workouts & weight · Export camp data</p>
+            <p className="text-xs text-gray-400">Import workouts & weight · Export camp data</p>
           </div>
         </div>
       </div>
@@ -257,7 +257,7 @@ export default function AppleHealthSync() {
           <button
             key={t}
             onClick={() => { setTab(t); setPreview(null); setImported(false); setImportError(''); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? 'bg-dark-500 text-white' : 'text-gray-500'}`}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${tab === t ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
           >
             {t === 'import' ? '↓ Import from Health' : '↑ Export Data'}
           </button>
@@ -273,8 +273,8 @@ export default function AppleHealthSync() {
               onClick={() => setShowInstructions(s => !s)}
               className="w-full flex items-center justify-between text-left"
             >
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">How to Export from Apple Health</p>
-              <ChevronDown size={14} className={`text-gray-500 transition-transform ${showInstructions ? 'rotate-180' : ''}`} />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">How to Export from Apple Health</p>
+              <ChevronDown size={14} className={`text-gray-400 transition-transform ${showInstructions ? 'rotate-180' : ''}`} />
             </button>
             {showInstructions && (
               <div className="mt-2 card space-y-2 text-sm text-gray-400">
@@ -288,7 +288,7 @@ export default function AppleHealthSync() {
                   <li>Unzip the file and find <strong className="text-white">export.xml</strong></li>
                   <li>Upload that file below</li>
                 </ol>
-                <p className="text-xs text-gray-600 pt-1">
+                <p className="text-xs text-gray-500 pt-1">
                   Only workouts and weight data within your current camp dates will be imported.
                 </p>
               </div>
@@ -315,7 +315,7 @@ export default function AppleHealthSync() {
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-semibold text-white">Select export.xml</p>
-                  <p className="text-xs text-gray-500 mt-1">Tap to browse files</p>
+                  <p className="text-xs text-gray-400 mt-1">Tap to browse files</p>
                 </div>
               </button>
             </div>
@@ -334,7 +334,7 @@ export default function AppleHealthSync() {
             <div className="mx-4 space-y-3">
               <div className="card space-y-3">
                 <p className="text-sm font-bold text-white">Import Preview</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   Filtered to your camp: {format(parseISO(activeCamp.startDate), 'MMM d')} – {format(
                     activeCamp.fightDate
                       ? parseISO(activeCamp.fightDate)
@@ -346,12 +346,12 @@ export default function AppleHealthSync() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-dark-600 rounded-xl p-3 text-center">
                     <p className="text-2xl font-black text-blue-400">{preview.weights.length}</p>
-                    <p className="text-xs text-gray-500">weight entries</p>
+                    <p className="text-xs text-gray-400">weight entries</p>
                     <p className="text-xs text-gray-700">{preview.rawWeightCount} total in file</p>
                   </div>
                   <div className="bg-dark-600 rounded-xl p-3 text-center">
                     <p className="text-2xl font-black text-brand-400">{preview.workouts.length}</p>
-                    <p className="text-xs text-gray-500">workouts</p>
+                    <p className="text-xs text-gray-400">workouts</p>
                     <p className="text-xs text-gray-700">{preview.rawWorkoutCount} total in file</p>
                   </div>
                 </div>
@@ -364,23 +364,23 @@ export default function AppleHealthSync() {
                   <>
                     {preview.weights.slice(0, 3).length > 0 && (
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Weight samples:</p>
+                        <p className="text-xs text-gray-400 mb-1">Weight samples:</p>
                         {preview.weights.slice(0, 3).map((w, i) => (
                           <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {formatWeight(w.weight, unit)}</p>
                         ))}
-                        {preview.weights.length > 3 && <p className="text-xs text-gray-600">… and {preview.weights.length - 3} more</p>}
+                        {preview.weights.length > 3 && <p className="text-xs text-gray-500">… and {preview.weights.length - 3} more</p>}
                       </div>
                     )}
                     {preview.workouts.slice(0, 3).length > 0 && (
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Workout samples:</p>
+                        <p className="text-xs text-gray-400 mb-1">Workout samples:</p>
                         {preview.workouts.slice(0, 3).map((w, i) => (
                           <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {w.title} ({w.duration}min)</p>
                         ))}
-                        {preview.workouts.length > 3 && <p className="text-xs text-gray-600">… and {preview.workouts.length - 3} more</p>}
+                        {preview.workouts.length > 3 && <p className="text-xs text-gray-500">… and {preview.workouts.length - 3} more</p>}
                       </div>
                     )}
-                    <p className="text-xs text-gray-600">Workouts imported with default RPE 7 — adjust in Training Log.</p>
+                    <p className="text-xs text-gray-500">Workouts imported with default RPE 7 — adjust in Training Log.</p>
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={doImport}
@@ -407,7 +407,7 @@ export default function AppleHealthSync() {
             <div className="mx-4 flex flex-col items-center gap-3 py-6">
               <CheckCircle size={44} className="text-green-400" />
               <p className="text-white font-bold">Import Complete!</p>
-              <p className="text-sm text-gray-500 text-center">
+              <p className="text-sm text-gray-400 text-center">
                 Your Apple Health data has been added to this camp.
               </p>
               <button
@@ -426,7 +426,7 @@ export default function AppleHealthSync() {
         <div className="mx-4 space-y-4">
           <div className="card space-y-3">
             <p className="text-sm font-bold text-white">Export Camp Data</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-400">
               Download all your training data as JSON. Use this for backups or to import into other apps.
             </p>
 
@@ -439,7 +439,7 @@ export default function AppleHealthSync() {
               ].map(s => (
                 <div key={s.label} className="bg-dark-600 rounded-xl p-2.5 text-center">
                   <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <p className="text-xs text-gray-400">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -454,11 +454,11 @@ export default function AppleHealthSync() {
           </div>
 
           <div className="card space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Add to Apple Health</p>
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Add to Apple Health</p>
+            <p className="text-xs text-gray-400 leading-relaxed">
               Apple Health doesn't support direct imports from third-party apps on iPhone. To add workouts to Health:
             </p>
-            <ol className="text-xs text-gray-500 space-y-1 list-decimal list-inside">
+            <ol className="text-xs text-gray-400 space-y-1 list-decimal list-inside">
               <li>Log your workouts in this app as normal</li>
               <li>Apple's <strong className="text-gray-300">Workouts</strong> app or apps like <strong className="text-gray-300">Strava</strong> can sync back to Health automatically</li>
               <li>For weight: use the Apple Health app directly to add manual entries</li>

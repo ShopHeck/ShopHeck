@@ -106,19 +106,19 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               </div>
               <p className="text-gray-400 text-sm mt-1">
                 {activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMMM d, yyyy') : 'Fight date TBD'}
-                {activeCamp.opponent && <span className="text-gray-500"> · vs {activeCamp.opponent}</span>}
+                {activeCamp.opponent && <span className="text-gray-400"> · vs {activeCamp.opponent}</span>}
               </p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-black text-white">{activeCamp.rounds}R</div>
-              <div className="text-xs text-gray-500">{activeCamp.roundDuration}min rounds</div>
+              <div className="text-xs text-gray-400">{activeCamp.roundDuration}min rounds</div>
               <div className="text-xs text-brand-400 mt-1">{activeCamp.weightClass}</div>
             </div>
           </div>
 
           {/* Progress bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
               <span>Week {currentWeekNum} of {activeCamp.campWeeks}</span>
               <span>{progress}% complete</span>
             </div>
@@ -182,8 +182,8 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             className="card w-full text-left hover:border-dark-300 transition-colors group"
           >
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fight Readiness</p>
-              <ChevronRight size={15} className="text-gray-600 group-hover:text-gray-400 transition-colors" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fight Readiness</p>
+              <ChevronRight size={15} className="text-gray-500 group-hover:text-gray-400 transition-colors" />
             </div>
             <div className="flex items-center gap-4">
               {/* Score ring */}
@@ -211,7 +211,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                   />
                 </div>
                 {readiness.insights[0] && (
-                  <p className="text-xs text-gray-500 mt-1.5 leading-snug line-clamp-2">
+                  <p className="text-xs text-gray-400 mt-1.5 leading-snug line-clamp-2">
                     {readiness.insights[0]}
                   </p>
                 )}
@@ -231,8 +231,8 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold text-purple-400">{latestCoachNote.coachName}</span>
-                <span className="text-xs text-gray-600">·</span>
-                <span className="text-xs text-gray-600">{format(parseISO(latestCoachNote.createdAt), 'MMM d')}</span>
+                <span className="text-xs text-gray-500">·</span>
+                <span className="text-xs text-gray-500">{format(parseISO(latestCoachNote.createdAt), 'MMM d')}</span>
                 <span className="badge text-xs bg-dark-600 text-gray-400 ml-auto capitalize">{latestCoachNote.category}</span>
               </div>
               <p className="text-sm text-gray-300 leading-relaxed line-clamp-3">{latestCoachNote.content}</p>
@@ -245,7 +245,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       {currentWeek && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Phase</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Current Phase</p>
             {currentWeek.phase && (
               <span className={`badge border ${PHASE_COLORS[currentWeek.phase] || 'bg-dark-600 text-gray-400 border-dark-400'}`}>
                 {currentWeek.phase}
@@ -264,7 +264,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                         className={`w-2 h-2 rounded-full ${i < (INTENSITY_DOTS[currentWeek.intensity] || 0) ? 'bg-brand-500' : 'bg-dark-400'}`}
                       />
                     ))}
-                    <span className="text-xs text-gray-500 ml-1">{currentWeek.intensity}</span>
+                    <span className="text-xs text-gray-400 ml-1">{currentWeek.intensity}</span>
                   </div>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               </button>
             </div>
             <div className="mt-3 pt-3 border-t border-dark-500">
-              <p className="text-xs text-gray-500 mb-2">This week's goals</p>
+              <p className="text-xs text-gray-400 mb-2">This week's goals</p>
               <div className="space-y-1">
                 {currentWeek.weeklyGoals.slice(0, 3).map((goal, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -296,17 +296,17 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <button onClick={() => onNavigate('weight')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <TrendingDown size={16} className="text-brand-500" />
           <div className="text-xl font-black text-white">{weightToGo}</div>
-          <div className="text-xs text-gray-500">{unit} to cut</div>
+          <div className="text-xs text-gray-400">{unit} to cut</div>
         </button>
         <button onClick={() => onNavigate('log')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <Activity size={16} className="text-green-500" />
           <div className="text-xl font-black text-white">{totalWorkouts}</div>
-          <div className="text-xs text-gray-500">sessions logged</div>
+          <div className="text-xs text-gray-400">sessions logged</div>
         </button>
         <button onClick={() => onNavigate('progress')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <Zap size={16} className="text-yellow-500" />
           <div className="text-xl font-black text-white">{totalSparingRounds}</div>
-          <div className="text-xs text-gray-500">sparring rounds</div>
+          <div className="text-xs text-gray-400">sparring rounds</div>
         </button>
       </div>
 
@@ -314,24 +314,24 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       {(weekPlanned > 0 || weekLogs.length > 0) && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">This Week</p>
-            <span className="text-xs text-gray-600">Week {currentWeekNum}</span>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">This Week</p>
+            <span className="text-xs text-gray-500">Week {currentWeekNum}</span>
           </div>
           <div className="card">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <div className="text-lg font-black text-white">
-                  {weekDone}<span className="text-gray-600 font-medium text-sm">/{weekPlanned}</span>
+                  {weekDone}<span className="text-gray-500 font-medium text-sm">/{weekPlanned}</span>
                 </div>
-                <div className="text-[11px] text-gray-500 mt-0.5">sessions</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">sessions</div>
               </div>
               <div>
                 <div className="text-lg font-black text-white">{weekMinutes || '—'}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">minutes</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">minutes</div>
               </div>
               <div>
                 <div className="text-lg font-black text-white">{weekAvgRpe ?? '—'}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5">avg RPE</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">avg RPE</div>
               </div>
             </div>
             {weekPlanned > 0 && (
@@ -355,15 +355,15 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       {todaySessions && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Training</p>
-            <span className="text-xs text-gray-500">{format(today, 'EEEE, MMM d')}</span>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Training</p>
+            <span className="text-xs text-gray-400">{format(today, 'EEEE, MMM d')}</span>
           </div>
 
           {todaySessions.isRestDay ? (
             <div className="card text-center py-6">
               <div className="text-3xl mb-2">🧘</div>
               <p className="text-white font-semibold">Rest Day</p>
-              <p className="text-sm text-gray-500 mt-1">Recovery is training too. Sleep well, eat well.</p>
+              <p className="text-sm text-gray-400 mt-1">Recovery is training too. Sleep well, eat well.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -384,7 +384,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{session.title}</p>
-                    <p className="text-xs text-gray-500">{session.duration} min</p>
+                    <p className="text-xs text-gray-400">{session.duration} min</p>
                   </div>
                   <button
                     onClick={() => onNavigate('log', {
@@ -407,7 +407,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       {recentLogs.length > 0 && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Activity</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent Activity</p>
             <button onClick={() => onNavigate('log')} className="text-xs text-brand-500 font-semibold">See all</button>
           </div>
           <div className="space-y-2">
@@ -418,7 +418,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{log.title}</p>
-                  <p className="text-xs text-gray-500">{format(parseISO(log.date), 'MMM d')} · {log.duration}min · RPE {log.rpe}</p>
+                  <p className="text-xs text-gray-400">{format(parseISO(log.date), 'MMM d')} · {log.duration}min · RPE {log.rpe}</p>
                 </div>
               </div>
             ))}
@@ -429,7 +429,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       {/* Weight Summary */}
       <div className="mx-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Weight Status</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Weight Status</p>
           <button onClick={() => onNavigate('weight')} className="text-xs text-brand-500 font-semibold">Track</button>
         </div>
         <div className="card">
@@ -438,7 +438,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
               <div className="text-2xl font-black text-white">
                 {toDisplayWeight(latestWeight ? latestWeight.weight : activeCamp.currentWeight, unit)}
               </div>
-              <div className="text-xs text-gray-500">current</div>
+              <div className="text-xs text-gray-400">current</div>
             </div>
             <div className="flex-1 px-4">
               <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
@@ -455,14 +455,14 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                   );
                 })()}
               </div>
-              <div className="flex justify-between text-xs text-gray-600 mt-1">
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
                 <span>{formatWeight(activeCamp.targetWeight, unit)}</span>
               </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-black text-brand-400">{toDisplayWeight(activeCamp.targetWeight, unit)}</div>
-              <div className="text-xs text-gray-500">target</div>
+              <div className="text-xs text-gray-400">target</div>
             </div>
           </div>
         </div>
@@ -470,7 +470,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
 
       {/* Quick Tools */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tools</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tools</p>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => onNavigate('aiinsights')}
@@ -481,7 +481,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">AI Insights</p>
-              <p className="text-xs text-gray-500">Coach analysis</p>
+              <p className="text-xs text-gray-400">Coach analysis</p>
             </div>
             {!pro && <ProChip />}
           </button>
@@ -494,7 +494,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Game Plan</p>
-              <p className="text-xs text-gray-500">Fight strategy</p>
+              <p className="text-xs text-gray-400">Fight strategy</p>
             </div>
             {!pro && <ProChip />}
           </button>
@@ -507,7 +507,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Nutrition</p>
-              <p className="text-xs text-gray-500">Water & meals</p>
+              <p className="text-xs text-gray-400">Water & meals</p>
             </div>
             {!pro && <ProChip />}
           </button>
@@ -520,7 +520,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Trackers</p>
-              <p className="text-xs text-gray-500">HR · HRV · Recovery</p>
+              <p className="text-xs text-gray-400">HR · HRV · Recovery</p>
             </div>
           </button>
           <button
@@ -532,7 +532,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Exercise Library</p>
-              <p className="text-xs text-gray-500">Drills & workouts</p>
+              <p className="text-xs text-gray-400">Drills & workouts</p>
             </div>
           </button>
           <button
@@ -544,7 +544,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Meal Library</p>
-              <p className="text-xs text-gray-500">Plans & generator</p>
+              <p className="text-xs text-gray-400">Plans & generator</p>
             </div>
           </button>
           <button
@@ -556,7 +556,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Camp History</p>
-              <p className="text-xs text-gray-500">Past camps & fights</p>
+              <p className="text-xs text-gray-400">Past camps & fights</p>
             </div>
           </button>
         </div>

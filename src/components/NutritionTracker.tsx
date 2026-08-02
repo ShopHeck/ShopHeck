@@ -45,7 +45,7 @@ function MacroBar({ label, actual, target, color }: {
         <span className="text-xs font-medium text-gray-400">{label}</span>
         <span className="text-xs text-gray-400">
           <span style={{ color: barColor }} className="font-semibold">{actual}</span>
-          {target > 0 && <span className="text-gray-600"> / {target}{unit}</span>}
+          {target > 0 && <span className="text-gray-500"> / {target}{unit}</span>}
         </span>
       </div>
       <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
@@ -73,9 +73,9 @@ export default function NutritionTracker() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Droplets size={40} className="text-gray-600 mx-auto mb-3" />
+        <Droplets size={40} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
-        <p className="text-sm text-gray-600 mt-1">Set up a fight camp to track nutrition</p>
+        <p className="text-sm text-gray-500 mt-1">Set up a fight camp to track nutrition</p>
       </div>
     );
   }
@@ -191,7 +191,7 @@ export default function NutritionTracker() {
       {/* Header */}
       <div className="mx-4 mt-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tracking Date</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tracking Date</p>
           <input
             type="date"
             aria-label="Tracking date"
@@ -210,18 +210,18 @@ export default function NutritionTracker() {
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
           <Droplets size={14} className="text-blue-400" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Hydration</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hydration</p>
         </div>
         <div className="card">
           {/* Water progress */}
           <div className="flex items-end justify-between mb-3">
             <div>
               <span className={`text-4xl font-black ${waterColor}`}>{waterOz}</span>
-              <span className="text-gray-500 text-sm ml-1">/ {DAILY_GOAL_OZ} oz</span>
+              <span className="text-gray-400 text-sm ml-1">/ {DAILY_GOAL_OZ} oz</span>
             </div>
             <div className="text-right">
               <div className={`text-2xl font-black ${waterColor}`}>{waterPct}%</div>
-              <div className="text-xs text-gray-500">of daily goal</div>
+              <div className="text-xs text-gray-400">of daily goal</div>
             </div>
           </div>
           <div className="h-3 bg-dark-500 rounded-full overflow-hidden mb-4">
@@ -240,7 +240,7 @@ export default function NutritionTracker() {
                 className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90 ${
                   i < glasses
                     ? 'bg-blue-700 text-white'
-                    : 'bg-dark-600 text-gray-600 hover:bg-dark-500'
+                    : 'bg-dark-600 text-gray-500 hover:bg-dark-500'
                 }`}
                 title={i < glasses ? 'Remove glass' : 'Add glass'}
               >
@@ -251,7 +251,7 @@ export default function NutritionTracker() {
 
           {/* Quick-add presets */}
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-xs text-gray-500 flex-shrink-0">Quick add:</span>
+            <span className="text-xs text-gray-400 flex-shrink-0">Quick add:</span>
             {[16, 32].map(oz => (
               <button
                 key={oz}
@@ -276,8 +276,8 @@ export default function NutritionTracker() {
       {/* Meal Quality */}
       <section className="mx-4">
         <div className="flex items-center gap-2 mb-2">
-          <UtensilsCrossed size={14} className="text-gray-500" />
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meal Quality</p>
+          <UtensilsCrossed size={14} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Meal Quality</p>
         </div>
         <div className="card space-y-3">
           {(['breakfast', 'lunch', 'dinner'] as Meal[]).map(meal => {
@@ -309,9 +309,9 @@ export default function NutritionTracker() {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Flame size={14} className="text-brand-400" />
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Macros</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Macros</p>
           </div>
-          <button onClick={openTargetEditor} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+          <button onClick={openTargetEditor} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-300 transition-colors">
             <Settings2 size={12} />
             {currentUser?.macroTargets ? 'Edit Targets' : 'Set Targets'}
           </button>
@@ -326,7 +326,7 @@ export default function NutritionTracker() {
               <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color="#a855f7" />
             </>
           ) : (
-            <p className="text-sm text-gray-500 text-center py-2">Set targets to track your macros</p>
+            <p className="text-sm text-gray-400 text-center py-2">Set targets to track your macros</p>
           )}
           <button onClick={openMacroEntry} className="w-full text-sm text-brand-400 hover:text-brand-300 font-semibold py-1 transition-colors">
             {todayLog?.macros ? 'Edit today\'s intake' : '+ Log today\'s macros'}
@@ -359,7 +359,7 @@ export default function NutritionTracker() {
               setNotes(todayLog?.notes ?? '');
               setShowNotes(true);
             }}
-            className="w-full card text-left text-sm text-gray-500 hover:text-gray-300 transition-colors"
+            className="w-full card text-left text-sm text-gray-400 hover:text-gray-300 transition-colors"
           >
             {todayLog?.notes
               ? <span className="text-gray-300">{todayLog.notes}</span>
@@ -370,7 +370,7 @@ export default function NutritionTracker() {
 
       {/* 7-day history */}
       <section className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Last 7 Days</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Last 7 Days</p>
         <div className="card divide-y divide-dark-600">
           {last7.map(({ date, log }) => {
             const score = mealScore(log);
@@ -386,7 +386,7 @@ export default function NutritionTracker() {
                 className={`w-full flex items-center justify-between py-2.5 px-1 transition-colors ${isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : ''}`}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500 w-16 text-left">
+                  <span className="text-xs text-gray-400 w-16 text-left">
                     {isToday ? 'Today' : format(parseISO(date), 'EEE M/d')}
                   </span>
                   {log ? (
@@ -409,13 +409,13 @@ export default function NutritionTracker() {
                       )}
                     </div>
                   ) : (
-                    <span className="text-gray-600 text-xs">No data</span>
+                    <span className="text-gray-500 text-xs">No data</span>
                   )}
                 </div>
                 {log && (
                   <button
                     onClick={e => { e.stopPropagation(); deleteLog(log.id); }}
-                    className="text-gray-600 hover:text-red-400 transition-colors p-1"
+                    className="text-gray-500 hover:text-red-400 transition-colors p-1"
                   >
                     <Trash2 size={13} />
                   </button>

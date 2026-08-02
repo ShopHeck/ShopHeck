@@ -92,7 +92,7 @@ export default function CelebrationToast() {
             )}
             <button
               onClick={() => dispatch({ type: 'DISMISS_CELEBRATION', payload: event.id })}
-              className="text-white/70 hover:text-white transition-colors flex-shrink-0"
+              className="text-white/70 hover:text-white transition-colors flex-shrink-0 w-11 h-11 flex items-center justify-center -m-2"
               aria-label="Dismiss"
             >
               <LucideIcons.X size={16} />

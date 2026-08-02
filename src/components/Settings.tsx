@@ -274,7 +274,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       {/* Profile Section */}
       <div className="mx-4 mt-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Profile</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Profile</p>
           <button
             onClick={() => {
               setEditingProfile(true);
@@ -298,7 +298,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-white text-base truncate">{currentUser?.name}</p>
-            {currentUser?.gym && <p className="text-xs text-gray-500 truncate">{currentUser.gym}</p>}
+            {currentUser?.gym && <p className="text-xs text-gray-400 truncate">{currentUser.gym}</p>}
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               <span className="badge bg-dark-500 text-gray-400 text-xs">{currentUser?.sport}</span>
               <span className="badge bg-dark-500 text-gray-400 text-xs">{currentUser?.weightClass}</span>
@@ -318,7 +318,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       {currentUser?.role === 'fighter' && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Fight Camps ({camps.length})</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fight Camps ({camps.length})</p>
             <button
               onClick={onNewCamp}
               className="flex items-center gap-1.5 text-brand-500 text-xs font-semibold hover:text-brand-400 transition-colors"
@@ -329,8 +329,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
           {camps.length === 0 ? (
             <div className="card text-center py-8">
-              <Flame size={28} className="text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">No fight camps yet</p>
+              <Flame size={28} className="text-gray-500 mx-auto mb-2" />
+              <p className="text-gray-400 text-sm">No fight camps yet</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -359,10 +359,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                             <span className="badge bg-brand-900/60 text-brand-400 text-xs">Active</span>
                           )}
                           {isPast && (
-                            <span className="badge bg-gray-800 text-gray-500 text-xs">Past</span>
+                            <span className="badge bg-gray-800 text-gray-400 text-xs">Past</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-400 mt-0.5">
                           {camp.weightClass} · {camp.rounds}R · {camp.campWeeks}wk camp
                           {camp.opponent && <span> · vs {camp.opponent}</span>}
                         </p>
@@ -377,14 +377,14 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                         <button
                           onClick={() => openEditCamp(camp)}
                           aria-label={`Edit camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
-                          className="p-2 text-gray-500 hover:text-white transition-colors"
+                          className="p-2 text-gray-400 hover:text-white transition-colors"
                         >
                           <Edit3 size={15} />
                         </button>
                         <button
                           onClick={() => setConfirmDeleteCamp(camp.id)}
                           aria-label={`Delete camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
-                          className="p-2 text-gray-600 hover:text-red-400 transition-colors"
+                          className="p-2 text-gray-500 hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -394,11 +394,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                     <div className="flex items-center gap-4 pt-2 border-t border-dark-500">
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{stats.workouts}</p>
-                        <p className="text-xs text-gray-600">sessions</p>
+                        <p className="text-xs text-gray-500">sessions</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{stats.sparring}</p>
-                        <p className="text-xs text-gray-600">spar rds</p>
+                        <p className="text-xs text-gray-500">spar rds</p>
                       </div>
                       <div className="flex-1" />
                       {!isActive && (
@@ -428,11 +428,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       {currentUser?.role === 'fighter' && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">My Coach</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Coach</p>
             {coaches.length > 0 && currentUser.coachId && (
               <button
                 onClick={() => dispatch({ type: 'LINK_COACH', payload: null })}
-                className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                className="text-xs text-gray-500 hover:text-red-400 transition-colors"
               >
                 Unlink
               </button>
@@ -440,9 +440,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
           {coaches.length === 0 ? (
             <div className="card text-center py-6">
-              <Users size={24} className="text-gray-600 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No coaches in the system yet</p>
-              <p className="text-xs text-gray-600 mt-1">A coach needs to create a profile on this device first</p>
+              <Users size={24} className="text-gray-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No coaches in the system yet</p>
+              <p className="text-xs text-gray-500 mt-1">A coach needs to create a profile on this device first</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -460,8 +460,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                     <div className="flex-1 min-w-0">
                       <p className={`font-semibold text-sm ${isLinked ? 'text-white' : 'text-gray-300'}`}>{coach.name}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {coach.gym && <span className="text-xs text-gray-600">{coach.gym}</span>}
-                        <span className="badge bg-dark-500 text-gray-500 text-xs">{coach.sport}</span>
+                        {coach.gym && <span className="text-xs text-gray-500">{coach.gym}</span>}
+                        <span className="badge bg-dark-500 text-gray-400 text-xs">{coach.sport}</span>
                       </div>
                     </div>
                     {isLinked ? (
@@ -470,7 +470,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                         <span className="text-xs font-semibold">Linked</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-600">Link</span>
+                      <span className="text-xs text-gray-500">Link</span>
                     )}
                   </button>
                 );
@@ -482,7 +482,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {/* Subscription */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Subscription</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Subscription</p>
         {userIsPro ? (
           <div className="card">
             <div className="flex items-center gap-3">
@@ -493,7 +493,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 <p className="text-sm font-bold text-white">
                   {userIsCoachPro ? 'Coach Pro' : 'Fighter Pro'}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {sub.expiresAt
                     ? `Renews ${new Date(sub.expiresAt).toLocaleDateString()}`
                     : 'Active'}
@@ -528,21 +528,21 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       {/* Bluetooth & Devices */}
       {hr.supported && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Bluetooth &amp; Devices</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bluetooth &amp; Devices</p>
           <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
             {/* Connect / disconnect */}
             <div className="px-4 py-3.5 flex items-center gap-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${hr.connected ? 'bg-green-900/30' : 'bg-dark-600'}`}>
                 {hr.connected
                   ? <Bluetooth size={15} className="text-green-400" />
-                  : <BluetoothOff size={15} className="text-gray-500" />
+                  : <BluetoothOff size={15} className="text-gray-400" />
                 }
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white">
                   {hr.connected ? hr.deviceName ?? 'HR Device' : 'Heart Rate Device'}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {hr.connected && hr.hr !== null
                     ? <span style={{ color: ZONE_COLORS[hr.zone] }}>
                         {hr.hr} bpm · {ZONE_LABELS[hr.zone]}
@@ -576,7 +576,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-white">Max Heart Rate</p>
-                  <p className="text-xs text-gray-500">Used for zone calculation</p>
+                  <p className="text-xs text-gray-400">Used for zone calculation</p>
                 </div>
                 {editingMaxHR ? (
                   <div className="flex items-center gap-2">
@@ -588,7 +588,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       onChange={e => setMaxHRDraft(e.target.value)}
                     />
                     <button onClick={saveMaxHR} className="text-xs font-semibold text-green-400 hover:text-green-300 transition-colors">Save</button>
-                    <button onClick={() => setEditingMaxHR(false)} className="text-xs text-gray-500 hover:text-white transition-colors">✕</button>
+                    <button onClick={() => setEditingMaxHR(false)} className="text-xs text-gray-400 hover:text-white transition-colors">✕</button>
                   </div>
                 ) : (
                   <button onClick={() => { setMaxHRDraft(String(currentUser?.maxHR ?? maxHRDefault)); setEditingMaxHR(true); }}
@@ -604,7 +604,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-white">Daily MEP Target</p>
-                  <p className="text-xs text-gray-500">MyZone Effort Points per session</p>
+                  <p className="text-xs text-gray-400">MyZone Effort Points per session</p>
                 </div>
                 {editingMEP ? (
                   <div className="flex items-center gap-2">
@@ -616,7 +616,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       onChange={e => setMepDraft(e.target.value)}
                     />
                     <button onClick={saveMEPTarget} className="text-xs font-semibold text-green-400 hover:text-green-300 transition-colors">Save</button>
-                    <button onClick={() => setEditingMEP(false)} className="text-xs text-gray-500 hover:text-white transition-colors">✕</button>
+                    <button onClick={() => setEditingMEP(false)} className="text-xs text-gray-400 hover:text-white transition-colors">✕</button>
                   </div>
                 ) : (
                   <button onClick={() => { setMepDraft(String(currentUser?.mepTarget ?? 65)); setEditingMEP(true); }}
@@ -632,7 +632,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {/* Integrations */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Integrations</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Integrations</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
           {/* Camp History */}
           <button
@@ -644,9 +644,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Camp History & Fight Breakdowns</p>
-              <p className="text-xs text-gray-600">Compare camps · tune next camp</p>
+              <p className="text-xs text-gray-500">Compare camps · tune next camp</p>
             </div>
-            <ChevronRight size={15} className="text-gray-600" />
+            <ChevronRight size={15} className="text-gray-500" />
           </button>
 
           {/* Achievements & Belt */}
@@ -659,9 +659,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Achievements & Belt</p>
-              <p className="text-xs text-gray-600">Rank · streak · PRs · weekly challenges</p>
+              <p className="text-xs text-gray-500">Rank · streak · PRs · weekly challenges</p>
             </div>
-            <ChevronRight size={15} className="text-gray-600" />
+            <ChevronRight size={15} className="text-gray-500" />
           </button>
 
           {/* AI Insights */}
@@ -674,9 +674,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">AI Coach Insights</p>
-              <p className="text-xs text-gray-600">Included with Pro — no setup needed</p>
+              <p className="text-xs text-gray-500">Included with Pro — no setup needed</p>
             </div>
-            <ChevronRight size={15} className="text-gray-600" />
+            <ChevronRight size={15} className="text-gray-500" />
           </button>
 
           {/* Custom Round Bell */}
@@ -691,14 +691,14 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                   <span className="text-xs text-green-400 font-semibold">✓ Set</span>
                   <button
                     onClick={() => { clearCustomBell(); setHasBell(false); }}
-                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    className="text-xs text-gray-500 hover:text-red-400 transition-colors"
                   >
                     Remove
                   </button>
                 </div>
               )}
             </div>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs text-gray-400 mb-3">
               Plays at the start of every round instead of the built-in bell.
             </p>
             <div className="space-y-2">
@@ -737,9 +737,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Apple Health</p>
-              <p className="text-xs text-gray-600">Import workouts & weight · Export data</p>
+              <p className="text-xs text-gray-500">Import workouts & weight · Export data</p>
             </div>
-            <ChevronRight size={15} className="text-gray-600" />
+            <ChevronRight size={15} className="text-gray-500" />
           </button>
         </div>
       </div>
@@ -747,7 +747,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       {/* Account (cloud sync — optional) */}
       {authConfigured && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Account</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Account</p>
           <div className="card">
             {authUser && (
               <div className="flex items-center gap-3">
@@ -756,7 +756,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{authUser.email}</p>
-                  <p className={`text-xs ${syncStatus === 'error' ? 'text-red-400' : 'text-gray-500'}`}>{syncLabel}</p>
+                  <p className={`text-xs ${syncStatus === 'error' ? 'text-red-400' : 'text-gray-400'}`}>{syncLabel}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
                   <button
@@ -780,9 +780,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 <Trash2 size={14} className="text-red-400 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-400">Delete account</p>
-                  <p className="text-xs text-gray-600">Permanently remove your account and all synced data</p>
+                  <p className="text-xs text-gray-500">Permanently remove your account and all synced data</p>
                 </div>
-                <ChevronRight size={15} className="text-gray-600" />
+                <ChevronRight size={15} className="text-gray-500" />
               </button>
             )}
             {!authUser && (
@@ -792,9 +792,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-white">Sign in / Create account</p>
-                  <p className="text-xs text-gray-500">Sync your camps &amp; connect with your coach</p>
+                  <p className="text-xs text-gray-400">Sync your camps &amp; connect with your coach</p>
                 </div>
-                <ChevronRight size={16} className="text-gray-600" />
+                <ChevronRight size={16} className="text-gray-500" />
               </button>
             )}
           </div>
@@ -806,7 +806,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {/* App Settings */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">App</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">App</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
           {notificationsSupported() && (
             <button
@@ -814,11 +814,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
             >
               <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Bell size={15} className={reminders ? 'text-brand-400' : 'text-gray-500'} />
+                <Bell size={15} className={reminders ? 'text-brand-400' : 'text-gray-400'} />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Training reminders</p>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-500">
                   {reminders ? 'On — daily check-in & weigh-in nudges' : 'Off — tap to enable'}
                 </p>
               </div>
@@ -833,11 +833,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
             >
               <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <HeartPulse size={15} className={healthSync ? 'text-brand-400' : 'text-gray-500'} />
+                <HeartPulse size={15} className={healthSync ? 'text-brand-400' : 'text-gray-400'} />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Sync to Apple Health</p>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-500">
                   {healthSync ? 'On — new workouts & weigh-ins saved to Health' : 'Off — tap to enable'}
                 </p>
               </div>
@@ -855,7 +855,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Weight units</p>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-500">
                 {weightUnit === 'kg' ? 'Kilograms (kg) — tap for lbs' : 'Pounds (lbs) — tap for kg'}
               </p>
             </div>
@@ -870,12 +870,12 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           >
             <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
               {state.dashboardPrefs?.progressWidgetHidden
-                ? <EyeOff size={15} className="text-gray-500" />
+                ? <EyeOff size={15} className="text-gray-400" />
                 : <Eye size={15} className="text-gray-400" />}
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Progress widget on dashboard</p>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-500">
                 {state.dashboardPrefs?.progressWidgetHidden ? 'Hidden — tap to show' : 'Visible — tap to hide'}
               </p>
             </div>
@@ -890,7 +890,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div>
               <p className="text-sm font-medium text-red-400">Reset & Log Out</p>
-              <p className="text-xs text-gray-600">Delete all data and start over</p>
+              <p className="text-xs text-gray-500">Delete all data and start over</p>
             </div>
           </button>
         </div>
@@ -903,7 +903,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             href="https://fightcamp.netlify.app/privacy.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-400 underline transition-colors"
           >
             Privacy Policy
           </a>
@@ -912,7 +912,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             href="https://fightcamp.netlify.app/terms.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-400 underline transition-colors"
           >
             Terms of Use (EULA)
           </a>
@@ -1080,7 +1080,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
             </div>
             <div className="bg-dark-600 rounded-xl p-3 border border-dark-400">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400">
                 Camp length stays at <span className="text-white font-medium">{editingCamp.campWeeks} weeks</span>. Start date will be recalculated from the fight date.
               </p>
             </div>

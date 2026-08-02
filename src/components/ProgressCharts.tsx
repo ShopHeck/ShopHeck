@@ -158,9 +158,9 @@ export default function ProgressCharts() {
     const isCoach = currentUser?.role === 'coach';
     return (
       <div className="mx-4 mt-10 card text-center py-12">
-        <BarChart3 size={32} className="text-gray-600 mx-auto mb-3" />
+        <BarChart3 size={32} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-medium">No progress to show yet</p>
-        <p className="text-sm text-gray-600 mt-1 max-w-xs mx-auto">
+        <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
           {isCoach
             ? 'Progress charts track an individual camp. Open the Fighters tab to view each athlete’s training progress.'
             : 'Start a fight camp or off-season plan to see your training charts here.'}
@@ -293,28 +293,28 @@ export default function ProgressCharts() {
         <div className="stat-card">
           <Activity size={16} className="text-brand-500" />
           <div className="text-xl font-black text-white">{campWorkouts.length}</div>
-          <div className="text-xs text-gray-500">total sessions</div>
+          <div className="text-xs text-gray-400">total sessions</div>
         </div>
         <div className="stat-card">
           <TrendingUp size={16} className="text-purple-400" />
           <div className="text-xl font-black text-white">{Math.round(totalMinutes / 60)}h</div>
-          <div className="text-xs text-gray-500">training hours</div>
+          <div className="text-xs text-gray-400">training hours</div>
         </div>
         <div className="stat-card">
           <Zap size={16} className="text-yellow-400" />
           <div className="text-xl font-black text-white">{totalSparringRounds}</div>
-          <div className="text-xs text-gray-500">sparring rounds</div>
+          <div className="text-xs text-gray-400">sparring rounds</div>
         </div>
         <div className="stat-card">
           <BarChart3 size={16} className="text-green-400" />
           <div className="text-xl font-black text-white">{avgRpe}</div>
-          <div className="text-xs text-gray-500">avg RPE</div>
+          <div className="text-xs text-gray-400">avg RPE</div>
         </div>
         {hasAnyAdherence && (
           <div className="stat-card col-span-2">
             <Activity size={16} className="text-brand-400" />
             <div className="text-xl font-black text-white">{overallAdherence}%</div>
-            <div className="text-xs text-gray-500">overall adherence ({allDone}/{allTotal} planned)</div>
+            <div className="text-xs text-gray-400">overall adherence ({allDone}/{allTotal} planned)</div>
           </div>
         )}
       </div>
@@ -322,7 +322,7 @@ export default function ProgressCharts() {
       {/* Weekly Adherence Chart */}
       {hasAnyAdherence && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weekly Adherence</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Adherence</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weeklyAdherence} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -337,7 +337,7 @@ export default function ProgressCharts() {
                       <div className="bg-dark-700 border border-dark-400 rounded-lg px-3 py-2 text-xs shadow-xl">
                         <p className="text-gray-400 mb-1">Week {label}</p>
                         <p className="text-brand-400 font-semibold">{payload[0].value}% done</p>
-                        {d && <p className="text-gray-500">{d.done}/{d.total} sessions</p>}
+                        {d && <p className="text-gray-400">{d.done}/{d.total} sessions</p>}
                       </div>
                     );
                   }}
@@ -358,7 +358,7 @@ export default function ProgressCharts() {
       {/* Weekly Volume Chart */}
       {weeklyVolume.some(w => w.sessions > 0) && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weekly Training Volume</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Training Volume</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={weeklyVolume} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -377,7 +377,7 @@ export default function ProgressCharts() {
       {/* RPE Trend */}
       {rpeTrend.length > 1 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Training Intensity (RPE Trend)</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Training Intensity (RPE Trend)</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={rpeTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -395,7 +395,7 @@ export default function ProgressCharts() {
       {/* Conditioning Benchmarks */}
       {Object.keys(condByType).length > 0 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Conditioning Benchmarks</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Conditioning Benchmarks</p>
           <div className="space-y-3">
             {Object.entries(condByType).map(([testType, data], idx) => {
               const first = data[0]?.value;
@@ -443,7 +443,7 @@ export default function ProgressCharts() {
       {/* Sparring Performance Trend */}
       {sparringPerf.length > 1 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Sparring Performance</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sparring Performance</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={sparringPerf} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -455,7 +455,7 @@ export default function ProgressCharts() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-between text-xs text-gray-600 px-2 mt-1">
+          <div className="flex justify-between text-xs text-gray-500 px-2 mt-1">
             <span>1=Poor</span><span>2=Below</span><span>3=Avg</span><span>4=Good</span><span>5=Excellent</span>
           </div>
         </div>
@@ -464,7 +464,7 @@ export default function ProgressCharts() {
       {/* Weekly RPE vs Sparring */}
       {weeklyVolume.some(w => w.avgRpe > 0) && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Weekly Avg RPE</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Avg RPE</p>
           <div className="card p-2">
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={weeklyVolume.filter(w => w.avgRpe > 0)} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -482,9 +482,9 @@ export default function ProgressCharts() {
       {/* Empty State */}
       {campWorkouts.length === 0 && campSparring.length === 0 && campCond.length === 0 && (
         <div className="mx-4 card text-center py-12">
-          <BarChart3 size={40} className="text-gray-600 mx-auto mb-3" />
+          <BarChart3 size={40} className="text-gray-500 mx-auto mb-3" />
           <p className="text-gray-400 font-semibold">No data yet</p>
-          <p className="text-sm text-gray-600 mt-1">Start logging workouts and tests to see your progress charts</p>
+          <p className="text-sm text-gray-500 mt-1">Start logging workouts and tests to see your progress charts</p>
         </div>
       )}
     </div>

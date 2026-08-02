@@ -185,7 +185,7 @@ export default function AIInsights() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Brain size={40} className="text-gray-600 mx-auto mb-3" />
+        <Brain size={40} className="text-gray-500 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
       </div>
     );
@@ -201,7 +201,7 @@ export default function AIInsights() {
           </div>
           <div className="flex-1">
             <p className="text-white font-bold">AI Coach Insights</p>
-            <p className="text-xs text-gray-500">Included with Pro — no setup needed</p>
+            <p className="text-xs text-gray-400">Included with Pro — no setup needed</p>
           </div>
           <Sparkles size={16} className="text-purple-400" />
         </div>
@@ -273,7 +273,7 @@ export default function AIInsights() {
       {/* Empty state */}
       {!loading && !insights && !error && (
         <div className="mx-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">What you'll get</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What you'll get</p>
           {[
             { icon: '📊', label: 'Camp Assessment', desc: 'Overall trajectory and what\'s working' },
             { icon: '⚡', label: 'Training Load Analysis', desc: 'Volume, intensity & overtraining risk' },
@@ -286,7 +286,7 @@ export default function AIInsights() {
               <span className="text-xl">{item.icon}</span>
               <div>
                 <p className="text-sm font-medium text-white">{item.label}</p>
-                <p className="text-xs text-gray-500">{item.desc}</p>
+                <p className="text-xs text-gray-400">{item.desc}</p>
               </div>
             </div>
           ))}

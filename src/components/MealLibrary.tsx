@@ -53,10 +53,10 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${GOAL_COLORS[plan.goal]}`}>
               {plan.goal}
             </span>
-            <span className="text-[10px] font-semibold text-gray-500">{plan.phase}</span>
+            <span className="text-[10px] font-semibold text-gray-400">{plan.phase}</span>
           </div>
           <p className="text-sm font-semibold text-white">{plan.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{plan.description}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{plan.description}</p>
           <div className="flex flex-wrap gap-1 mt-2">
             <MacroPill label="Cal" value={t.calories} unit="" color="bg-orange-900/40 text-orange-300" />
             <MacroPill label="P" value={t.protein} unit="g" color="bg-green-900/40 text-green-300" />
@@ -64,7 +64,7 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
             <MacroPill label="F" value={t.fat} unit="g" color="bg-purple-900/40 text-purple-300" />
           </div>
         </div>
-        <div className="text-gray-500 flex-shrink-0 mt-1">
+        <div className="text-gray-400 flex-shrink-0 mt-1">
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
@@ -78,12 +78,12 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
                 onClick={() => setExpandedMeal(expandedMeal === i ? null : i)}
               >
                 <div>
-                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{meal.time}</span>
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{meal.time}</span>
                   <p className="text-sm font-medium text-white">{meal.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{meal.macros.calories} kcal</span>
-                  {expandedMeal === i ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+                  <span className="text-xs text-gray-400">{meal.macros.calories} kcal</span>
+                  {expandedMeal === i ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
                 </div>
               </button>
 
@@ -91,11 +91,11 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
                 <div className="px-4 pb-3 space-y-2">
                   <p className="text-xs text-gray-400">{meal.description}</p>
                   <div>
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Ingredients</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Ingredients</p>
                     <ul className="space-y-0.5">
                       {meal.ingredients.map((ing, j) => (
                         <li key={j} className="text-xs text-gray-300 flex items-start gap-1.5">
-                          <span className="text-gray-600 mt-0.5">·</span>{ing}
+                          <span className="text-gray-500 mt-0.5">·</span>{ing}
                         </li>
                       ))}
                     </ul>
@@ -293,7 +293,7 @@ function MacroGenerator() {
   return (
     <div className="space-y-4">
       <div className="card space-y-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Your Target Macros</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Target Macros</p>
 
         {[
           { label: 'Calories',   value: calories,  set: setCalories, unit: 'kcal', color: 'text-orange-400' },
@@ -351,7 +351,7 @@ function MacroGenerator() {
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Ingredients</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Ingredients</p>
             <div className="space-y-1.5">
               {result.ingredients.map((ing, i) => (
                 <div key={i} className="flex items-center justify-between">
@@ -364,7 +364,7 @@ function MacroGenerator() {
 
           {t && (
             <div className="space-y-2 pt-1 border-t border-dark-600">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Estimated Macros</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Estimated Macros</p>
               <MacroBar label="Calories" value={t.calories} max={Number(calories) || 2000} color="bg-orange-500" unit="kcal" />
               <MacroBar label="Protein"  value={t.protein}  max={Number(protein)  || 200} color="bg-green-500" />
               <MacroBar label="Carbs"    value={t.carbs}    max={Number(carbs)    || 300} color="bg-blue-500"  />
@@ -392,7 +392,7 @@ function MacroGenerator() {
               {saved ? '✓ Saved to Nutrition Log' : 'Save Macros to Today\'s Log'}
             </button>
           ) : (
-            <p className="text-xs text-gray-500 text-center">Set up a fight camp to save macros to your log.</p>
+            <p className="text-xs text-gray-400 text-center">Set up a fight camp to save macros to your log.</p>
           )}
         </div>
       )}
@@ -459,14 +459,14 @@ export default function MealLibrary() {
           </div>
 
           <div className="mx-4 mt-3 mb-2">
-            <p className="text-xs text-gray-500">{filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-gray-400">{filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''}</p>
           </div>
 
           <div className="mx-4 space-y-2">
             {filteredPlans.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <div className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center">
-                  <UtensilsCrossed size={22} className="text-gray-500" />
+                  <UtensilsCrossed size={22} className="text-gray-400" />
                 </div>
                 <p className="text-sm text-gray-400">No plans found.</p>
               </div>

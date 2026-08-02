@@ -31,7 +31,7 @@ export default function ReactionPrompt({ sport, active, isPro }: Props) {
       className="px-4 text-center transition-opacity duration-300"
       style={{ opacity: fade ? 1 : 0 }}
     >
-      <p className="text-[10px] font-semibold tracking-widest text-gray-500 uppercase mb-1">Coach says</p>
+      <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1">Coach says</p>
       <p className="text-sm font-semibold text-gray-200 leading-snug">{prompt}</p>
     </div>
   );
