@@ -128,6 +128,12 @@ function shareStats(opts: {
   ctx.font = '12px system-ui, sans-serif';
   ctx.fillText(`Camp Progress: ${opts.progress}%`, 40, H - 20);
 
+  // Brand watermark — the shared image is the app's only outbound artifact.
+  ctx.fillStyle = '#4b5563';
+  ctx.textAlign = 'right';
+  ctx.fillText('fightcamp.netlify.app', W - 40, H - 20);
+  ctx.textAlign = 'left';
+
   canvas.toBlob(async blob => {
     if (!blob) return;
     const file = new File([blob], 'fight-camp-stats.png', { type: 'image/png' });

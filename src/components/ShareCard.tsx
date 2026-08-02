@@ -3,12 +3,31 @@ import { X, Share2, Download } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import type { WorkoutLog, FightCamp, FighterProfile } from '../types';
 
+/** A shareable win that isn't a training session — belt, streak, PR, fight. */
+export interface MilestoneShare {
+  /** Big center line, e.g. "BLUE BELT", "14-DAY STREAK", "VICTORY". */
+  title: string;
+  /** Supporting line, e.g. "New rank earned" or "UD · R3 · vs J. Smith". */
+  subtitle: string;
+  /** Large celebratory glyph drawn above the title. */
+  emoji: string;
+  /** File-name stem for the exported PNG, e.g. "belt-blue". */
+  slug: string;
+}
+
+export type ShareContent =
+  | { kind: 'session'; log: WorkoutLog; camp: FightCamp }
+  | { kind: 'milestone'; milestone: MilestoneShare };
+
 interface Props {
-  log: WorkoutLog;
-  camp: FightCamp;
+  content: ShareContent;
   user: FighterProfile;
   onClose: () => void;
 }
+
+// The real site — shared images are the app's only outbound artifact, and the
+// previous watermark pointed at a domain the app doesn't own.
+const SHARE_DOMAIN = 'fightcamp.netlify.app';
 
 const SESSION_EMOJIS: Record<string, string> = {
   conditioning: '🔥',
@@ -169,21 +188,110 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   // Bottom brand watermark
   ctx.fillStyle = '#374151';
   ctx.font = '36px system-ui, sans-serif';
-  ctx.fillText('fightcamp.app', cx, H - 80);
+  ctx.fillText(SHARE_DOMAIN, cx, H - 80);
 
   return canvas;
 }
 
-export default function ShareCard({ log, camp, user, onClose }: Props) {
+function buildMilestoneCard(m: MilestoneShare, user: FighterProfile): HTMLCanvasElement {
+  const W = 1080, H = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  // Same visual system as the session card: dark gradient, brand accent line.
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0a0a0a');
+  bg.addColorStop(1, '#111827');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#ea580c';
+  ctx.fillRect(0, 0, W, 8);
+
+  const cx = W / 2;
+
+  ctx.fillStyle = '#ea580c';
+  ctx.font = 'bold 52px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.letterSpacing = '0.15em';
+  ctx.fillText('FIGHT CAMP', cx, 140);
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '40px system-ui, sans-serif';
+  ctx.fillText(user.name.toUpperCase(), cx, 210);
+
+  // Soft radial glow behind the emoji so the moment reads celebratory even in
+  // a feed thumbnail.
+  const glow = ctx.createRadialGradient(cx, 700, 60, cx, 700, 460);
+  glow.addColorStop(0, '#ea580c33');
+  glow.addColorStop(1, '#ea580c00');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 240, W, 920);
+
+  ctx.font = '340px system-ui, sans-serif';
+  ctx.fillText(m.emoji, cx, 830);
+
+  // Headline, shrunk to fit long titles ("NEW PR: MOST SPARRING ROUNDS").
+  let size = 130;
+  ctx.fillStyle = '#ffffff';
+  do {
+    ctx.font = `bold ${size}px system-ui, sans-serif`;
+    size -= 8;
+  } while (ctx.measureText(m.title).width > W - 140 && size > 56);
+  ctx.fillText(m.title, cx, 1080);
+
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = '52px system-ui, sans-serif';
+  ctx.fillText(m.subtitle, cx, 1180);
+
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '36px system-ui, sans-serif';
+  ctx.fillText(format(new Date(), 'MMMM d, yyyy').toUpperCase(), cx, 1290);
+
+  ctx.fillStyle = '#374151';
+  ctx.font = '36px system-ui, sans-serif';
+  ctx.fillText(SHARE_DOMAIN, cx, H - 80);
+
+  return canvas;
+}
+
+export default function ShareCard({ content, user, onClose }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const fileName =
+    content.kind === 'session' ? 'fight-camp-session.png' : `fight-camp-${content.milestone.slug}.png`;
+  const shareTitle =
+    content.kind === 'session'
+      ? `Day ${Math.max(1, differenceInDays(parseISO(content.log.date), parseISO(content.camp.startDate)) + 1)} — ${content.log.title}`
+      : content.milestone.title;
+
   useEffect(() => {
-    const canvas = buildCard(log, camp, user);
+    const canvas =
+      content.kind === 'session'
+        ? buildCard(content.log, content.camp, user)
+        : buildMilestoneCard(content.milestone, user);
     canvasRef.current = canvas;
-    setDataUrl(canvas.toDataURL('image/png'));
-  }, [log, camp, user]);
+    // Async on purpose (toBlob's callback, not a sync toDataURL) so the state
+    // update can't cascade into the same render pass; the object URL is also
+    // far lighter than a multi-MB base64 data URL for a 1080×1920 PNG.
+    let url: string | null = null;
+    let cancelled = false;
+    canvas.toBlob(blob => {
+      if (!blob || cancelled) return;
+      url = URL.createObjectURL(blob);
+      setDataUrl(url);
+    }, 'image/png');
+    return () => {
+      cancelled = true;
+      // Revoking after replacement/unmount is safe: an <img> that already
+      // loaded the URL keeps its pixels; only new loads are prevented.
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [content, user]);
 
   async function handleShare() {
     if (!canvasRef.current) return;
@@ -191,17 +299,14 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
     try {
       canvasRef.current.toBlob(async (blob) => {
         if (!blob) return;
-        const file = new File([blob], 'fight-camp-session.png', { type: 'image/png' });
+        const file = new File([blob], fileName, { type: 'image/png' });
         if (navigator.share && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: `Day ${Math.max(1, differenceInDays(parseISO(log.date), parseISO(camp.startDate)) + 1)} — ${log.title}`,
-          });
+          await navigator.share({ files: [file], title: shareTitle });
         } else {
           // Fallback: download
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = 'fight-camp-session.png';
+          a.download = fileName;
           a.click();
           URL.revokeObjectURL(a.href);
         }
@@ -216,7 +321,7 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
     if (!dataUrl) return;
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = 'fight-camp-session.png';
+    a.download = fileName;
     a.click();
   }
 
@@ -225,7 +330,9 @@ export default function ShareCard({ log, camp, user, onClose }: Props) {
       <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5" style={{ maxHeight: 'calc(100dvh - 2rem)' }}>
         {/* Header */}
         <div className="flex items-center justify-between flex-shrink-0">
-          <p className="text-sm font-semibold text-white">Share Session</p>
+          <p className="text-sm font-semibold text-white">
+            {content.kind === 'session' ? 'Share Session' : 'Share the Win'}
+          </p>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <X size={18} />
           </button>
