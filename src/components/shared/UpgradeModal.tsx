@@ -13,7 +13,7 @@ interface Props {
 // App Store metadata in spirit (Guideline 2.3.1) and drifts silently if it
 // isn't checked against the real ProGate call sites when features change.
 const FIGHTER_PRO_FEATURES = [
-  'AI Insights & AI Cut Coach (uses your Anthropic API key)',
+  'AI Insights & AI Cut Coach — included, no setup',
   'Nutrition tracker — hydration, meals & macros',
   'Game Plan Builder for fight strategy',
   'Unlimited fight camps & camp comparison',

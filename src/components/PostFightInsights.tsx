@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import Anthropic from '@anthropic-ai/sdk';
-import { Brain, RefreshCw, Key, AlertCircle, Sparkles } from 'lucide-react';
-import { getApiKey, setApiKey } from '../utils/apiKey';
+import { Brain, RefreshCw, AlertCircle, Sparkles, User, Zap } from 'lucide-react';
+import { streamAiCoach, AiCoachError, type AiCoachErrorCode } from '../lib/aiCoach';
+import AuthScreen from './AuthScreen';
+import UpgradeModal from './shared/UpgradeModal';
 import type { FightResult, FightCamp } from '../types';
 import type { CampKpis } from '../utils/campKpis';
 import type { FightAnalysis } from '../utils/fightAnalysis';
@@ -107,60 +108,30 @@ export default function PostFightInsights(props: Props) {
   const [insights, setInsights] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyDraft, setKeyDraft] = useState('');
-
-  const hasKey = !!getApiKey();
+  const [errorCode, setErrorCode] = useState<AiCoachErrorCode | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   async function generate() {
-    const apiKey = getApiKey();
-    if (!apiKey) { setShowKeyInput(true); return; }
-
     setLoading(true);
     setError('');
+    setErrorCode(null);
     setInsights('');
 
     try {
-      const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-      const prompt = buildPrompt(props);
-
-      const stream = client.messages.stream({
-        model: 'claude-opus-4-6',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }],
+      await streamAiCoach('postfight', buildPrompt(props), text => {
+        setInsights(prev => prev + text);
       });
-
-      for await (const event of stream) {
-        if (
-          event.type === 'content_block_delta' &&
-          event.delta.type === 'text_delta' &&
-          'text' in event.delta
-        ) {
-          setInsights(prev => prev + (event.delta as { type: 'text_delta'; text: string }).text);
-        }
-      }
     } catch (err) {
-      setInsights('');
-      if (err instanceof Anthropic.AuthenticationError) {
-        setError('Invalid API key.');
-        setShowKeyInput(true);
-      } else if (err instanceof Anthropic.RateLimitError) {
-        setError('Rate limit reached. Wait a moment and try again.');
-      } else if (err instanceof Error) {
+      if (err instanceof AiCoachError) {
         setError(err.message);
+        setErrorCode(err.code);
       } else {
         setError('Something went wrong. Please try again.');
       }
     } finally {
       setLoading(false);
     }
-  }
-
-  function saveKey() {
-    setApiKey(keyDraft.trim());
-    setShowKeyInput(false);
-    setKeyDraft('');
-    if (keyDraft.trim()) generate();
   }
 
   return (
@@ -172,78 +143,50 @@ export default function PostFightInsights(props: Props) {
           </div>
           <div className="flex-1">
             <p className="text-white font-bold">AI Post-Fight Breakdown</p>
-            <p className="text-xs text-gray-500">Claude writes the narrative. Weights below are rules-based.</p>
+            <p className="text-xs text-gray-500">The AI writes the narrative. Weights above are rules-based.</p>
           </div>
           <Sparkles size={16} className="text-purple-400" />
         </div>
       </div>
 
-      {showKeyInput && (
-        <div className="card space-y-3">
-          <div className="flex items-center gap-2">
-            <Key size={15} className="text-yellow-400" />
-            <p className="text-sm font-semibold text-white">Anthropic API Key</p>
-          </div>
-          <input
-            type="password"
-            className="input font-mono text-sm"
-            placeholder="sk-ant-..."
-            value={keyDraft}
-            onChange={e => setKeyDraft(e.target.value)}
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={saveKey}
-              disabled={!keyDraft.trim().startsWith('sk-')}
-              className="btn-primary flex-1 py-2 text-sm disabled:opacity-50"
-            >
-              Save & Generate
-            </button>
-            <button onClick={() => setShowKeyInput(false)} className="btn-secondary px-4 py-2 text-sm">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!showKeyInput && (
-        <button
-          onClick={generate}
-          disabled={loading}
-          className={`w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-98 ${
-            loading
-              ? 'bg-purple-900/40 border border-purple-800 text-purple-300 cursor-not-allowed'
-              : 'bg-purple-700 hover:bg-purple-600 text-white'
-          }`}
-        >
-          {loading ? (
-            <>
-              <RefreshCw size={16} className="animate-spin" />
-              Generating breakdown…
-            </>
-          ) : (
-            <>
-              <Brain size={16} />
-              {insights ? 'Regenerate' : 'Generate AI Breakdown'}
-            </>
-          )}
-        </button>
-      )}
-
-      {!hasKey && !insights && !showKeyInput && (
-        <button
-          onClick={() => setShowKeyInput(true)}
-          className="w-full flex items-center justify-center gap-2 py-2 text-xs text-gray-500 hover:text-gray-300"
-        >
-          <Key size={12} /> Add API key
-        </button>
-      )}
+      <button
+        onClick={generate}
+        disabled={loading}
+        className={`w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-98 ${
+          loading
+            ? 'bg-purple-900/40 border border-purple-800 text-purple-300 cursor-not-allowed'
+            : 'bg-purple-700 hover:bg-purple-600 text-white'
+        }`}
+      >
+        {loading ? (
+          <>
+            <RefreshCw size={16} className="animate-spin" />
+            Generating breakdown…
+          </>
+        ) : (
+          <>
+            <Brain size={16} />
+            {insights ? 'Regenerate' : 'Generate AI Breakdown'}
+          </>
+        )}
+      </button>
 
       {error && (
-        <div className="flex items-start gap-3 bg-red-900/20 border border-red-900/40 rounded-xl p-3">
-          <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-300">{error}</p>
+        <div className="space-y-2">
+          <div className="flex items-start gap-3 bg-red-900/20 border border-red-900/40 rounded-xl p-3">
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-300">{error}</p>
+          </div>
+          {errorCode === 'signin_required' && (
+            <button onClick={() => setShowAuth(true)} className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+              <User size={14} /> Sign in
+            </button>
+          )}
+          {errorCode === 'upgrade_required' && (
+            <button onClick={() => setShowUpgrade(true)} className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+              <Zap size={14} /> Unlock with Fighter Pro
+            </button>
+          )}
         </div>
       )}
 
@@ -252,7 +195,7 @@ export default function PostFightInsights(props: Props) {
           {loading && !insights && (
             <div className="flex items-center gap-2 text-purple-400 text-sm">
               <RefreshCw size={14} className="animate-spin" />
-              Claude is analyzing the fight…
+              Your AI coach is analyzing the fight…
             </div>
           )}
           <div className="space-y-0.5">
@@ -263,6 +206,9 @@ export default function PostFightInsights(props: Props) {
           </div>
         </div>
       )}
+
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

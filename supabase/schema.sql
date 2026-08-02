@@ -570,3 +570,56 @@ $$;
 
 revoke execute on function public.delete_account() from public;
 grant  execute on function public.delete_account() to authenticated;
+
+------------------------------------------------------------
+-- ai_usage — monthly metering for the server-side AI coach
+-- (netlify/functions/ai-coach). One row per user per calendar
+-- month (UTC, 'YYYY-MM'). Written ONLY through increment_ai_usage,
+-- called with the service-role key; clients may read their own row
+-- (so the app can show "N analyses left") but never write it.
+------------------------------------------------------------
+create table if not exists public.ai_usage (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  month      text not null,                     -- 'YYYY-MM' (UTC)
+  count      integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, month)
+);
+
+alter table public.ai_usage enable row level security;
+drop policy if exists "ai_usage_own_select" on public.ai_usage;
+create policy "ai_usage_own_select" on public.ai_usage
+  for select using (user_id = auth.uid());
+
+-- Atomically consume one analysis. Returns the calls REMAINING after this one,
+-- or -1 (consuming nothing) when the month's limit is already spent. The
+-- conditional upsert makes concurrent requests race-safe: the WHERE clause
+-- refuses the increment once count has reached the limit.
+create or replace function public.increment_ai_usage(p_user_id uuid, p_month text, p_limit integer)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_count integer;
+begin
+  if p_limit <= 0 then
+    return -1;
+  end if;
+  insert into public.ai_usage as u (user_id, month, count)
+  values (p_user_id, p_month, 1)
+  on conflict (user_id, month) do update
+    set count = u.count + 1, updated_at = now()
+    where u.count < p_limit
+  returning u.count into new_count;
+  if new_count is null then
+    return -1;
+  end if;
+  return p_limit - new_count;
+end;
+$$;
+
+-- Only the service role (which bypasses the revoke) may meter usage — a client
+-- must never be able to burn or reset its own quota.
+revoke execute on function public.increment_ai_usage(uuid, text, integer) from public, anon, authenticated;
