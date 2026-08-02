@@ -333,7 +333,7 @@ export default function ShareCard({ content, user, onClose }: Props) {
           <p className="text-sm font-semibold text-white">
             {content.kind === 'session' ? 'Share Session' : 'Share the Win'}
           </p>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white transition-colors p-2.5 -m-2">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white transition-colors w-11 h-11 flex items-center justify-center -m-2">
             <X size={18} />
           </button>
         </div>
