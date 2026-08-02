@@ -762,11 +762,19 @@ export async function fetchServerSubscription(userId: string): Promise<Subscript
         .eq('user_id', userId)
         .maybeSingle(),
     ]);
-    // A table read failing (e.g. schema not yet migrated) counts as "no row"
-    // rather than poisoning the other source's verdict.
+    // A failed read makes that source UNKNOWN, not "no row" — with one
+    // exception: the table not existing yet (schema migration not applied) is
+    // a conclusive "no row", or the whole function would go dark during
+    // rollout. The distinction matters below: the free sentinel (which lets
+    // the caller downgrade a server-verified user) is only returned when
+    // every source answered conclusively, so a transient error on one table
+    // can never read as "your subscription is gone".
+    const missingTable = (e: { code?: string } | null): boolean =>
+      e?.code === 'PGRST205' || e?.code === '42P01';
+    const stripeConclusive = !stripeQ.error || missingTable(stripeQ.error);
+    const rcConclusive = !rcQ.error || missingTable(rcQ.error);
     const stripe = stripeQ.error ? null : stripeQ.data;
     const rc = rcQ.error ? null : rcQ.data;
-    if (!stripe && !rc) return null;
 
     const candidates: SubscriptionState[] = [];
 
@@ -801,6 +809,10 @@ export async function fetchServerSubscription(userId: string): Promise<Subscript
       });
       return candidates[0];
     }
+    // No active entitlement found. Downgrading is only safe when both sources
+    // actually answered — and only meaningful when a row exists to be expired.
+    if (!stripeConclusive || !rcConclusive) return null;
+    if (!stripe && !rc) return null;
     return { tier: 'free', expiresAt: null, source: stripe ? 'stripe_server' : 'revenuecat_server' };
   } catch {
     return null;

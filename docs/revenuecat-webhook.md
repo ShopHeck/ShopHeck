@@ -53,8 +53,10 @@ RevenueCat dashboard → your project → **Integrations → Webhooks → Add**:
   function compares the header verbatim (a `Bearer ` prefix is tolerated).
 - **Environment:** leave "All environments" on. Sandbox (TestFlight) events are
   recorded with `environment = 'SANDBOX'` and expire within minutes-to-hours on
-  their own (Apple's accelerated sandbox clock), so they're harmless and make
-  end-to-end testing possible.
+  their own (Apple's accelerated sandbox clock), which makes end-to-end testing
+  possible. They can't contaminate real access: the write guards give
+  production events absolute precedence — a sandbox event never replaces a
+  production row, and a production event always supersedes a sandbox one.
 
 ### 3. Set Netlify environment variables
 Netlify → Site settings → **Environment variables** (server-only; no `VITE_`
@@ -86,9 +88,11 @@ the `logIn` call shipping in the same release:
 
 ## Event handling details
 
-- **All entitlement-bearing events** upsert tier + expiry; out-of-order
-  redelivery is guarded by `event_timestamp_ms` (an older event never
-  overwrites newer state; identical timestamps re-apply idempotently).
+- **All entitlement-bearing events** upsert tier + expiry through
+  `record_revenuecat_event` (one atomic SQL statement, service-role only), so
+  concurrent deliveries can't race: an older `event_timestamp_ms` never
+  overwrites newer state (identical timestamps re-apply idempotently), sandbox
+  never replaces production, production always supersedes sandbox.
 - **`TEST`** (dashboard "send test event") → acknowledged, no write.
 - **`TRANSFER`** carries no entitlement ids and is deliberately not mirrored —
   the destination account's next real event (or the device SDK) corrects the

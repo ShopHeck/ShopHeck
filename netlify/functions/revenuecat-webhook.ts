@@ -117,44 +117,31 @@ export default async (req: Request): Promise<Response> => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const eventAt = event.event_timestamp_ms ? new Date(event.event_timestamp_ms).toISOString() : null;
-
+  // The write goes through record_revenuecat_event (supabase/schema.sql), a
+  // single atomic statement whose guards make redelivery and concurrency safe:
+  // an older event never overwrites newer state (webhooks arrive out of order
+  // and in parallel), a sandbox/TestFlight event never replaces a production
+  // row (its accelerated expiry would revoke real access), and a production
+  // event always supersedes a sandbox row.
+  let outcome: unknown;
   try {
-    // Webhooks are retried and can arrive out of order; an older event must
-    // not overwrite a newer state (e.g. RENEWAL landing after EXPIRATION).
-    // Equal timestamps re-apply — the upsert is idempotent, so redelivery of
-    // the same event is harmless.
-    if (eventAt) {
-      const { data: existing, error: readErr } = await supabase
-        .from('revenuecat_subscriptions')
-        .select('last_event_at')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (readErr) throw new Error(`read failed: ${readErr.message}`);
-      if (existing?.last_event_at && new Date(eventAt) < new Date(existing.last_event_at)) {
-        return ok('stale event (newer state already recorded)');
-      }
-    }
-
-    const { error } = await supabase.from('revenuecat_subscriptions').upsert(
-      {
-        user_id: userId,
-        rc_app_user_id: event.app_user_id ?? null,
-        tier,
-        product_id: event.product_id ?? null,
-        environment: event.environment ?? null,
-        expires_at: event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
-        last_event_type: event.type ?? null,
-        last_event_at: eventAt,
-      },
-      { onConflict: 'user_id' },
-    );
-    if (error) throw new Error(`upsert failed: ${error.message}`);
+    const { data, error } = await supabase.rpc('record_revenuecat_event', {
+      p_user_id: userId,
+      p_rc_app_user_id: event.app_user_id ?? null,
+      p_tier: tier,
+      p_product_id: event.product_id ?? null,
+      p_environment: event.environment ?? null,
+      p_expires_at: event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
+      p_event_type: event.type ?? null,
+      p_event_at: event.event_timestamp_ms ? new Date(event.event_timestamp_ms).toISOString() : null,
+    });
+    if (error) throw new Error(`record_revenuecat_event failed: ${error.message}`);
+    outcome = data;
   } catch (err) {
     // 5xx → RevenueCat retries with backoff rather than dropping the event.
     console.error('revenuecat-webhook handler error:', err);
     return new Response('Handler error', { status: 500 });
   }
 
-  return ok('entitlement recorded');
+  return ok(outcome === 'recorded' ? 'entitlement recorded' : 'skipped (stale, or sandbox under a production row)');
 };
