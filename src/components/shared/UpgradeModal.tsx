@@ -36,6 +36,20 @@ const COACH_PRO_FEATURES = [
   'Fighter detail views: training, weight cut & readiness',
 ];
 
+// Existing Stripe Payment Links used by the web app. Environment variables can
+// override the current production links without rebuilding the payment flow.
+// iOS continues to use Apple IAP through RevenueCat.
+const LINKS = {
+  fighter: {
+    monthly: (import.meta.env.VITE_STRIPE_FIGHTER_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/aFa28r7BY2t13JafKwgYU00',
+    annual: (import.meta.env.VITE_STRIPE_FIGHTER_PRO_ANNUAL as string | undefined) || 'https://buy.stripe.com/4gMfZh7BYaZx1B20PCgYU03',
+  },
+  coach: {
+    monthly: (import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/cNi3cvf4q2t1cfG41OgYU01',
+    annual: (import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL as string | undefined) || 'https://buy.stripe.com/28EcN57BY2t13Ja55SgYU02',
+  },
+};
+
 /**
  * The native plugin already phrases its rejections for humans, so pass them
  * through rather than flattening every failure into a generic sentence.
@@ -52,7 +66,7 @@ function purchaseErrorMessage(e: unknown): string {
 
 export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   const { dispatch } = useApp();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
@@ -77,34 +91,6 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
     return true;
   }
 
-  async function createWebCheckout(tier: 'fighter' | 'coach'): Promise<string> {
-    const token = session?.access_token;
-    if (!token || !user?.id || !user.email) {
-      throw new Error('Sign in before subscribing so your purchase follows your account and devices.');
-    }
-
-    const response = await fetch('/.netlify/functions/create-checkout', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ tier, billing }),
-    });
-
-    let body: { url?: string; message?: string } = {};
-    try {
-      body = await response.json() as { url?: string; message?: string };
-    } catch {
-      // Keep the generic message below for a non-JSON infrastructure error.
-    }
-
-    if (!response.ok || !body.url) {
-      throw new Error(body.message || 'Checkout is unavailable right now. Please try again.');
-    }
-    return body.url;
-  }
-
   async function handleSubscribe(tier: 'fighter' | 'coach') {
     setNotice('');
     if (Capacitor.isNativePlatform()) {
@@ -120,24 +106,28 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
       return;
     }
 
-    if (!session?.access_token || !user?.id || !user.email) {
+    // Keep the existing Payment Link setup, but require a real account so the
+    // signed Stripe webhook can attach the entitlement to the correct user.
+    if (!user?.id || !user.email) {
       setNotice('Sign in before subscribing so your purchase follows your account and devices.');
       setShowAuth(true);
       return;
     }
 
-    setLoading(true);
-    try {
-      const checkoutUrl = await createWebCheckout(tier);
-      onBeforeWebCheckout?.();
-      // Give React/local persistence one beat to commit onboarding draft state
-      // before the page leaves for Stripe.
-      await new Promise(resolve => setTimeout(resolve, 120));
-      window.location.assign(checkoutUrl);
-    } catch (e) {
-      setNotice(purchaseErrorMessage(e));
-      setLoading(false);
+    const base = LINKS[tier][billing];
+    if (!base) {
+      setNotice('That subscription option is not configured yet.');
+      return;
     }
+
+    const url = new URL(base);
+    url.searchParams.set('client_reference_id', user.id);
+    url.searchParams.set('prefilled_email', user.email);
+    onBeforeWebCheckout?.();
+    setLoading(true);
+    // Give React/local persistence one beat to commit onboarding draft state
+    // before the page leaves for the already-configured payment page.
+    setTimeout(() => window.location.assign(url.toString()), 120);
   }
 
   async function handleRestore() {
