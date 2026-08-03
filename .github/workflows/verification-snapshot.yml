@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Package exact source and dependencies
-        run: tar -czf "$RUNNER_TEMP/fightcamp-verification.tgz" --exclude=.git --exclude=dist .
+        run: tar -czf "$RUNNER_TEMP/fightcamp-verification.tgz" --exclude='./.git' --exclude='./dist' .
       - uses: actions/upload-artifact@v4
         with:
           name: fightcamp-verification-source
