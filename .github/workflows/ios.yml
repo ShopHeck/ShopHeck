@@ -171,6 +171,50 @@ jobs:
         run: pod install
         working-directory: ios/App
 
+      # match clones the private certificates repo. Authenticating that clone
+      # with a personal access token — whether in the URL or as a base64 basic-auth
+      # header — makes every build depend on that token's expiry date, and the
+      # failure when it lapses is an opaque "invalid credentials" from git.
+      #
+      # A deploy key has no expiry, is scoped to the single certs repo rather
+      # than the whole account, and can be revoked without touching anything
+      # else. Only the certs clone uses SSH; actions/checkout still authenticates
+      # over HTTPS with its own token, so this Host block cannot affect it.
+      - name: Authorize the certificates repo over SSH
+        env:
+          MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+        run: |
+          if [ -z "$MATCH_DEPLOY_KEY" ]; then
+            echo "No MATCH_DEPLOY_KEY set — skipping (match will use whatever MATCH_GIT_URL provides)."
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # printf guarantees the trailing newline OpenSSH requires; a key pasted
+          # without one is rejected as "invalid format" with no further detail.
+          printf '%s\n' "$MATCH_DEPLOY_KEY" > ~/.ssh/match_deploy_key
+          chmod 600 ~/.ssh/match_deploy_key
+
+          # Non-fatal: a transient keyscan failure would otherwise abort the whole
+          # build under `set -e`. accept-new below covers that case.
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # IdentitiesOnly stops ssh from offering any other key first and
+          # tripping GitHub's per-account auth limit before it reaches this one.
+          # accept-new trusts a first-seen host key but still refuses a *changed*
+          # one, so a failed keyscan degrades gracefully instead of wedging.
+          cat >> ~/.ssh/config <<'EOF'
+          Host github.com
+            IdentityFile ~/.ssh/match_deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+          EOF
+          chmod 600 ~/.ssh/config
+
+          echo "Deploy key installed."
+
       # `version:` is only appended when supplied, so scheduled/push builds keep
       # using the MARKETING_VERSION committed in the project.
       - name: Upload to TestFlight via Fastlane
@@ -188,4 +232,8 @@ jobs:
           # they're configured (see docs/ios-signing.md).
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          # Only used when the certs repo is reached over HTTPS. With an SSH
+          # deploy key (the documented setup) this secret does not exist, and the
+          # Fastfile deletes the variable rather than letting match send an empty
+          # Authorization header — see sanitize_match_env! in ios/fastlane/Fastfile.
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
