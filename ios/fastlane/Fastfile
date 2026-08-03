@@ -55,8 +55,41 @@ def validate_revenuecat_key!(key)
   MSG
 end
 
+# GitHub Actions defines every key in a step's `env:` block, so a secret that
+# does not exist arrives as an empty string rather than being absent. match's
+# `git_basic_authorization` defaults to ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+# and in Ruby "" is truthy — so an unset secret still sends
+#
+#     git clone <url> -c http.extraheader='Authorization: Basic '
+#
+# an empty credential that OVERRIDES any token embedded in MATCH_GIT_URL. GitHub
+# answers "invalid credentials" and match reports it as a repo access problem,
+# which sends you looking at permissions that were never wrong.
+#
+# The whitespace strip matters just as much: `base64` line-wraps at 76 columns,
+# so an encoded "x-access-token:<fine-grained PAT>" arrives split across two
+# lines. A newline inside the header makes the HTTP request itself malformed and
+# GitHub answers 400 — a different error with the same non-obvious cause.
+def sanitize_match_env!
+  auth = ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.gsub(/\s+/, "")
+  if auth.empty?
+    ENV.delete("MATCH_GIT_BASIC_AUTHORIZATION")
+  else
+    ENV["MATCH_GIT_BASIC_AUTHORIZATION"] = auth
+  end
+
+  url = ENV["MATCH_GIT_URL"].to_s.strip
+  if url.empty?
+    ENV.delete("MATCH_GIT_URL")
+  else
+    ENV["MATCH_GIT_URL"] = url
+  end
+end
+
 platform :ios do
   before_all do
+    sanitize_match_env!
+
     # Authenticate every lane with the App Store Connect API key. Reads CI
     # secrets. ASC_KEY_CONTENT may be the raw .p8 (PEM) text or base64-encoded —
     # we detect which so either form works.
