@@ -13,6 +13,8 @@ function forbidText(source, forbidden, label) {
 
 const [
   aiCoach,
+  createCheckout,
+  stripeWebhook,
   subscription,
   upgradeModal,
   appContext,
@@ -22,6 +24,8 @@ const [
   terms,
 ] = await Promise.all([
   read('netlify/functions/ai-coach.ts'),
+  read('netlify/functions/create-checkout.ts'),
+  read('netlify/functions/stripe-webhook.ts'),
   read('src/utils/subscription.ts'),
   read('src/components/shared/UpgradeModal.tsx'),
   read('src/context/AppContext.tsx'),
@@ -36,8 +40,18 @@ requireText(aiCoach, 'server-authoritative sources only', 'AI authorization');
 
 forbidText(subscription, '30-day soft unlock', 'Stripe return');
 forbidText(subscription, "source: 'stripe_payment_link'", 'Stripe return');
-requireText(subscription, 'never grant', 'Stripe return');
-requireText(upgradeModal, 'if (!user?.id || !user.email)', 'Web checkout attribution');
+requireText(subscription, 'grants nothing by itself', 'Stripe return');
+
+forbidText(upgradeModal, 'buy.stripe.com', 'Web checkout');
+forbidText(upgradeModal, 'VITE_STRIPE_', 'Web checkout');
+requireText(upgradeModal, '/.netlify/functions/create-checkout', 'Web checkout');
+requireText(upgradeModal, 'session?.access_token', 'Web checkout authentication');
+requireText(createCheckout, 'supabase.auth.getUser(token)', 'Checkout authentication');
+requireText(createCheckout, 'STRIPE_FIGHTER_MONTHLY_PRICE_ID', 'Checkout price allowlist');
+requireText(createCheckout, 'client_reference_id: user.id', 'Checkout attribution');
+requireText(createCheckout, 'subscription_data:', 'Checkout subscription attribution');
+requireText(stripeWebhook, 'unattributed_stripe_events', 'Stripe reconciliation');
+requireText(stripeWebhook, 'STRIPE_COACH_ANNUAL_PRICE_ID', 'Stripe price allowlist');
 
 requireText(appContext, 'clearFightCampLocalData()', 'Complete reset');
 requireText(appContext, 'return createDefaultState()', 'Complete reset');
