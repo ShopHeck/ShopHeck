@@ -1,7 +1,9 @@
 import { addDays, differenceInDays, parseISO, subDays } from 'date-fns';
-import type { AppState, CampFactorWeights } from '../types';
+import type { AppState, CampFactorWeights, TrainingWeek } from '../types';
 import { DEFAULT_FACTOR_WEIGHTS } from '../types';
 import { formatWeightDelta } from './units';
+import { getCurrentWeekNumber } from './campGenerator';
+import { latestComparableTrend } from './conditioningMetrics';
 
 export interface ReadinessBreakdownItem {
   label: string;
@@ -18,6 +20,38 @@ export interface ReadinessResult {
   breakdown: ReadinessBreakdownItem[];
   insights: string[];
   daysUntilFight: number;
+  /** Current generated phase used to interpret load and sparring expectations. */
+  phase: TrainingWeek['phase'] | 'Unscheduled';
+  /** Percentage of the readiness inputs that contain usable athlete data. */
+  dataCoverage: number;
+  confidence: 'low' | 'medium' | 'high';
+}
+
+interface RpeTarget {
+  min: number;
+  max: number;
+  label: string;
+}
+
+function rpeTargetForPhase(phase: ReadinessResult['phase']): RpeTarget {
+  if (phase === 'Taper' || phase === 'Active Recovery') {
+    return { min: 4, max: 6.5, label: 'recovery-range' };
+  }
+  if (phase === 'Base Building' || phase === 'Foundation') {
+    return { min: 5.5, max: 7.5, label: 'base-building range' };
+  }
+  if (phase === 'Strength & Conditioning' || phase === 'Development') {
+    return { min: 6.5, max: 8.5, label: 'development range' };
+  }
+  return { min: 7, max: 8.75, label: 'fight-specific range' };
+}
+
+function ratioFromRpe(avg: number, target: RpeTarget): number {
+  if (avg >= target.min && avg <= target.max) return 1;
+  const distance = avg < target.min ? target.min - avg : avg - target.max;
+  if (distance <= 0.75) return 0.8;
+  if (distance <= 1.5) return 0.6;
+  return 0.35;
 }
 
 export function computeReadiness(state: AppState): ReadinessResult | null {
@@ -29,6 +63,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     conditioningTests,
     nutritionLogs,
     currentUser,
+    trainingSchedule,
   } = state;
 
   if (!activeCamp) return null;
@@ -45,8 +80,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const now = new Date();
   const campStart = parseISO(activeCamp.startDate);
   // Off-season camps have no fight date — anchor on the scheduled end of the
-  // block (start + campWeeks) so every day-count below stays finite instead of
-  // NaN-ing the whole readiness score (parseISO('') is an Invalid Date).
+  // block so every day-count below stays finite.
   const fightDate = activeCamp.fightDate
     ? parseISO(activeCamp.fightDate)
     : addDays(campStart, activeCamp.campWeeks * 7);
@@ -55,21 +89,29 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const totalCampDays = Math.max(1, differenceInDays(fightDate, campStart));
   const campProgress = Math.min(1, daysIntoCamp / totalCampDays);
 
-  const campWorkouts = workoutLogs.filter(w => w.campId === activeCamp.id);
-  const campSparring = sparringLogs.filter(s => s.campId === activeCamp.id);
+  const currentWeekNumber = getCurrentWeekNumber(activeCamp);
+  const currentWeek = trainingSchedule[currentWeekNumber - 1];
+  const phase: ReadinessResult['phase'] = currentWeek?.phase ?? 'Unscheduled';
+  const sparringPrescribed = currentWeek
+    ? currentWeek.days.some(day => day.sessions.some(session => session.type === 'sparring'))
+    : phase !== 'Taper' && phase !== 'Active Recovery';
+
+  const campWorkouts = workoutLogs.filter(log => log.campId === activeCamp.id);
+  const campSparring = sparringLogs.filter(log => log.campId === activeCamp.id);
   const campWeights = weightEntries
-    .filter(w => w.campId === activeCamp.id)
+    .filter(entry => entry.campId === activeCamp.id)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const campTests = conditioningTests
-    .filter(t => t.campId === activeCamp.id)
+    .filter(test => test.campId === activeCamp.id)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const recent14 = subDays(now, 14);
   const recent7 = subDays(now, 7);
-  const recentWorkouts = campWorkouts.filter(w => parseISO(w.date) >= recent14);
+  const recentWorkouts = campWorkouts.filter(log => parseISO(log.date) >= recent14);
 
   // Each section computes a 0..1 ratio, then scales to its per-fighter max.
-  const scale = (ratio: number, max: number) => Math.round(ratio * max);
+  const scale = (ratio: number, max: number) => Math.round(Math.max(0, Math.min(1, ratio)) * max);
+  const ratioOf = (item: ReadinessBreakdownItem) => item.max > 0 ? item.score / item.max : 1;
 
   // User-facing detail strings speak the display unit; all math stays lbs.
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
@@ -79,10 +121,18 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const currentW = latestWeight ? latestWeight.weight : activeCamp.currentWeight;
   const targetW = activeCamp.targetWeight;
   const lbsToGo = Math.max(0, currentW - targetW);
+  const hasFightWeightTarget = Boolean(
+    activeCamp.fightDate && targetW > 0 && activeCamp.currentWeight > targetW,
+  );
 
   let weightRatio: number;
   let weightDetail: string;
-  if (!latestWeight) {
+  if (!hasFightWeightTarget) {
+    weightRatio = 1;
+    weightDetail = activeCamp.isOffSeason
+      ? 'No fight-weight cut required in this block'
+      : 'No cut required for this camp';
+  } else if (!latestWeight) {
     weightRatio = 0.5;
     weightDetail = 'No weigh-ins logged yet';
   } else if (lbsToGo <= 0) {
@@ -99,11 +149,6 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const weightScore = scale(weightRatio, w.weightCut);
 
   // ── 2. Training Volume (max = w.trainingVolume) ──────────────────────────
-  // No Math.max(1, …) floor here: a camp that starts tomorrow has a progress of
-  // 0, and forcing "1 session expected" told a fighter they were already a
-  // session behind — and scored them 0 on volume — before day one of camp. With
-  // nothing expected yet, volume is unscored (neutral 0.5), like every other
-  // "no data yet" branch in this file.
   const expectedSessions = Math.round(campProgress * activeCamp.campWeeks * 4.5);
   const totalLogged = campWorkouts.length;
   const gap = Math.max(0, expectedSessions - totalLogged);
@@ -112,41 +157,48 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const volumeDetail = expectedSessions === 0
     ? (totalLogged > 0 ? `${totalLogged} logged · camp hasn't started` : 'Camp starts soon — nothing due yet')
     : gap > 0
-    ? `${totalLogged} logged · ${gap} behind pace`
-    : `${totalLogged} sessions logged · on pace`;
+      ? `${totalLogged} logged · ${gap} behind pace`
+      : `${totalLogged} sessions logged · on pace`;
 
   // ── 3. Session Quality / RPE (max = w.sessionQuality) ────────────────────
-  const recentRPEs = recentWorkouts.map(wl => wl.rpe).filter(r => r > 0);
+  const recentRPEs = recentWorkouts.map(log => log.rpe).filter(rpe => rpe > 0);
+  const rpeTarget = rpeTargetForPhase(phase);
   let qualityRatio: number;
   let qualityDetail: string;
   if (recentRPEs.length === 0) {
     qualityRatio = 0.5;
-    qualityDetail = 'Log sessions with RPE to score this';
+    qualityDetail = `Log session RPE · ${phase} target ${rpeTarget.min}–${rpeTarget.max}`;
   } else {
-    const avg = recentRPEs.reduce((a, b) => a + b, 0) / recentRPEs.length;
-    if (avg >= 7 && avg <= 8.5)       { qualityRatio = 1;    qualityDetail = `Avg RPE ${avg.toFixed(1)} — ideal intensity`; }
-    else if (avg >= 6 && avg < 7)     { qualityRatio = 0.75; qualityDetail = `Avg RPE ${avg.toFixed(1)} — could push harder`; }
-    else if (avg > 8.5 && avg <= 9.5) { qualityRatio = 0.65; qualityDetail = `Avg RPE ${avg.toFixed(1)} — monitor recovery`; }
-    else if (avg < 6)                  { qualityRatio = 0.33; qualityDetail = `Avg RPE ${avg.toFixed(1)} — intensity too low`; }
-    else                               { qualityRatio = 0.45; qualityDetail = `Avg RPE ${avg.toFixed(1)} — overtraining risk`; }
+    const avg = recentRPEs.reduce((sum, rpe) => sum + rpe, 0) / recentRPEs.length;
+    qualityRatio = ratioFromRpe(avg, rpeTarget);
+    if (qualityRatio === 1) {
+      qualityDetail = `Avg RPE ${avg.toFixed(1)} — on target for ${phase}`;
+    } else if (avg < rpeTarget.min) {
+      qualityDetail = `Avg RPE ${avg.toFixed(1)} — below ${rpeTarget.label}`;
+    } else {
+      qualityDetail = `Avg RPE ${avg.toFixed(1)} — above ${rpeTarget.label}; monitor recovery`;
+    }
   }
   const qualityScore = scale(qualityRatio, w.sessionQuality);
 
   // ── 4. Sparring (max = w.sparring) ───────────────────────────────────────
   const sortedSpar = [...campSparring].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
   const lastSpar = sortedSpar[0];
   const daysSinceSpar = lastSpar
     ? Math.max(0, differenceInDays(now, parseISO(lastSpar.date)))
     : 999;
-  const totalSparRounds = campSparring.reduce((sum, s) => sum + s.rounds, 0);
+  const totalSparRounds = campSparring.reduce((sum, log) => sum + log.rounds, 0);
 
   let sparRatio: number;
   let sparDetail: string;
-  if (campSparring.length === 0) {
-    sparRatio = 0;
-    sparDetail = 'No sparring logged yet';
+  if (!sparringPrescribed) {
+    sparRatio = 1;
+    sparDetail = `No sparring prescribed during ${phase}`;
+  } else if (campSparring.length === 0) {
+    sparRatio = 0.25;
+    sparDetail = `Sparring is prescribed in ${phase}, but none is logged`;
   } else {
     const baseRatio = Math.min(0.75, campSparring.length * 0.15);
     const recencyBonus = daysSinceSpar <= 7 ? 0.25 : daysSinceSpar <= 14 ? 0.1 : daysSinceSpar > 21 ? -0.15 : 0;
@@ -156,27 +208,34 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const sparScore = scale(sparRatio, w.sparring);
 
   // ── 5. Conditioning (max = w.conditioning) ───────────────────────────────
+  const conditioningTrend = latestComparableTrend(campTests);
   let condRatio: number;
   let condDetail: string;
   if (campTests.length === 0) {
     condRatio = 0.5;
-    condDetail = 'Log a test to benchmark fitness';
-  } else if (campTests.length === 1) {
+    condDetail = 'Log a repeatable test to benchmark fitness';
+  } else if (!conditioningTrend) {
+    const latest = campTests[campTests.length - 1];
     condRatio = 0.7;
-    condDetail = `${campTests[0].testType}: ${campTests[0].value} ${campTests[0].unit}`;
+    condDetail = `${latest.testType}: ${latest.value} ${latest.unit} · repeat it to show a trend`;
   } else {
-    const first = campTests[0].value;
-    const last = campTests[campTests.length - 1].value;
-    const pct = ((last - first) / Math.abs(Math.max(1, first))) * 100;
-    if (pct > 2)        { condRatio = 1;   condDetail = `${campTests[0].testType} improving ↑`; }
-    else if (pct >= -2) { condRatio = 0.7; condDetail = `${campTests[0].testType} stable`; }
-    else                { condRatio = 0.4; condDetail = `${campTests[0].testType} declining ↓`; }
+    const change = Math.abs(conditioningTrend.improvementPct).toFixed(1);
+    if (conditioningTrend.improvementPct > 2) {
+      condRatio = 1;
+      condDetail = `${conditioningTrend.testType} improved ${change}% ↑`;
+    } else if (conditioningTrend.improvementPct >= -2) {
+      condRatio = 0.75;
+      condDetail = `${conditioningTrend.testType} stable (${conditioningTrend.sampleCount} tests)`;
+    } else {
+      condRatio = 0.4;
+      condDetail = `${conditioningTrend.testType} declined ${change}% ↓`;
+    }
   }
   const condScore = scale(condRatio, w.conditioning);
 
   // ── 6. Nutrition & Recovery (max = w.nutrition) ──────────────────────────
   const recentNutrition = nutritionLogs.filter(
-    n => n.campId === activeCamp.id && parseISO(n.date) >= recent7
+    log => log.campId === activeCamp.id && parseISO(log.date) >= recent7,
   );
   let nutritionRatio: number;
   let nutritionDetail: string;
@@ -184,13 +243,15 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     nutritionRatio = 0.5;
     nutritionDetail = 'Log nutrition to score this';
   } else {
-    let mealPts = 0, mealTotal = 0, goodHydration = 0;
+    let mealPts = 0;
+    let mealTotal = 0;
+    let goodHydration = 0;
     for (const log of recentNutrition) {
-      for (const r of Object.values(log.mealRatings).filter(Boolean) as string[]) {
-        mealPts += r === 'good' ? 2 : r === 'ok' ? 1 : 0;
+      for (const rating of Object.values(log.mealRatings).filter(Boolean) as string[]) {
+        mealPts += rating === 'good' ? 2 : rating === 'ok' ? 1 : 0;
         mealTotal += 2;
       }
-      if ((log.waterOz ?? 0) >= 80) goodHydration++;
+      if ((log.waterOz ?? 0) >= 80) goodHydration += 1;
     }
     const mealRatio = mealTotal > 0 ? mealPts / mealTotal : 0.5;
     const waterRatio = goodHydration / recentNutrition.length;
@@ -200,10 +261,10 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   }
   const nutritionScore = scale(nutritionRatio, w.nutrition);
 
-  // ── Overall ─────────────────────────────────────────────────────────────
+  // ── Overall + data confidence ─────────────────────────────────────────────
   const overall = Math.min(
     100,
-    weightScore + volumeScore + qualityScore + sparScore + condScore + nutritionScore
+    weightScore + volumeScore + qualityScore + sparScore + condScore + nutritionScore,
   );
 
   const breakdown: ReadinessBreakdownItem[] = [
@@ -215,29 +276,44 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     { label: 'Nutrition',       score: nutritionScore, max: w.nutrition,       detail: nutritionDetail,  icon: 'droplets' },
   ];
 
-  // ── Insights (flag weakest areas) ───────────────────────────────────────
+  const coverageSignals = [
+    !hasFightWeightTarget || Boolean(latestWeight),
+    campWorkouts.length > 0,
+    recentRPEs.length > 0,
+    !sparringPrescribed || campSparring.length > 0,
+    campTests.length > 0,
+    recentNutrition.length > 0,
+  ];
+  const dataCoverage = Math.round(
+    coverageSignals.filter(Boolean).length / coverageSignals.length * 100,
+  );
+  const confidence: ReadinessResult['confidence'] =
+    dataCoverage >= 80 ? 'high' : dataCoverage >= 50 ? 'medium' : 'low';
+
+  // ── Insights (flag weakest areas) ────────────────────────────────────────
   const insights: string[] = [];
-  const byRatio = [...breakdown].sort((a, b) => a.score / a.max - b.score / b.max);
+  const byRatio = [...breakdown].sort((a, b) => ratioOf(a) - ratioOf(b));
   for (const item of byRatio.slice(0, 3)) {
-    if (item.score / item.max >= 0.75) continue;
-    if (item.label === 'Weight Cut' && lbsToGo > 0) {
-      insights.push(`Log your weight daily — you need to cut ${formatWeightDelta(lbsToGo, unit)} in ${daysUntilFight} days.`);
+    if (ratioOf(item) >= 0.75) continue;
+    if (item.label === 'Weight Cut' && hasFightWeightTarget && lbsToGo > 0) {
+      insights.push(`Log your weight consistently — ${formatWeightDelta(lbsToGo, unit)} remains with ${daysUntilFight} days to the fight-date target.`);
     } else if (item.label === 'Training Volume') {
-      // gap can legitimately be 0 (nothing due yet, or logging is on pace but
-      // the neutral no-data score still lands in the bottom three) — don't tell
-      // a fighter they're "0 sessions behind".
       insights.push(gap > 0
-        ? `You're ${gap} session${gap > 1 ? 's' : ''} behind pace — push consistency this week.`
-        : 'Log every session as you train — training volume is what drives this score.');
+        ? `You're ${gap} session${gap > 1 ? 's' : ''} behind the current camp pace.`
+        : 'Log each completed session so training volume reflects the work you are doing.');
     } else if (item.label === 'Session Quality') {
-      insights.push('Aim for RPE 7–8 in most sessions for peak fight-readiness gains.');
-    } else if (item.label === 'Sparring') {
-      insights.push('Schedule sparring soon — live rounds are essential for fight readiness.');
+      insights.push(`For ${phase}, keep most session RPEs around ${rpeTarget.min}–${rpeTarget.max}; do not chase peak intensity in a recovery phase.`);
+    } else if (item.label === 'Sparring' && sparringPrescribed) {
+      insights.push(`Sparring is scheduled during ${phase}; coordinate the next live-work session with your coach.`);
     } else if (item.label === 'Conditioning') {
-      insights.push('Log a conditioning test to benchmark your fitness and track improvement.');
+      insights.push('Repeat the same conditioning test under similar conditions to establish a trustworthy trend.');
     } else if (item.label === 'Nutrition') {
-      insights.push('Track meals and hit 80+ oz of water daily — nutrition drives recovery speed.');
+      insights.push('Track meals and hydration consistently so the recovery component is based on current data.');
     }
+  }
+
+  if (confidence === 'low') {
+    insights.unshift(`Readiness confidence is low (${dataCoverage}% data coverage). Log current training, recovery and benchmark data before making camp changes from this score.`);
   }
 
   // ── Status label & colour ────────────────────────────────────────────────
@@ -254,5 +330,15 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     overall >= 40 ? '#f97316' :
     '#ef4444';
 
-  return { overall, status, statusColor, breakdown, insights, daysUntilFight };
+  return {
+    overall,
+    status,
+    statusColor,
+    breakdown,
+    insights,
+    daysUntilFight,
+    phase,
+    dataCoverage,
+    confidence,
+  };
 }
