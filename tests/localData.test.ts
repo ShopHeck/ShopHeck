@@ -43,7 +43,17 @@ describe('Fight Camp local-data boundaries', () => {
     expect(storage.getItem('fightcamp_app')).toBe('existing data');
   });
 
-  it('clears Fight Camp state when the local account changes', () => {
+  it('adopts a guest camp when the guest creates or signs into an account', () => {
+    const storage = new MemoryStorage();
+    setActiveLocalAccount(GUEST_ACCOUNT_ID, storage);
+    storage.setItem('fightcamp_app', 'guest camp');
+
+    expect(reconcileLocalAccount('user-a', storage)).toBe(false);
+    expect(getActiveLocalAccount(storage)).toBe('user-a');
+    expect(storage.getItem('fightcamp_app')).toBe('guest camp');
+  });
+
+  it('clears Fight Camp state when one signed account changes to another', () => {
     const storage = new MemoryStorage();
     setActiveLocalAccount('user-a', storage);
     storage.setItem('fightcamp_app', 'user-a data');
@@ -55,11 +65,13 @@ describe('Fight Camp local-data boundaries', () => {
     expect(storage.getItem('sb-project-auth-token')).toBe('new auth session');
   });
 
-  it('treats signed-out state as an explicit guest account', () => {
+  it('clears the signed-in account cache before entering guest mode', () => {
     const storage = new MemoryStorage();
     setActiveLocalAccount('user-a', storage);
+    storage.setItem('fightcamp_app', 'user-a data');
 
     expect(reconcileLocalAccount(null, storage)).toBe(true);
     expect(getActiveLocalAccount(storage)).toBe(GUEST_ACCOUNT_ID);
+    expect(storage.getItem('fightcamp_app')).toBeNull();
   });
 });
