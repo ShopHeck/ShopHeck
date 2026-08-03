@@ -26,6 +26,8 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - name: Lock the unit-test runner into the project
+        run: npm install --save-dev --save-exact vitest@3.2.4
       - name: Package exact source and dependencies
         run: tar -czf "$RUNNER_TEMP/fightcamp-verification.tgz" --exclude='./.git' --exclude='./dist' .
       - uses: actions/upload-artifact@v4
