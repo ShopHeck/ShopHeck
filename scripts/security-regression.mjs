@@ -45,9 +45,12 @@ requireText(upgradeModal, "if (!user?.id || !user.email)", 'Web checkout authent
 requireText(upgradeModal, "url.searchParams.set('client_reference_id', user.id)", 'Web checkout attribution');
 requireText(upgradeModal, "url.searchParams.set('prefilled_email', user.email)", 'Web checkout attribution');
 forbidText(upgradeModal, '/.netlify/functions/create-checkout', 'Existing web checkout');
-requireText(stripeWebhook, 'unattributed_stripe_events', 'Stripe reconciliation');
+
 requireText(stripeWebhook, "normalized === 'coach pro'", 'Stripe fail-closed mapping');
 requireText(stripeWebhook, "normalized === 'fighter pro'", 'Stripe fail-closed mapping');
+requireText(stripeWebhook, 'return null;', 'Stripe fail-closed mapping');
+forbidText(stripeWebhook, '/coach/i', 'Stripe fail-closed mapping');
+forbidText(stripeWebhook, 'unattributed_stripe_events', 'Existing Stripe setup');
 
 requireText(appContext, 'clearFightCampLocalData()', 'Complete reset');
 requireText(appContext, 'return createDefaultState()', 'Complete reset');
