@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -16,6 +16,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import AuthScreen from './AuthScreen';
 import CoachConnect from './CoachConnect';
+import ConnectionDiagnostics from './shared/ConnectionDiagnostics';
+import { supabaseConfigError } from '../lib/supabase';
 import type { Sport, WeightClass, ExperienceLevel, FightCamp } from '../types';
 import { format, addDays, parseISO } from 'date-fns';
 import Modal from './shared/Modal';
@@ -72,6 +74,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const { configured: authConfigured, user: authUser, signOut: authSignOut, deleteAccount } = useAuth();
   const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSync();
   const [showAuth, setShowAuth] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -469,7 +472,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
               {Capacitor.isNativePlatform() && (
                 <button
-                  onClick={() => RevenueCat.presentCustomerCenter()}
+                  // Rejects when the purchase SDK never configured; without a
+                  // catch that surfaces as an unhandled rejection and the tap
+                  // appears to do nothing at all.
+                  onClick={() => { void RevenueCat.presentCustomerCenter().catch(() => setShowDiagnostics(true)); }}
                   className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors"
                 >
                   Manage
@@ -713,10 +719,25 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       </div>
 
       {/* Account (cloud sync — optional) */}
-      {authConfigured && (
+      {(authConfigured || supabaseConfigError) && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Account</p>
           <div className="card">
+            {/* A build whose Supabase credentials are broken has no working
+                sign-in to offer, but silently dropping the whole section leaves
+                the user hunting for an account screen that used to be here. */}
+            {supabaseConfigError && (
+              <div className="flex items-start gap-2.5">
+                <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Accounts unavailable in this build</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{supabaseConfigError}</p>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Your camps, sessions and weight history are all stored on this device and are unaffected.
+                  </p>
+                </div>
+              </div>
+            )}
             {authUser && (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-brand-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -753,7 +774,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 <ChevronRight size={15} className="text-gray-500" />
               </button>
             )}
-            {!authUser && (
+            {!authUser && authConfigured && (
               <button onClick={() => setShowAuth(true)} className="w-full flex items-center gap-3 text-left">
                 <div className="w-10 h-10 bg-dark-600 rounded-xl flex items-center justify-center flex-shrink-0">
                   <UserCheck size={18} className="text-gray-400" />
@@ -776,6 +797,19 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
       <div className="mx-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">App</p>
         <div className="card divide-y divide-dark-500 p-0 overflow-hidden">
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
+          >
+            <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Stethoscope size={15} className={supabaseConfigError ? 'text-red-400' : 'text-gray-400'} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Connection diagnostics</p>
+              <p className="text-xs text-gray-400">Check sign-in and purchases if something isn&apos;t working</p>
+            </div>
+            <ChevronRight size={15} className="text-gray-500" />
+          </button>
           {notificationsSupported() && (
             <button
               onClick={toggleReminders}
@@ -1100,6 +1134,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+
+      {showDiagnostics && <ConnectionDiagnostics onClose={() => setShowDiagnostics(false)} />}
     </div>
   );
 }

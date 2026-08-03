@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, supabaseConfigError, supabaseHost, supabaseUrl } from '../lib/supabase';
 
 const APPLE_BUNDLE_ID = 'app.fightcamptraining';
 
@@ -48,22 +48,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /** Supabase's own auth copy ("Invalid login credentials") reads fine, but
-   *  transport failures surface as raw fetch errors — translate those. */
+   *  transport failures surface as raw fetch errors — translate those.
+   *
+   *  WKWebView words a failed fetch as "Load failed", which users reasonably
+   *  read as an app bug rather than a connection problem. Naming the host we
+   *  couldn't reach also makes a wrong-project build self-evident from a
+   *  screenshot, which is otherwise only visible by unpacking the .ipa. */
   function friendlyAuthError(message: string): string {
     if (/failed to fetch|network|fetch failed|load failed/i.test(message)) {
-      return "Can't reach the server — check your connection and try again.";
+      return supabaseHost
+        ? `Can't reach ${supabaseHost} — check your connection and try again.`
+        : "Can't reach the server — check your connection and try again.";
     }
     return message;
   }
 
+  /** Why sign-in is unavailable. A build carrying broken credentials is a
+   *  different problem from one deliberately built without any, and only the
+   *  first is worth reporting in detail. */
+  function unavailableReason(): string {
+    return supabaseConfigError
+      ? `Accounts are unavailable in this build — ${supabaseConfigError}`
+      : 'Accounts are not available right now.';
+  }
+
   async function signInEmail(email: string, password: string) {
-    if (!supabase) return { error: 'Accounts are not available right now.' };
+    if (!supabase) return { error: unavailableReason() };
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
   async function signUpEmail(email: string, password: string, name?: string) {
-    if (!supabase) return { error: 'Accounts are not available right now.' };
+    if (!supabase) return { error: unavailableReason() };
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -75,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInApple() {
-    if (!supabase) return { error: 'Accounts are not available right now.' };
+    if (!supabase) return { error: unavailableReason() };
 
     // Native iOS: use the real "Sign in with Apple" sheet and exchange the
     // identity token with Supabase. A nonce (hashed for Apple, raw for Supabase)
@@ -87,7 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const hashedNonce = await sha256Hex(rawNonce);
         const result = await SignInWithApple.authorize({
           clientId: APPLE_BUNDLE_ID,
-          redirectURI: `${supabase ? new URL(import.meta.env.VITE_SUPABASE_URL as string).origin : ''}/auth/v1/callback`,
+          // Normalized, not the raw env var: a stray quote or newline in the
+          // secret makes `new URL()` throw, and the throw lands in the catch
+          // below as a generic "Apple sign-in failed" that names nothing.
+          redirectURI: `${supabaseUrl}/auth/v1/callback`,
           scopes: 'email name',
           nonce: hashedNonce,
         });
@@ -98,12 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           token: idToken,
           nonce: rawNonce,
         });
-        return error ? { error: error.message } : {};
+        return error ? { error: friendlyAuthError(error.message) } : {};
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Apple sign-in failed.';
         // User cancelling the native sheet shouldn't read as an error.
         if (/cancel/i.test(msg)) return {};
-        return { error: msg };
+        return { error: friendlyAuthError(msg) };
       }
     }
 
@@ -121,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function deleteAccount() {
-    if (!supabase) return { error: 'Accounts are not available right now.' };
+    if (!supabase) return { error: unavailableReason() };
     // Server-side cascade delete via SECURITY DEFINER RPC (see supabase/schema.sql).
     const { error } = await supabase.rpc('delete_account');
     if (error) return { error: error.message };

@@ -1,7 +1,6 @@
 import UIKit
 import Capacitor
 import AVFoundation
-import RevenueCat
 
 /// The storyboard instantiates this controller instead of the stock
 /// CAPBridgeViewController. Capacitor only auto-registers plugins listed in the
@@ -28,13 +27,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // RevenueCat key is injected per build configuration via the REVENUECAT_API_KEY
         // build setting (Debug: test key in project.pbxproj; Release: CI secret via xcargs).
-        // The app crashes immediately at launch if the release build is missing a real key
-        // so a broken key can never reach users silently.
-        guard let revenueCatKey = Bundle.main.infoDictionary?["RevenueCatAPIKey"] as? String,
-              !revenueCatKey.isEmpty else {
-            preconditionFailure("[FightCamp] RevenueCatAPIKey missing from Info.plist — set REVENUECAT_API_KEY in the build settings or CI xcargs")
-        }
-        Purchases.configure(withAPIKey: revenueCatKey)
+        //
+        // This used to crash on launch when the key was missing, on the theory that a
+        // broken key should never reach users silently. The guard is better placed
+        // earlier: the CI preflight and the Fastlane archive lane now both reject a
+        // missing or wrong-shaped key, so a bad binary is never produced in the first
+        // place. Crashing here only punished users of an app whose timer, logging, and
+        // sync all work perfectly well without purchases — and it never fired anyway
+        // for the failure that actually shipped, a key that is present but wrong.
+        // RevenueCatConfig validates the key's shape instead and leaves the SDK
+        // unconfigured when it can't work, so purchase entry points fail with an
+        // explanation rather than a 401 from RevenueCat's backend.
+        RevenueCatConfig.configure()
 
         // Configure the audio session so that timer bells and coaching voice duck
         // (fade) background music rather than interrupting it entirely, and music
