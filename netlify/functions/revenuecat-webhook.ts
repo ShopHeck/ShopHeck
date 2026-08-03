@@ -1,36 +1,17 @@
 // RevenueCat webhook — server-authoritative App Store entitlements.
 //
-// RevenueCat calls this endpoint on every subscription lifecycle event
-// (purchase, renewal, cancellation, expiration, billing issue…). We check the
-// shared-secret Authorization header, resolve which Supabase user the event
-// belongs to, and upsert the entitlement into `public.revenuecat_subscriptions`
-// with the service-role key (bypasses RLS). That row — not the client-synced
-// `user_state.subscription` mirror — is what server code (ai-coach) and the web
-// app trust for App Store subscribers.
-//
-// Attribution requires the native app to have called
-// `Purchases.shared.logIn(<supabase user id>)` (see RevenueCatPlugin.swift):
-// events then carry the Supabase uuid as app_user_id, or at least list it in
-// `aliases` when the purchase predates the login. Events whose ids are all
-// anonymous (`$RCAnonymousID:…`) are acknowledged and skipped — there is no
-// account to attach them to, and returning an error would only make RevenueCat
-// retry an event that can never succeed.
-//
-// Endpoint (register in the RevenueCat dashboard → Project → Integrations →
-// Webhooks — see docs/revenuecat-webhook.md):
-//   https://fightcamp.netlify.app/.netlify/functions/revenuecat-webhook
+// RevenueCat calls this endpoint on every subscription lifecycle event. We
+// check the shared-secret Authorization header, resolve which Supabase user the
+// event belongs to, and upsert the entitlement using the service-role key.
 //
 // Required Netlify env vars (server only, never VITE_ prefixed):
-//   REVENUECAT_WEBHOOK_SECRET — must equal the webhook's Authorization header
-//     value configured in the RevenueCat dashboard ("Bearer …" prefix optional)
-//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+//   REVENUECAT_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
-// The subset of RevenueCat's event payload we consume.
-// https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields
 interface RcEvent {
+  id?: string;
   type?: string;
   app_user_id?: string;
   original_app_user_id?: string;
@@ -40,21 +21,18 @@ interface RcEvent {
   environment?: string;            // PRODUCTION | SANDBOX
   expiration_at_ms?: number | null;
   event_timestamp_ms?: number;
+  transferred_from?: string[];
+  transferred_to?: string[];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Entitlement identifiers as configured in RevenueCat (they match
-// RevenueCatPlugin.swift's tierFromEntitlements). Coach Pro is checked first —
-// it's the superset tier when a product grants both.
 const tierFor = (entitlementIds: string[]): 'coach_pro' | 'fighter_pro' | null => {
   if (entitlementIds.includes('Coach Pro')) return 'coach_pro';
   if (entitlementIds.includes('Fight Camp Pro')) return 'fighter_pro';
   return null;
 };
 
-// Constant-time comparison via digests so differing lengths don't throw and
-// the compare doesn't leak position information.
 const secretMatches = (provided: string, secret: string): boolean => {
   const norm = (s: string) => s.replace(/^Bearer\s+/i, '').trim();
   const a = createHash('sha256').update(norm(provided)).digest();
@@ -62,9 +40,6 @@ const secretMatches = (provided: string, secret: string): boolean => {
   return timingSafeEqual(a, b);
 };
 
-// 2xx tells RevenueCat the event is handled; anything else is retried with
-// backoff. Deliberate skips must therefore be 200s, and only genuinely
-// transient failures (DB down) may 5xx.
 const ok = (note: string): Response =>
   new Response(JSON.stringify({ received: true, note }), {
     status: 200,
@@ -95,17 +70,76 @@ export default async (req: Request): Promise<Response> => {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  // Dashboard "send test event" button.
   if (event.type === 'TEST') return ok('test event');
 
-  // TRANSFER moves entitlements between subscribers and carries no
-  // entitlement_ids; the destination user's next real event (or the client
-  // SDK) carries the truth. Skipping keeps this handler single-shaped.
-  if (event.type === 'TRANSFER') return ok('transfer events are not mirrored');
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // TRANSFER is the only event RevenueCat guarantees for moving an entitlement
+  // between subscriber identities. Move the latest mirrored source grant to the
+  // destination, then remove every source row so the former account cannot keep
+  // server-side access. Redelivery is safe: once sources are gone the already-
+  // moved destination row is left intact.
+  if (event.type === 'TRANSFER') {
+    const fromIds = (event.transferred_from ?? []).filter(id => UUID_RE.test(id));
+    const toId = (event.transferred_to ?? []).find(id => UUID_RE.test(id));
+    if (!toId) return ok('transfer has no Supabase destination id');
+
+    try {
+      let source: {
+        tier: string;
+        product_id: string | null;
+        environment: string | null;
+        expires_at: string | null;
+        last_event_at: string | null;
+      } | null = null;
+
+      if (fromIds.length > 0) {
+        const { data, error } = await supabase
+          .from('revenuecat_subscriptions')
+          .select('tier,product_id,environment,expires_at,last_event_at')
+          .in('user_id', fromIds)
+          .order('last_event_at', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw new Error(`transfer source lookup failed: ${error.message}`);
+        source = data;
+      }
+
+      if (source && (source.tier === 'fighter_pro' || source.tier === 'coach_pro')) {
+        const { error } = await supabase.rpc('record_revenuecat_event', {
+          p_user_id: toId,
+          p_rc_app_user_id: toId,
+          p_tier: source.tier,
+          p_product_id: source.product_id,
+          p_environment: event.environment ?? source.environment,
+          p_expires_at: source.expires_at,
+          p_event_type: 'TRANSFER',
+          p_event_at: event.event_timestamp_ms
+            ? new Date(event.event_timestamp_ms).toISOString()
+            : source.last_event_at ?? new Date().toISOString(),
+        });
+        if (error) throw new Error(`transfer destination write failed: ${error.message}`);
+      }
+
+      if (fromIds.length > 0) {
+        const { error } = await supabase
+          .from('revenuecat_subscriptions')
+          .delete()
+          .in('user_id', fromIds);
+        if (error) throw new Error(`transfer source revoke failed: ${error.message}`);
+      }
+
+      return ok(source ? 'entitlement transferred' : 'source grant absent; destination left unchanged');
+    } catch (err) {
+      console.error('revenuecat transfer error:', err);
+      return new Response('Handler error', { status: 500 });
+    }
+  }
 
   // Which Supabase account? Any id RevenueCat knows for this subscriber that
-  // looks like a Supabase uuid — app_user_id once logIn ships, or an alias
-  // when the purchase happened while still anonymous.
+  // looks like a Supabase uuid — app_user_id once logIn ships, or an alias.
   const candidates = [event.app_user_id, event.original_app_user_id, ...(event.aliases ?? [])];
   const userId = candidates.find(id => !!id && UUID_RE.test(id));
   if (!userId) return ok('no Supabase user id among subscriber aliases');
@@ -113,16 +147,6 @@ export default async (req: Request): Promise<Response> => {
   const tier = tierFor(event.entitlement_ids ?? []);
   if (!tier) return ok(`no known entitlement on ${event.type ?? 'event'}`);
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  // The write goes through record_revenuecat_event (supabase/schema.sql), a
-  // single atomic statement whose guards make redelivery and concurrency safe:
-  // an older event never overwrites newer state (webhooks arrive out of order
-  // and in parallel), a sandbox/TestFlight event never replaces a production
-  // row (its accelerated expiry would revoke real access), and a production
-  // event always supersedes a sandbox row.
   let outcome: unknown;
   try {
     const { data, error } = await supabase.rpc('record_revenuecat_event', {
