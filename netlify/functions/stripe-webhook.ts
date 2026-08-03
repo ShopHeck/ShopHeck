@@ -7,14 +7,19 @@
 // Required server-only env vars:
 //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-// Optional comma-separated exact price allowlists:
+//   STRIPE_FIGHTER_MONTHLY_PRICE_ID, STRIPE_FIGHTER_ANNUAL_PRICE_ID,
+//   STRIPE_COACH_MONTHLY_PRICE_ID, STRIPE_COACH_ANNUAL_PRICE_ID
+// Optional comma-separated additional price allowlists:
 //   STRIPE_FIGHTER_PRICE_IDS, STRIPE_COACH_PRICE_IDS
 
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const csvSet = (value: string | undefined): ReadonlySet<string> =>
-  new Set((value ?? '').split(',').map(v => v.trim()).filter(Boolean));
+const priceSet = (csv: string | undefined, ...explicit: Array<string | undefined>): ReadonlySet<string> =>
+  new Set([
+    ...(csv ?? '').split(',').map(value => value.trim()).filter(Boolean),
+    ...explicit.map(value => value?.trim()).filter((value): value is string => Boolean(value)),
+  ]);
 
 export default async (req: Request): Promise<Response> => {
   const {
@@ -24,14 +29,26 @@ export default async (req: Request): Promise<Response> => {
     SUPABASE_SERVICE_ROLE_KEY,
     STRIPE_FIGHTER_PRICE_IDS,
     STRIPE_COACH_PRICE_IDS,
+    STRIPE_FIGHTER_MONTHLY_PRICE_ID,
+    STRIPE_FIGHTER_ANNUAL_PRICE_ID,
+    STRIPE_COACH_MONTHLY_PRICE_ID,
+    STRIPE_COACH_ANNUAL_PRICE_ID,
   } = process.env;
 
   if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response('Webhook not configured', { status: 500 });
   }
 
-  const fighterPriceIds = csvSet(STRIPE_FIGHTER_PRICE_IDS);
-  const coachPriceIds = csvSet(STRIPE_COACH_PRICE_IDS);
+  const fighterPriceIds = priceSet(
+    STRIPE_FIGHTER_PRICE_IDS,
+    STRIPE_FIGHTER_MONTHLY_PRICE_ID,
+    STRIPE_FIGHTER_ANNUAL_PRICE_ID,
+  );
+  const coachPriceIds = priceSet(
+    STRIPE_COACH_PRICE_IDS,
+    STRIPE_COACH_MONTHLY_PRICE_ID,
+    STRIPE_COACH_ANNUAL_PRICE_ID,
+  );
   const stripe = new Stripe(STRIPE_SECRET_KEY);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -49,19 +66,19 @@ export default async (req: Request): Promise<Response> => {
   }
 
   /** Unknown products grant nothing. Exact price ids take priority; exact names
-   *  are the backwards-compatible fallback until the allowlists are configured. */
+   *  are a backwards-compatible fallback for subscriptions created before the
+   *  price allowlists were deployed. */
   const tierFor = (
     priceId: string | null | undefined,
     productName: string | null | undefined,
-  ): 'coach_pro' | 'fighter_pro' => {
+  ): 'coach_pro' | 'fighter_pro' | null => {
     if (priceId && coachPriceIds.has(priceId)) return 'coach_pro';
     if (priceId && fighterPriceIds.has(priceId)) return 'fighter_pro';
 
     const normalized = productName?.trim().toLowerCase();
     if (normalized === 'coach pro') return 'coach_pro';
     if (normalized === 'fighter pro') return 'fighter_pro';
-
-    throw new Error(`unrecognized Stripe product/price: ${productName ?? 'unnamed'} / ${priceId ?? 'no price id'}`);
+    return null;
   };
 
   const recordUnattributed = async (input: {
@@ -84,7 +101,7 @@ export default async (req: Request): Promise<Response> => {
     if (error) throw new Error(`could not record unattributed Stripe event: ${error.message}`);
   };
 
-  const syncSubscription = async (userId: string, subscriptionId: string): Promise<void> => {
+  const syncSubscription = async (userId: string, subscriptionId: string): Promise<boolean> => {
     const sub = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['items.data.price.product'],
     });
@@ -93,6 +110,19 @@ export default async (req: Request): Promise<Response> => {
 
     const product = item.price.product as Stripe.Product | Stripe.DeletedProduct | string | undefined;
     const productName = product && typeof product === 'object' && 'name' in product ? product.name : null;
+    const tier = tierFor(item.price.id, productName);
+    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
+
+    if (!tier) {
+      await recordUnattributed({
+        reason: `unrecognized price/product: ${item.price.id} / ${productName ?? 'unnamed'}`,
+        subscriptionId: sub.id,
+        customerId,
+        eventType: event.type,
+      });
+      return false;
+    }
+
     const periodEnd =
       (sub as { current_period_end?: number }).current_period_end ??
       (item as { current_period_end?: number } | undefined)?.current_period_end ??
@@ -101,9 +131,9 @@ export default async (req: Request): Promise<Response> => {
     const { error } = await supabase.from('stripe_subscriptions').upsert(
       {
         user_id: userId,
-        stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null,
+        stripe_customer_id: customerId,
         stripe_subscription_id: sub.id,
-        tier: tierFor(item.price.id, productName),
+        tier,
         status: sub.status,
         current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
         cancel_at_period_end: Boolean(sub.cancel_at_period_end),
@@ -111,6 +141,7 @@ export default async (req: Request): Promise<Response> => {
       { onConflict: 'user_id' },
     );
     if (error) throw new Error(`supabase entitlement upsert failed: ${error.message}`);
+    return true;
   };
 
   const userIdForCustomer = async (customerId: string | null): Promise<string | null> => {
@@ -128,14 +159,14 @@ export default async (req: Request): Promise<Response> => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.client_reference_id;
+        const userId = session.client_reference_id ?? session.metadata?.supabase_user_id ?? null;
         const subscriptionId =
           typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
         const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null;
 
         if (!userId || !subscriptionId) {
           await recordUnattributed({
-            reason: !userId ? 'missing client_reference_id' : 'missing subscription id',
+            reason: !userId ? 'missing Supabase user id' : 'missing subscription id',
             checkoutSessionId: session.id,
             subscriptionId: subscriptionId ?? null,
             customerId,
@@ -145,8 +176,8 @@ export default async (req: Request): Promise<Response> => {
           break;
         }
 
-        // Persist the account mapping on Stripe itself so all later lifecycle
-        // events remain attributable even if the customer lookup table changes.
+        // Server-created checkout already stamps this metadata; repeat it here
+        // for legacy Payment Link returns and as an idempotent repair.
         await stripe.subscriptions.update(subscriptionId, {
           metadata: { supabase_user_id: userId },
         });
