@@ -13,7 +13,6 @@ function forbidText(source, forbidden, label) {
 
 const [
   aiCoach,
-  createCheckout,
   stripeWebhook,
   subscription,
   upgradeModal,
@@ -24,7 +23,6 @@ const [
   terms,
 ] = await Promise.all([
   read('netlify/functions/ai-coach.ts'),
-  read('netlify/functions/create-checkout.ts'),
   read('netlify/functions/stripe-webhook.ts'),
   read('src/utils/subscription.ts'),
   read('src/components/shared/UpgradeModal.tsx'),
@@ -42,16 +40,14 @@ forbidText(subscription, '30-day soft unlock', 'Stripe return');
 forbidText(subscription, "source: 'stripe_payment_link'", 'Stripe return');
 requireText(subscription, 'grants nothing by itself', 'Stripe return');
 
-forbidText(upgradeModal, 'buy.stripe.com', 'Web checkout');
-forbidText(upgradeModal, 'VITE_STRIPE_', 'Web checkout');
-requireText(upgradeModal, '/.netlify/functions/create-checkout', 'Web checkout');
-requireText(upgradeModal, 'session?.access_token', 'Web checkout authentication');
-requireText(createCheckout, 'supabase.auth.getUser(token)', 'Checkout authentication');
-requireText(createCheckout, 'STRIPE_FIGHTER_MONTHLY_PRICE_ID', 'Checkout price allowlist');
-requireText(createCheckout, 'client_reference_id: user.id', 'Checkout attribution');
-requireText(createCheckout, 'subscription_data:', 'Checkout subscription attribution');
+requireText(upgradeModal, 'VITE_STRIPE_FIGHTER_PRO_MONTHLY', 'Existing web checkout');
+requireText(upgradeModal, "if (!user?.id || !user.email)", 'Web checkout authentication');
+requireText(upgradeModal, "url.searchParams.set('client_reference_id', user.id)", 'Web checkout attribution');
+requireText(upgradeModal, "url.searchParams.set('prefilled_email', user.email)", 'Web checkout attribution');
+forbidText(upgradeModal, '/.netlify/functions/create-checkout', 'Existing web checkout');
 requireText(stripeWebhook, 'unattributed_stripe_events', 'Stripe reconciliation');
-requireText(stripeWebhook, 'STRIPE_COACH_ANNUAL_PRICE_ID', 'Stripe price allowlist');
+requireText(stripeWebhook, "normalized === 'coach pro'", 'Stripe fail-closed mapping');
+requireText(stripeWebhook, "normalized === 'fighter pro'", 'Stripe fail-closed mapping');
 
 requireText(appContext, 'clearFightCampLocalData()', 'Complete reset');
 requireText(appContext, 'return createDefaultState()', 'Complete reset');
