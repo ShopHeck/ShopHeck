@@ -5,6 +5,7 @@ import { RevenueCat } from '../../plugins/RevenueCat';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { PRICES } from '../../utils/pricing';
+import AuthScreen from '../AuthScreen';
 
 interface Props {
   onClose: () => void;
@@ -76,6 +77,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   // Screenshot harness (?shot): render the iOS footer (auto-renew disclosure +
   // Restore Purchases) so App Store review screenshots match the native app.
@@ -98,6 +100,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   }
 
   async function handleSubscribe(tier: 'fighter' | 'coach') {
+    setNotice('');
     if (Capacitor.isNativePlatform()) {
       setLoading(true);
       try {
@@ -114,24 +117,30 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
       } finally {
         setLoading(false);
       }
+      return;
+    }
+
+    // Web entitlements are attributed by the signed Stripe webhook. Never let
+    // a guest pay into an orphaned checkout the server cannot attach to them.
+    if (!user?.id || !user.email) {
+      setNotice('Sign in before subscribing so your purchase follows your account and devices.');
+      setShowAuth(true);
+      return;
+    }
+
+    const base = LINKS[tier][billing];
+    if (base) {
+      const url = new URL(base);
+      url.searchParams.set('client_reference_id', user.id);
+      url.searchParams.set('prefilled_email', user.email);
+      onBeforeWebCheckout?.();
+      // Defer the navigation a beat so React commits any state the callback
+      // dispatched and the persistence effect writes it to localStorage
+      // before the page unloads. Imperceptible next to Stripe's page load.
+      setLoading(true);
+      setTimeout(() => { window.location.href = url.toString(); }, 120);
     } else {
-      const base = LINKS[tier][billing];
-      if (base) {
-        // Tie the checkout to the signed-in account so the Stripe webhook can
-        // grant the entitlement server-side: Stripe echoes client_reference_id
-        // back on checkout.session.completed. prefilled_email saves a keystroke.
-        const url = new URL(base);
-        if (user?.id) url.searchParams.set('client_reference_id', user.id);
-        if (user?.email) url.searchParams.set('prefilled_email', user.email);
-        onBeforeWebCheckout?.();
-        // Defer the navigation a beat so React commits any state the callback
-        // dispatched and the persistence effect writes it to localStorage
-        // before the page unloads. Imperceptible next to Stripe's page load.
-        setLoading(true);
-        setTimeout(() => { window.location.href = url.toString(); }, 120);
-      } else {
-        setNotice('Payment links not yet configured — check back soon!');
-      }
+      setNotice('Payment links not yet configured — check back soon!');
     }
   }
 
@@ -153,153 +162,156 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <div>
-            <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
-            <h2 className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Billing toggle */}
-        <div className="px-5 pb-3">
-          <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
-            <button
-              onClick={() => setBilling('monthly')}
-              aria-pressed={billing === 'monthly'}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBilling('annual')}
-              aria-pressed={billing === 'annual'}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
-            >
-              Annual <span className="text-brand-400">Save 37%</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="px-5 pb-5 space-y-4">
-          {/* Fighter Pro card */}
-          <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Zap size={16} className="text-brand-400" />
-              <span className="text-sm font-bold text-white">Fighter Pro</span>
-              {/* The 7-day trial is configured in RevenueCat (App Store);
-                  the web Stripe Payment Links have no trial — don't claim one. */}
-              <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
+    <>
+      <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4" onClick={onClose}>
+        <div
+          className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3">
+            <div>
+              <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
+              <h2 className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
             </div>
-            <ul className="space-y-1.5">
-              {FIGHTER_PRO_FEATURES.slice(0, 5).map(f => (
-                <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
-                  <Check size={11} className="text-brand-400 mt-0.5 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-              <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
-            </ul>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                {billing === 'monthly' ? (
-                  <>
-                    <span className="text-xl font-black text-white">{PRICES.fighter.monthly}</span>
-                    <span className="text-xs text-gray-400">/mo</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xl font-black text-white">{PRICES.fighter.annual}</span>
-                    <span className="text-xs text-gray-400">/yr</span>
-                    <p className="text-xs text-brand-400">{PRICES.fighter.annualMonthly}/mo · save {PRICES.fighter.saving}</p>
-                  </>
-                )}
-              </div>
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Billing toggle */}
+          <div className="px-5 pb-3">
+            <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
               <button
-                onClick={() => handleSubscribe('fighter')}
-                disabled={loading}
-                className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                onClick={() => setBilling('monthly')}
+                aria-pressed={billing === 'monthly'}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'monthly' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
               >
-                {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
+                Monthly
+              </button>
+              <button
+                onClick={() => setBilling('annual')}
+                aria-pressed={billing === 'annual'}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${billing === 'annual' ? 'bg-dark-500 text-white' : 'text-gray-400'}`}
+              >
+                Annual <span className="text-brand-400">Save 37%</span>
               </button>
             </div>
           </div>
 
-          {/* Coach Pro card */}
-          <div className="bg-gradient-to-br from-purple-900/30 to-dark-700 border border-purple-700/40 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Trophy size={16} className="text-purple-400" />
-              <span className="text-sm font-bold text-white">Coach Pro</span>
-              <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
-            </div>
-            <ul className="space-y-1.5">
-              {COACH_PRO_FEATURES.map(f => (
-                <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
-                  <Check size={11} className="text-purple-400 mt-0.5 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                {billing === 'monthly' ? (
-                  <>
-                    <span className="text-xl font-black text-white">{PRICES.coach.monthly}</span>
-                    <span className="text-xs text-gray-400">/mo</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xl font-black text-white">{PRICES.coach.annual}</span>
-                    <span className="text-xs text-gray-400">/yr</span>
-                    <p className="text-xs text-purple-400">{PRICES.coach.annualMonthly}/mo · save {PRICES.coach.saving}</p>
-                  </>
-                )}
+          <div className="px-5 pb-5 space-y-4">
+            {/* Fighter Pro card */}
+            <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-brand-400" />
+                <span className="text-sm font-bold text-white">Fighter Pro</span>
+                {/* The 7-day trial is configured in RevenueCat (App Store);
+                    the web Stripe Payment Links have no trial — don't claim one. */}
+                <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
               </div>
-              <button
-                onClick={() => handleSubscribe('coach')}
-                disabled={loading}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
-              >
-                {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
-              </button>
+              <ul className="space-y-1.5">
+                {FIGHTER_PRO_FEATURES.slice(0, 5).map(f => (
+                  <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
+                    <Check size={11} className="text-brand-400 mt-0.5 flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+                <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
+              </ul>
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  {billing === 'monthly' ? (
+                    <>
+                      <span className="text-xl font-black text-white">{PRICES.fighter.monthly}</span>
+                      <span className="text-xs text-gray-400">/mo</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl font-black text-white">{PRICES.fighter.annual}</span>
+                      <span className="text-xs text-gray-400">/yr</span>
+                      <p className="text-xs text-brand-400">{PRICES.fighter.annualMonthly}/mo · save {PRICES.fighter.saving}</p>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleSubscribe('fighter')}
+                  disabled={loading}
+                  className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                >
+                  {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
+                </button>
+              </div>
             </div>
+
+            {/* Coach Pro card */}
+            <div className="bg-gradient-to-br from-purple-900/30 to-dark-700 border border-purple-700/40 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Trophy size={16} className="text-purple-400" />
+                <span className="text-sm font-bold text-white">Coach Pro</span>
+                <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
+              </div>
+              <ul className="space-y-1.5">
+                {COACH_PRO_FEATURES.map(f => (
+                  <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
+                    <Check size={11} className="text-purple-400 mt-0.5 flex-shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  {billing === 'monthly' ? (
+                    <>
+                      <span className="text-xl font-black text-white">{PRICES.coach.monthly}</span>
+                      <span className="text-xs text-gray-400">/mo</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl font-black text-white">{PRICES.coach.annual}</span>
+                      <span className="text-xs text-gray-400">/yr</span>
+                      <p className="text-xs text-purple-400">{PRICES.coach.annualMonthly}/mo · save {PRICES.coach.saving}</p>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleSubscribe('coach')}
+                  disabled={loading}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
+                </button>
+              </div>
+            </div>
+
+            {notice && (
+              <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
+            )}
+
+            <p className="text-center text-[11px] leading-relaxed text-gray-500">
+              {showNativeFooter
+                ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
+                : 'Cancel anytime. No commitment required.'}
+            </p>
+
+            <p className="text-center text-[11px] text-gray-400">
+              <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use (EULA)</a>
+              <span className="mx-1.5">·</span>
+              <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
+            </p>
+
+            {showNativeFooter && (
+              <button
+                onClick={handleRestore}
+                disabled={loading}
+                className="text-xs text-gray-400 underline block mx-auto disabled:opacity-50"
+              >
+                Restore Purchases
+              </button>
+            )}
           </div>
-
-          {notice && (
-            <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
-          )}
-
-          <p className="text-center text-[11px] leading-relaxed text-gray-500">
-            {showNativeFooter
-              ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
-              : 'Cancel anytime. No commitment required.'}
-          </p>
-
-          <p className="text-center text-[11px] text-gray-400">
-            <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Terms of Use (EULA)</a>
-            <span className="mx-1.5">·</span>
-            <a href="https://fightcamp.netlify.app/privacy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Privacy Policy</a>
-          </p>
-
-          {showNativeFooter && (
-            <button
-              onClick={handleRestore}
-              disabled={loading}
-              className="text-xs text-gray-400 underline block mx-auto disabled:opacity-50"
-            >
-              Restore Purchases
-            </button>
-          )}
         </div>
       </div>
-    </div>
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+    </>
   );
 }
