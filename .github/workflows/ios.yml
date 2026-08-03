@@ -183,6 +183,10 @@ jobs:
       - name: Authorize the certificates repo over SSH
         env:
           MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+          # Only used to authenticate the host-key lookup below, which is a
+          # public endpoint — this needs no repository permissions beyond the
+          # default, it just lifts the anonymous rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$MATCH_DEPLOY_KEY" ]; then
             echo "No MATCH_DEPLOY_KEY set — skipping (match will use whatever MATCH_GIT_URL provides)."
@@ -206,8 +210,16 @@ jobs:
           #
           # Fails closed. Degrading to an unverified scan would defeat the point,
           # so no keys means no clone.
-          if ! curl -fsSL --retry 3 https://api.github.com/meta -o "$RUNNER_TEMP/gh-meta.json"; then
-            echo "::error::Could not fetch GitHub's published SSH host keys from api.github.com"
+          # Authenticated: unauthenticated api.github.com requests are limited to
+          # 60/hour per IP, and GitHub-hosted runners share egress addresses, so
+          # an anonymous call here reliably draws a 403 rather than the keys.
+          # GITHUB_TOKEN raises the limit to 1000/hour for this repository.
+          if ! curl -fsSL --retry 3 \
+                 -H "Authorization: Bearer $GITHUB_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 -H "X-GitHub-Api-Version: 2022-11-28" \
+                 https://api.github.com/meta -o "$RUNNER_TEMP/gh-meta.json"; then
+            echo "::error::Could not fetch GitHub's published SSH host keys from api.github.com (403 here usually means an API rate limit)"
             exit 1
           fi
           jq -r '.ssh_keys[] | "github.com \(.)"' "$RUNNER_TEMP/gh-meta.json" >> ~/.ssh/known_hosts
