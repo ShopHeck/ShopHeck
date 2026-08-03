@@ -1,0 +1,33 @@
+name: Verification snapshot
+
+on:
+  push:
+    branches:
+      - agent/fightcamp-hardening-verify
+    paths:
+      - '.github/workflows/verification-snapshot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fightcamp-hardening-verify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Package exact source and dependencies
+        run: tar -czf "$RUNNER_TEMP/fightcamp-verification.tgz" --exclude=.git --exclude=dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fightcamp-verification-source
+          retention-days: 1
+          if-no-files-found: error
+          path: ${{ runner.temp }}/fightcamp-verification.tgz
