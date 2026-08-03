@@ -1,0 +1,163 @@
+name: Finalize Phase 0-2 implementation
+
+on:
+  push:
+    branches:
+      - agent/phase-0-2-hardening
+    paths:
+      - '.phase-run-v3'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: apply-phase0-2-hardening
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-0-2-hardening
+          fetch-depth: 0
+
+      - name: Apply guarded transformations if still pending
+        run: |
+          if [ ! -f src/utils/timerMath.ts ]; then
+            python3 .github/scripts/apply_phase0_2.py
+          fi
+          if [ -f .github/scripts/finalize_phase0_2.py ]; then
+            python3 .github/scripts/finalize_phase0_2.py
+          fi
+          git diff --check
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run validation with captured logs
+        id: checks
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/phase-logs"
+          npm run lint > "$RUNNER_TEMP/phase-logs/lint.log" 2>&1
+          lint=$?
+          npm run test:unit > "$RUNNER_TEMP/phase-logs/unit.log" 2>&1
+          unit=$?
+          npm run test:security > "$RUNNER_TEMP/phase-logs/security.log" 2>&1
+          security=$?
+          npm run build > "$RUNNER_TEMP/phase-logs/build.log" 2>&1
+          build=$?
+          npm audit --omit=dev --json > dependency-audit.json 2>&1
+          audit=$?
+          echo "lint=$lint" >> "$GITHUB_OUTPUT"
+          echo "unit=$unit" >> "$GITHUB_OUTPUT"
+          echo "security=$security" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "audit=$audit" >> "$GITHUB_OUTPUT"
+          if [ "$lint" -ne 0 ] || [ "$unit" -ne 0 ] || [ "$security" -ne 0 ] || [ "$build" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0-2-validation-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/phase-logs/*.log
+            dependency-audit.json
+
+      - name: Post failure report and preserve draft status
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo '## Phase 0-2 validation stopped before commit'
+            echo
+            echo '| Gate | Exit code |'
+            echo '|---|---:|'
+            echo "| Lint | ${{ steps.checks.outputs.lint || 'not run' }} |"
+            echo "| Unit tests | ${{ steps.checks.outputs.unit || 'not run' }} |"
+            echo "| Security tests | ${{ steps.checks.outputs.security || 'not run' }} |"
+            echo "| Production build | ${{ steps.checks.outputs.build || 'not run' }} |"
+            echo
+            for file in "$RUNNER_TEMP"/phase-logs/*.log; do
+              [ -f "$file" ] || continue
+              echo "<details><summary>$(basename "$file")</summary>"
+              echo
+              echo '```text'
+              tail -n 120 "$file"
+              echo '```'
+              echo '</details>'
+            done
+            echo
+            echo 'No implementation commit was pushed. The PR remains draft.'
+          } > "$RUNNER_TEMP/failure-comment.md"
+          gh pr comment 74 --repo ShopHeck/ShopHeck --body-file "$RUNNER_TEMP/failure-comment.md"
+          exit 1
+
+      - name: Remove one-time implementation machinery
+        if: success()
+        run: |
+          rm -rf .agent-patch
+          rm -f .phase-run-v2 .phase-run-v3
+          rm -f .github/scripts/apply_phase0_2.py
+          rm -f .github/scripts/finalize_phase0_2.py
+          rm -f .github/workflows/apply-agent-patch.yml
+          rm -f .github/workflows/apply-phase0-2-v2.yml
+          rm -f .github/workflows/finalize-phase0-2.yml
+          rm -f .github/workflows/dependency-audit-report.yml
+          rm -f .github/workflows/scaffold-supabase-migration.yml
+          git diff --check
+
+      - name: Write validation record
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p docs
+          cat > docs/phase0-2-validation.md <<EOF
+          # Phase 0-2 implementation validation
+
+          The isolated hardening branch passed the following gates before its implementation commit was created:
+
+          - ESLint: passed
+          - Unit tests: passed
+          - Security regression tests: passed
+          - Production TypeScript/Vite build: passed
+          - Production dependency audit: executed and attached to the workflow run (non-blocking while advisories are reviewed)
+
+          The implementation includes account-scoped local persistence, complete reset/deletion primitives, authenticated server-created Stripe Checkout, removal of client-attested paid AI access, hardened coach-link/note database authorization, corrected timer duration/deadline logic, direction-aware conditioning analytics, phase-aware readiness scoring, date guards, legal disclosures, migrations, and CI regression gates.
+
+          Database migrations and new server environment variables must be applied in staging before production deployment. No migration is automatically applied by this pull request.
+          EOF
+
+      - name: Commit the verified implementation
+        if: success()
+        run: |
+          git config user.name "OpenAI Agent"
+          git config user.email "noreply@openai.com"
+          git add -A
+          git commit -m "Implement security, validation, and core engine hardening"
+          git pull --rebase origin agent/phase-0-2-hardening
+          git push origin HEAD:agent/phase-0-2-hardening
+
+      - name: Mark pull request ready and post success summary
+        if: success()
+        run: |
+          gh pr ready 74 --repo ShopHeck/ShopHeck
+          gh pr comment 74 --repo ShopHeck/ShopHeck --body $'## Phase 0-2 implementation committed and verified\n\nLint, unit tests, security regression tests, and the production build passed before commit. The dependency audit artifact is attached to this workflow run. Database migrations and server environment variables still require a staged deployment review; nothing was applied directly to production.'
