@@ -197,19 +197,35 @@ jobs:
           printf '%s\n' "$MATCH_DEPLOY_KEY" > ~/.ssh/match_deploy_key
           chmod 600 ~/.ssh/match_deploy_key
 
-          # Non-fatal: a transient keyscan failure would otherwise abort the whole
-          # build under `set -e`. accept-new below covers that case.
-          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Pin GitHub's host keys from its published list rather than trusting
+          # whatever ssh-keyscan happens to receive. The runner is ephemeral, so
+          # known_hosts starts empty and a scan has nothing to verify against —
+          # that is trust-on-first-use, and ssh-keyscan(1) warns as much. Fetching
+          # over HTTPS instead means the keys arrive on a connection authenticated
+          # against the system trust store, which is a real anchor.
+          #
+          # Fails closed. Degrading to an unverified scan would defeat the point,
+          # so no keys means no clone.
+          if ! curl -fsSL --retry 3 https://api.github.com/meta -o "$RUNNER_TEMP/gh-meta.json"; then
+            echo "::error::Could not fetch GitHub's published SSH host keys from api.github.com"
+            exit 1
+          fi
+          jq -r '.ssh_keys[] | "github.com \(.)"' "$RUNNER_TEMP/gh-meta.json" >> ~/.ssh/known_hosts
+          if ! grep -q '^github\.com ' ~/.ssh/known_hosts; then
+            echo "::error::api.github.com returned no ssh_keys — refusing to fall back to an unverified host key"
+            exit 1
+          fi
+          chmod 600 ~/.ssh/known_hosts
 
           # IdentitiesOnly stops ssh from offering any other key first and
           # tripping GitHub's per-account auth limit before it reaches this one.
-          # accept-new trusts a first-seen host key but still refuses a *changed*
-          # one, so a failed keyscan degrades gracefully instead of wedging.
+          # StrictHostKeyChecking yes is safe now that known_hosts is pinned from
+          # an authenticated source rather than populated on first sight.
           cat >> ~/.ssh/config <<'EOF'
           Host github.com
             IdentityFile ~/.ssh/match_deploy_key
             IdentitiesOnly yes
-            StrictHostKeyChecking accept-new
+            StrictHostKeyChecking yes
           EOF
           chmod 600 ~/.ssh/config
 
