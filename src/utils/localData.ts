@@ -29,8 +29,12 @@ export function setActiveLocalAccount(accountId: string, storage: Storage = loca
 }
 
 /**
- * First run after this migration adopts the existing local data. Later account
- * changes wipe the previous account's device-local cache before cloud restore.
+ * First run after this migration adopts existing local data. Guest → signed-in
+ * also adopts the guest camp, matching the user's expectation that creating an
+ * account backs up the plan they just built. Signed account → guest and signed
+ * account → another signed account are hard boundaries and wipe the previous
+ * device-local cache before cloud restore.
+ *
  * Returns true when a boundary was crossed and callers must reset in-memory state.
  */
 export function reconcileLocalAccount(
@@ -48,6 +52,15 @@ export function reconcileLocalAccount(
   }
 
   if (previous === next) return false;
+
+  // A guest intentionally creating/signing into an account should keep the
+  // current device-local camp so SyncProvider can attach it to that account.
+  // Signing out of an account clears its data first, so a subsequent empty
+  // guest session remains safe to adopt.
+  if (previous === GUEST_ACCOUNT_ID && userId) {
+    setActiveLocalAccount(next, storage);
+    return false;
+  }
 
   clearFightCampLocalData(storage);
   setActiveLocalAccount(next, storage);
