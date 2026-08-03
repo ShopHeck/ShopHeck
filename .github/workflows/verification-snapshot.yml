@@ -6,6 +6,9 @@ on:
       - agent/fightcamp-hardening-verify
     paths:
       - '.github/workflows/verification-snapshot.yml'
+  pull_request:
+    branches:
+      - agent/fightcamp-hardening-clean
 
 permissions:
   contents: read
