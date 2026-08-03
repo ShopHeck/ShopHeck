@@ -4,6 +4,7 @@ import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import { getCustomBellDataUrl } from '../utils/customBell';
+import { nextPhaseDeadline } from '../utils/timerClock';
 import {
   scheduleRoundAlerts, cancelRoundAlerts, roundAlertsEnabled, setRoundAlertsEnabled,
   requestNotificationPermission, notificationsSupported,
@@ -374,19 +375,20 @@ export function useRoundTimer() {
       return;
     }
 
-    const ctx = getAudioCtx();
     const dataUrl = getCustomBellDataUrl();
-    if (dataUrl) {
-      const b64    = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-      const binary = atob(b64);
-      const bytes  = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      ctx.decodeAudioData(bytes.buffer.slice(0))
-        .then(buf => { customBellBufRef.current = buf; })
-        .catch(e  => { console.warn('[RoundTimer] custom bell decode failed:', e); });
-    } else {
+    if (!dataUrl) {
       customBellBufRef.current = null;
+      return;
     }
+
+    const ctx = getAudioCtx();
+    const b64    = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    ctx.decodeAudioData(bytes.buffer.slice(0))
+      .then(buf => { customBellBufRef.current = buf; })
+      .catch(e  => { console.warn('[RoundTimer] custom bell decode failed:', e); });
   }, [isRunning, getAudioCtx]);
 
   // Debounced audio-session release — called after every bell/clapper so the
@@ -490,7 +492,7 @@ export function useRoundTimer() {
       setPhase(saved.phase);
       setCurrentRound(saved.currentRound);
       setTimeLeft(saved.pausedTimeLeft); timeLeftRef.current = saved.pausedTimeLeft;
-      deadlineRef.current = Date.now() + saved.pausedTimeLeft * 1000;
+      deadlineRef.current = nextPhaseDeadline(0, saved.pausedTimeLeft);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -637,15 +639,16 @@ export function useRoundTimer() {
         const round = roundRef.current;
 
         if (ph === 'prep') {
-          // Prep done → start round 1
+          // Prep done → start round 1. Anchor to the scheduled prep deadline so
+          // a late callback does not stretch every later round.
           playRoundStartBell(ctx); scheduleCtxSuspend();
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');
-          const newDeadline = Date.now() + workSecRef.current * 1000;
+          const newDeadline = nextPhaseDeadline(deadlineRef.current, workSecRef.current);
           deadlineRef.current = newDeadline;
           setPhase('work'); phaseRef.current = 'work';
-          setTimeLeft(workSecRef.current);
+          setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
           warningFiredRef.current = false;
           lastTickRef.current = -1;
 
@@ -665,10 +668,10 @@ export function useRoundTimer() {
             flash('bg-blue-500');
             vibrate(HAPTIC.roundEnd);
             if (voiceRef.current) speak('Rest');
-            const newDeadline = Date.now() + restSecRef.current * 1000;
+            const newDeadline = nextPhaseDeadline(deadlineRef.current, restSecRef.current);
             deadlineRef.current = newDeadline;
             setPhase('rest'); phaseRef.current = 'rest';
-            setTimeLeft(restSecRef.current);
+            setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
             warningFiredRef.current = false;
           }
         } else {
@@ -679,12 +682,12 @@ export function useRoundTimer() {
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak(isLast ? 'Last round' : `Round ${newRound}`);
-          const newDeadline = Date.now() + workSecRef.current * 1000;
+          const newDeadline = nextPhaseDeadline(deadlineRef.current, workSecRef.current);
           deadlineRef.current = newDeadline;
           roundRef.current    = newRound;
           setCurrentRound(newRound);
           setPhase('work');    phaseRef.current = 'work';
-          setTimeLeft(workSecRef.current);
+          setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
           warningFiredRef.current = false;
         }
         return;
@@ -692,11 +695,8 @@ export function useRoundTimer() {
 
       setTimeLeft(remaining);
 
-      const ctx = getAudioCtx();
-
-      // Configurable warning (only fires once per phase). Guard warningSec <
-      // workSec: otherwise a warning >= the work length would fire on the very
-      // first tick of the round (remaining === workSec) or never fire at all.
+      // Configurable warning (only fires once per phase). Audio is created or
+      // resumed only when a sound is due; the 250ms timing loop stays silent.
       if (
         warningSecRef.current < workSecRef.current &&
         remaining === warningSecRef.current &&
@@ -704,22 +704,24 @@ export function useRoundTimer() {
         !warningFiredRef.current
       ) {
         warningFiredRef.current = true;
+        const ctx = getAudioCtx();
         playClapper(ctx); scheduleCtxSuspend();
         vibrate(HAPTIC.warning);
         if (voiceRef.current) speak(`${warningSecRef.current} seconds`);
       }
 
-      // 3-2-1 countdown ticks — fire once per distinct second value
+      // 3-2-1 countdown ticks — fire once per distinct second value.
       if (remaining <= 3 && phaseRef.current === 'work' && remaining !== lastTickRef.current) {
         lastTickRef.current = remaining;
-        playTick(ctx);
+        const ctx = getAudioCtx();
+        playTick(ctx); scheduleCtxSuspend();
         vibrate(HAPTIC.tick);
         if (voiceRef.current) speak(String(remaining));
       }
     }, 250);
 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, getAudioCtx, flash, vibrate, speak, scheduleCtxSuspend]);
+  }, [isRunning, getAudioCtx, playRoundStartBell, flash, vibrate, speak, scheduleCtxSuspend]);
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
@@ -766,29 +768,32 @@ export function useRoundTimer() {
         // New session — mint an id so the completion effect logs it exactly once,
         // even across an app relaunch that restores the finished session.
         setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-        const ctx = getAudioCtx();
         if (prepSecRef.current > 0) {
-          // Start with prep countdown
+          // Start with prep countdown. No audio context is needed until a bell
+          // actually fires (unless a custom file must be decoded in the effect).
           setPhase('prep'); phaseRef.current = 'prep';
-          deadlineRef.current = Date.now() + prepSecRef.current * 1000;
+          deadlineRef.current = nextPhaseDeadline(0, prepSecRef.current);
           if (voiceRef.current) speak(`Round 1 begins in ${prepSecRef.current}`);
         } else {
           // Straight to work
-          playRoundStartBell(ctx);
+          const ctx = getAudioCtx();
+          playRoundStartBell(ctx); scheduleCtxSuspend();
           flash('bg-brand-500');
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');
           setPhase('work'); phaseRef.current = 'work';
-          deadlineRef.current = Date.now() + workSec * 1000;
+          deadlineRef.current = nextPhaseDeadline(0, workSec);
         }
       } else {
         // Resume from pause
-        deadlineRef.current = Date.now() + timeLeft * 1000;
+        deadlineRef.current = nextPhaseDeadline(0, timeLeft);
       }
     }
     setIsRunning(r => !r);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, isRunning, workSec, timeLeft, reset, getAudioCtx, flash, vibrate, speak, unlock]);
+  }, [
+    phase, isRunning, workSec, timeLeft, reset, getAudioCtx,
+    playRoundStartBell, scheduleCtxSuspend, flash, vibrate, speak, unlock,
+  ]);
 
   // Sync idle display when workSec changes
   useEffect(() => {
