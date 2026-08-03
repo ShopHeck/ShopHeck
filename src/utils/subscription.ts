@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../plugins/RevenueCat';
-import type { SubscriptionState, SubscriptionTier } from '../types';
+import type { SubscriptionState } from '../types';
 
 const SUB_KEY = 'fightcamp_subscription';
 
@@ -100,32 +100,26 @@ export async function identifyNativeSubscriber(
 }
 
 /**
- * Reads Stripe Payment Link return params from the URL, writes a 30-day soft
- * unlock to localStorage, and strips the params from the URL.
- * Returns the new subscription state if a valid return was detected, else null.
+ * Consume Stripe's success-return parameters without granting any local access.
+ * Entitlements are applied only after the signed webhook records a verified
+ * subscription in Supabase. Returns true so AppContext can briefly poll for the
+ * webhook row and give a completed checkout an immediate unlock when it lands.
  */
-export function processStripeReturn(): SubscriptionState | null {
+export function processStripeReturn(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
-    const tier = params.get('tier') as SubscriptionTier | null;
+    const tier = params.get('tier');
     const session = params.get('stripe_session');
+    const validTier = tier === 'fighter_pro' || tier === 'coach_pro';
 
-    if (!tier || !session) return null;
-    if (!['fighter_pro', 'coach_pro'].includes(tier)) return null;
+    if (!validTier || !session) return false;
 
-    // 30-day soft unlock (client-side only — acceptable for MVP)
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const sub: SubscriptionState = { tier, expiresAt, source: 'stripe_payment_link' };
-    saveSubscription(sub);
-
-    // Clean up URL
     const url = new URL(window.location.href);
     url.searchParams.delete('tier');
     url.searchParams.delete('stripe_session');
     window.history.replaceState({}, '', url.toString());
-
-    return sub;
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
