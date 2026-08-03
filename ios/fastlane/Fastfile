@@ -90,6 +90,18 @@ platform :ios do
   before_all do
     sanitize_match_env!
 
+    # match installs the distribution certificate into a keychain, and without
+    # this it picks the runner's default `login.keychain`. That keychain is
+    # locked on a fresh macOS runner, so when codesign later reaches for the
+    # private key during `archive` it blocks on a keychain-access prompt that
+    # nothing on a headless CI box can answer — the job hangs until the job
+    # timeout rather than failing. `setup_ci` creates a temporary, unlocked
+    # keychain and points match at it.
+    #
+    # This never bit while the pipeline was on automatic signing, because those
+    # builds died at provisioning long before any signing key was needed.
+    setup_ci if ENV["CI"]
+
     # Authenticate every lane with the App Store Connect API key. Reads CI
     # secrets. ASC_KEY_CONTENT may be the raw .p8 (PEM) text or base64-encoded —
     # we detect which so either form works.
