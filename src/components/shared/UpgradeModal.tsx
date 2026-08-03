@@ -10,16 +10,14 @@ import AuthScreen from '../AuthScreen';
 interface Props {
   onClose: () => void;
   /**
-   * Called just before the web checkout navigates away to Stripe — the only
-   * purchase path that leaves the page. Lets callers with unsaved state
-   * (onboarding's draft profile/camp) persist it first.
+   * Called just before web checkout navigation — the only purchase path that
+   * leaves the page. Lets onboarding persist its draft profile/camp first.
    */
   onBeforeWebCheckout?: () => void;
 }
 
 // Every line here must describe something that actually ships — this list is
-// App Store metadata in spirit (Guideline 2.3.1) and drifts silently if it
-// isn't checked against the real ProGate call sites when features change.
+// App Store metadata in spirit and must stay aligned with the real gates.
 const FIGHTER_PRO_FEATURES = [
   'AI Insights & AI Cut Coach — included, no setup',
   'Nutrition tracker — hydration, meals & macros',
@@ -38,33 +36,14 @@ const COACH_PRO_FEATURES = [
   'Fighter detail views: training, weight cut & readiness',
 ];
 
-// Stripe Payment Link URLs. Env vars (set in the host, e.g. Netlify) take
-// precedence; the literals are the production fallback so the buttons work even
-// when env vars aren't configured. Payment Link URLs are public, not secrets.
-// Each link's success URL is configured in Stripe to redirect back with
-// ?tier=<fighter_pro|coach_pro>&stripe_session={CHECKOUT_SESSION_ID}.
-const LINKS = {
-  fighter: {
-    monthly: (import.meta.env.VITE_STRIPE_FIGHTER_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/aFa28r7BY2t13JafKwgYU00',
-    annual:  (import.meta.env.VITE_STRIPE_FIGHTER_PRO_ANNUAL  as string | undefined) || 'https://buy.stripe.com/4gMfZh7BYaZx1B20PCgYU03',
-  },
-  coach: {
-    monthly: (import.meta.env.VITE_STRIPE_COACH_PRO_MONTHLY as string | undefined) || 'https://buy.stripe.com/cNi3cvf4q2t1cfG41OgYU01',
-    annual:  (import.meta.env.VITE_STRIPE_COACH_PRO_ANNUAL  as string | undefined) || 'https://buy.stripe.com/28EcN57BY2t13Ja55SgYU02',
-  },
-};
-
 /**
- * The native plugin already phrases its rejections for humans, so the job here
- * is to pass them through rather than flatten every failure into one apologetic
- * sentence. Only a genuinely empty error falls back to generic copy.
+ * The native plugin already phrases its rejections for humans, so pass them
+ * through rather than flattening every failure into a generic sentence.
  */
 function purchaseErrorMessage(e: unknown): string {
   const raw = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
   const message = raw.trim();
   if (!message) return 'The purchase screen couldn’t be opened. Please try again in a moment.';
-  // Capacitor rejects an unregistered plugin method with this; it means an old
-  // binary, not a user-facing problem worth restating verbatim.
   if (/not implemented|unimplemented/i.test(message)) {
     return 'Purchases aren’t available in this build. Please update to the latest version.';
   }
@@ -73,15 +52,14 @@ function purchaseErrorMessage(e: unknown): string {
 
 export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   const { dispatch } = useApp();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
 
-  // Screenshot harness (?shot): render the iOS footer (auto-renew disclosure +
-  // Restore Purchases) so App Store review screenshots match the native app.
-  // Purchase/restore behavior still keys off the real platform.
+  // Screenshot harness (?shot): render the iOS footer so App Store review
+  // screenshots match the native app. Behavior still keys off the real platform.
   const showNativeFooter =
     Capacitor.isNativePlatform() ||
     (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot'));
@@ -99,20 +77,42 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
     return true;
   }
 
+  async function createWebCheckout(tier: 'fighter' | 'coach'): Promise<string> {
+    const token = session?.access_token;
+    if (!token || !user?.id || !user.email) {
+      throw new Error('Sign in before subscribing so your purchase follows your account and devices.');
+    }
+
+    const response = await fetch('/.netlify/functions/create-checkout', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ tier, billing }),
+    });
+
+    let body: { url?: string; message?: string } = {};
+    try {
+      body = await response.json() as { url?: string; message?: string };
+    } catch {
+      // Keep the generic message below for a non-JSON infrastructure error.
+    }
+
+    if (!response.ok || !body.url) {
+      throw new Error(body.message || 'Checkout is unavailable right now. Please try again.');
+    }
+    return body.url;
+  }
+
   async function handleSubscribe(tier: 'fighter' | 'coach') {
     setNotice('');
     if (Capacitor.isNativePlatform()) {
       setLoading(true);
       try {
-        // Resolves after the paywall sheet is dismissed — with the resulting
-        // entitlements. Closing the sheet without buying is not an error, so
-        // no notice is shown for it.
         const result = await RevenueCat.presentPaywall();
         if (applyRevenueCatResult(result.isPro, result.tier)) onClose();
       } catch (e) {
-        // The plugin rejects with a reason a user can act on (bad build config,
-        // no offering, offline). Swallowing it and saying "try again in a
-        // moment" sent people into a loop that could never succeed.
         setNotice(purchaseErrorMessage(e));
       } finally {
         setLoading(false);
@@ -120,27 +120,23 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
       return;
     }
 
-    // Web entitlements are attributed by the signed Stripe webhook. Never let
-    // a guest pay into an orphaned checkout the server cannot attach to them.
-    if (!user?.id || !user.email) {
+    if (!session?.access_token || !user?.id || !user.email) {
       setNotice('Sign in before subscribing so your purchase follows your account and devices.');
       setShowAuth(true);
       return;
     }
 
-    const base = LINKS[tier][billing];
-    if (base) {
-      const url = new URL(base);
-      url.searchParams.set('client_reference_id', user.id);
-      url.searchParams.set('prefilled_email', user.email);
+    setLoading(true);
+    try {
+      const checkoutUrl = await createWebCheckout(tier);
       onBeforeWebCheckout?.();
-      // Defer the navigation a beat so React commits any state the callback
-      // dispatched and the persistence effect writes it to localStorage
-      // before the page unloads. Imperceptible next to Stripe's page load.
-      setLoading(true);
-      setTimeout(() => { window.location.href = url.toString(); }, 120);
-    } else {
-      setNotice('Payment links not yet configured — check back soon!');
+      // Give React/local persistence one beat to commit onboarding draft state
+      // before the page leaves for Stripe.
+      await new Promise(resolve => setTimeout(resolve, 120));
+      window.location.assign(checkoutUrl);
+    } catch (e) {
+      setNotice(purchaseErrorMessage(e));
+      setLoading(false);
     }
   }
 
@@ -168,7 +164,6 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
           className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
             <div>
               <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
@@ -179,7 +174,6 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
             </button>
           </div>
 
-          {/* Billing toggle */}
           <div className="px-5 pb-3">
             <div className="flex bg-dark-700 rounded-xl p-1 gap-1">
               <button
@@ -200,20 +194,17 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
           </div>
 
           <div className="px-5 pb-5 space-y-4">
-            {/* Fighter Pro card */}
             <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Zap size={16} className="text-brand-400" />
                 <span className="text-sm font-bold text-white">Fighter Pro</span>
-                {/* The 7-day trial is configured in RevenueCat (App Store);
-                    the web Stripe Payment Links have no trial — don't claim one. */}
                 <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
               </div>
               <ul className="space-y-1.5">
-                {FIGHTER_PRO_FEATURES.slice(0, 5).map(f => (
-                  <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
+                {FIGHTER_PRO_FEATURES.slice(0, 5).map(feature => (
+                  <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
                     <Check size={11} className="text-brand-400 mt-0.5 flex-shrink-0" />
-                    {f}
+                    {feature}
                   </li>
                 ))}
                 <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
@@ -243,7 +234,6 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
               </div>
             </div>
 
-            {/* Coach Pro card */}
             <div className="bg-gradient-to-br from-purple-900/30 to-dark-700 border border-purple-700/40 rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Trophy size={16} className="text-purple-400" />
@@ -251,10 +241,10 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
                 <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
               </div>
               <ul className="space-y-1.5">
-                {COACH_PRO_FEATURES.map(f => (
-                  <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
+                {COACH_PRO_FEATURES.map(feature => (
+                  <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
                     <Check size={11} className="text-purple-400 mt-0.5 flex-shrink-0" />
-                    {f}
+                    {feature}
                   </li>
                 ))}
               </ul>
