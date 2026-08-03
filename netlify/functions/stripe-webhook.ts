@@ -1,25 +1,15 @@
 // Stripe webhook — server-authoritative web entitlements.
 //
-// Stripe calls this endpoint when a checkout completes or a subscription
-// changes. We verify the signature, resolve which Supabase user the event
-// belongs to, and upsert verified state into `public.stripe_subscriptions`.
+// This keeps the existing Stripe Payment Link setup intact. Stripe calls this
+// endpoint when a checkout completes or a subscription changes. We verify the
+// signature, resolve the Supabase user, and upsert verified entitlement state.
 //
-// Required server-only env vars:
+// Required Netlify environment variables:
 //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-//   STRIPE_FIGHTER_MONTHLY_PRICE_ID, STRIPE_FIGHTER_ANNUAL_PRICE_ID,
-//   STRIPE_COACH_MONTHLY_PRICE_ID, STRIPE_COACH_ANNUAL_PRICE_ID
-// Optional comma-separated additional price allowlists:
-//   STRIPE_FIGHTER_PRICE_IDS, STRIPE_COACH_PRICE_IDS
 
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const priceSet = (csv: string | undefined, ...explicit: Array<string | undefined>): ReadonlySet<string> =>
-  new Set([
-    ...(csv ?? '').split(',').map(value => value.trim()).filter(Boolean),
-    ...explicit.map(value => value?.trim()).filter((value): value is string => Boolean(value)),
-  ]);
 
 export default async (req: Request): Promise<Response> => {
   const {
@@ -27,28 +17,12 @@ export default async (req: Request): Promise<Response> => {
     STRIPE_WEBHOOK_SECRET,
     SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY,
-    STRIPE_FIGHTER_PRICE_IDS,
-    STRIPE_COACH_PRICE_IDS,
-    STRIPE_FIGHTER_MONTHLY_PRICE_ID,
-    STRIPE_FIGHTER_ANNUAL_PRICE_ID,
-    STRIPE_COACH_MONTHLY_PRICE_ID,
-    STRIPE_COACH_ANNUAL_PRICE_ID,
   } = process.env;
 
   if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response('Webhook not configured', { status: 500 });
   }
 
-  const fighterPriceIds = priceSet(
-    STRIPE_FIGHTER_PRICE_IDS,
-    STRIPE_FIGHTER_MONTHLY_PRICE_ID,
-    STRIPE_FIGHTER_ANNUAL_PRICE_ID,
-  );
-  const coachPriceIds = priceSet(
-    STRIPE_COACH_PRICE_IDS,
-    STRIPE_COACH_MONTHLY_PRICE_ID,
-    STRIPE_COACH_ANNUAL_PRICE_ID,
-  );
   const stripe = new Stripe(STRIPE_SECRET_KEY);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -57,6 +31,7 @@ export default async (req: Request): Promise<Response> => {
   const signature = req.headers.get('stripe-signature');
   if (!signature) return new Response('Missing stripe-signature', { status: 400 });
 
+  // The raw, unparsed body is required for Stripe signature verification.
   const payload = await req.text();
   let event: Stripe.Event;
   try {
@@ -65,43 +40,16 @@ export default async (req: Request): Promise<Response> => {
     return new Response(`Signature verification failed: ${(err as Error).message}`, { status: 400 });
   }
 
-  /** Unknown products grant nothing. Exact price ids take priority; exact names
-   *  are a backwards-compatible fallback for subscriptions created before the
-   *  price allowlists were deployed. */
-  const tierFor = (
-    priceId: string | null | undefined,
-    productName: string | null | undefined,
-  ): 'coach_pro' | 'fighter_pro' | null => {
-    if (priceId && coachPriceIds.has(priceId)) return 'coach_pro';
-    if (priceId && fighterPriceIds.has(priceId)) return 'fighter_pro';
-
-    const normalized = productName?.trim().toLowerCase();
+  // Existing products are named exactly "Fighter Pro" and "Coach Pro". Unknown
+  // products grant nothing instead of silently defaulting to Fighter Pro.
+  const tierFor = (name: string | null | undefined): 'coach_pro' | 'fighter_pro' | null => {
+    const normalized = name?.trim().toLowerCase();
     if (normalized === 'coach pro') return 'coach_pro';
     if (normalized === 'fighter pro') return 'fighter_pro';
     return null;
   };
 
-  const recordUnattributed = async (input: {
-    reason: string;
-    checkoutSessionId?: string | null;
-    subscriptionId?: string | null;
-    customerId?: string | null;
-    customerEmail?: string | null;
-    eventType: string;
-  }): Promise<void> => {
-    const { error } = await supabase.from('unattributed_stripe_events').upsert({
-      event_id: event.id,
-      event_type: input.eventType,
-      reason: input.reason,
-      checkout_session_id: input.checkoutSessionId ?? null,
-      stripe_subscription_id: input.subscriptionId ?? null,
-      stripe_customer_id: input.customerId ?? null,
-      customer_email: input.customerEmail ?? null,
-    }, { onConflict: 'event_id' });
-    if (error) throw new Error(`could not record unattributed Stripe event: ${error.message}`);
-  };
-
-  const syncSubscription = async (userId: string, subscriptionId: string): Promise<boolean> => {
+  const syncSubscription = async (userId: string, subscriptionId: string): Promise<void> => {
     const sub = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['items.data.price.product'],
     });
@@ -110,17 +58,15 @@ export default async (req: Request): Promise<Response> => {
 
     const product = item.price.product as Stripe.Product | Stripe.DeletedProduct | string | undefined;
     const productName = product && typeof product === 'object' && 'name' in product ? product.name : null;
-    const tier = tierFor(item.price.id, productName);
-    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
-
+    const tier = tierFor(productName);
     if (!tier) {
-      await recordUnattributed({
-        reason: `unrecognized price/product: ${item.price.id} / ${productName ?? 'unnamed'}`,
+      console.error('stripe-webhook ignored unknown subscription product', {
+        eventId: event.id,
         subscriptionId: sub.id,
-        customerId,
-        eventType: event.type,
+        priceId: item.price.id,
+        productName,
       });
-      return false;
+      return;
     }
 
     const periodEnd =
@@ -131,7 +77,7 @@ export default async (req: Request): Promise<Response> => {
     const { error } = await supabase.from('stripe_subscriptions').upsert(
       {
         user_id: userId,
-        stripe_customer_id: customerId,
+        stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null,
         stripe_subscription_id: sub.id,
         tier,
         status: sub.status,
@@ -141,7 +87,6 @@ export default async (req: Request): Promise<Response> => {
       { onConflict: 'user_id' },
     );
     if (error) throw new Error(`supabase entitlement upsert failed: ${error.message}`);
-    return true;
   };
 
   const userIdForCustomer = async (customerId: string | null): Promise<string | null> => {
@@ -162,22 +107,19 @@ export default async (req: Request): Promise<Response> => {
         const userId = session.client_reference_id ?? session.metadata?.supabase_user_id ?? null;
         const subscriptionId =
           typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
-        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null;
 
         if (!userId || !subscriptionId) {
-          await recordUnattributed({
-            reason: !userId ? 'missing Supabase user id' : 'missing subscription id',
+          console.error('stripe-webhook could not attribute completed checkout', {
+            eventId: event.id,
             checkoutSessionId: session.id,
-            subscriptionId: subscriptionId ?? null,
-            customerId,
-            customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
-            eventType: event.type,
+            hasUserId: Boolean(userId),
+            hasSubscriptionId: Boolean(subscriptionId),
           });
           break;
         }
 
-        // Server-created checkout already stamps this metadata; repeat it here
-        // for legacy Payment Link returns and as an idempotent repair.
+        // Persist the account mapping on the Stripe subscription for future
+        // renewal, cancellation, and expiration events.
         await stripe.subscriptions.update(subscriptionId, {
           metadata: { supabase_user_id: userId },
         });
@@ -191,11 +133,10 @@ export default async (req: Request): Promise<Response> => {
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? null;
         const userId = sub.metadata?.supabase_user_id ?? (await userIdForCustomer(customerId));
         if (!userId) {
-          await recordUnattributed({
-            reason: 'subscription event has no Supabase user mapping',
+          console.error('stripe-webhook could not attribute subscription event', {
+            eventId: event.id,
             subscriptionId: sub.id,
             customerId,
-            eventType: event.type,
           });
           break;
         }
