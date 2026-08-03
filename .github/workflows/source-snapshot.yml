@@ -6,6 +6,9 @@ on:
       - agent/fightcamp-hardening-clean
     paths:
       - '.github/workflows/source-snapshot.yml'
+  pull_request:
+    branches:
+      - claude/fight-training-camp-app-ggs3g
 
 permissions:
   contents: read
