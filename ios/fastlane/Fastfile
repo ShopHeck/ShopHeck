@@ -12,6 +12,49 @@ TEAM_ID = "WV4L598A44".freeze
 # to this Fastfile's directory so it resolves regardless of fastlane's cwd.
 ASC_KEY_PATH = File.expand_path("AuthKey_asc.p8", __dir__).freeze
 
+# Reject a RevenueCat key that cannot work in a release build.
+#
+# Emptiness was the only thing checked here before, which let the wrong *kind*
+# of key through — and every public RevenueCat key is a valid-looking string,
+# so nothing downstream complains either. The failure only appears once a user
+# taps Subscribe, as RevenueCat error 11 ("There was a credentials issue")
+# rendered by the SDK's own alert over a half-loaded paywall.
+#
+# Mirrors RevenueCatConfig.validate in ios/App/App/RevenueCatPlugin.swift —
+# keep the two in step.
+def validate_revenuecat_key!(key)
+  if key.empty?
+    UI.user_error!("REVENUECAT_API_KEY env var is required for release builds")
+  end
+  return if key.start_with?("appl_")
+
+  reason =
+    if key.start_with?("test_")
+      "it is a Test Store key, which only works in debug builds"
+    elsif key.start_with?("goog_")
+      "it is the Google Play key"
+    elsif key.start_with?("amzn_")
+      "it is the Amazon key"
+    elsif key.start_with?("rcb_") || key.start_with?("strp_")
+      "it is a Web Billing key"
+    elsif key.start_with?("sk_")
+      "it is a secret key, which is server-side only"
+    else
+      "it does not start with appl_"
+    end
+
+  UI.user_error!(<<~MSG)
+    REVENUECAT_API_KEY cannot be used for an iOS release build — #{reason}.
+
+    Use the public Apple SDK key: RevenueCat dashboard → Project Settings →
+    API keys → "Public app-specific Apple API key". It starts with appl_.
+
+    Shipping the wrong key produces no build error at all; it fails on the
+    user's device as "Error 11: There was a credentials issue" when they try
+    to subscribe or start a free trial.
+  MSG
+end
+
 platform :ios do
   before_all do
     # Authenticate every lane with the App Store Connect API key. Reads CI
@@ -194,8 +237,8 @@ platform :ios do
   # key is injected as a build setting so it lands in Info.plist's
   # RevenueCatAPIKey (AppDelegate crashes on launch if it's empty in Release).
   private_lane :archive_app do
-    rc_key = ENV["REVENUECAT_API_KEY"].to_s
-    UI.user_error!("REVENUECAT_API_KEY env var is required for release builds") if rc_key.empty?
+    rc_key = ENV["REVENUECAT_API_KEY"].to_s.strip
+    validate_revenuecat_key!(rc_key)
 
     match_git_url = ENV["MATCH_GIT_URL"].to_s
 

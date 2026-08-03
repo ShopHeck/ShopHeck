@@ -52,6 +52,80 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Every credential this app needs is baked into the binary at build time,
+      # so a missing or wrong-shaped secret does not fail the build — it ships,
+      # and then fails on a user's phone as "Load failed" on sign-in or
+      # "Error 11: There was a credentials issue" on the paywall, neither of
+      # which names its cause. Check the shapes here, before ~20 minutes of
+      # macOS build time and a TestFlight release get spent on a broken binary.
+      #
+      # Values are only ever tested for shape and never echoed.
+      - name: Preflight build secrets
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: |
+          fail=0
+          problem() { echo "::error::$1"; fail=1; }
+
+          # Leading/trailing whitespace and wrapping quotes survive into the
+          # bundle and produce a URL that fetch rejects before it reaches the
+          # network. Compare against the trimmed form to catch them.
+          trim() { printf '%s' "$1" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//'; }
+
+          url_trimmed=$(trim "$VITE_SUPABASE_URL")
+          key_trimmed=$(trim "$VITE_SUPABASE_ANON_KEY")
+          rc_trimmed=$(trim "$REVENUECAT_API_KEY")
+
+          if [ -z "$url_trimmed" ]; then
+            problem "VITE_SUPABASE_URL is not set. Sign-in and cloud sync will be absent from this build."
+          else
+            if [ "$url_trimmed" != "$VITE_SUPABASE_URL" ]; then
+              problem "VITE_SUPABASE_URL has surrounding whitespace or quotes — re-paste it with none."
+            fi
+            case "$url_trimmed" in
+              https://*.*) ;;
+              *) problem "VITE_SUPABASE_URL must be https://<project-ref>.supabase.co" ;;
+            esac
+          fi
+
+          if [ -z "$key_trimmed" ]; then
+            problem "VITE_SUPABASE_ANON_KEY is not set. Sign-in and cloud sync will be absent from this build."
+          else
+            if [ "$key_trimmed" != "$VITE_SUPABASE_ANON_KEY" ]; then
+              problem "VITE_SUPABASE_ANON_KEY has surrounding whitespace or quotes — re-paste it with none."
+            fi
+            # Either a JWT (three dot-separated parts) or an sb_publishable_… key.
+            case "$key_trimmed" in
+              sb_*) ;;
+              *.*.*) ;;
+              *) problem "VITE_SUPABASE_ANON_KEY is not a recognisable Supabase key (expected a JWT or sb_publishable_…). Check for a truncated paste." ;;
+            esac
+          fi
+
+          # Public RevenueCat SDK keys are platform-scoped and prefixed. iOS
+          # needs the Apple one; anything else 401s at runtime as error 11.
+          if [ -z "$rc_trimmed" ]; then
+            problem "REVENUECAT_API_KEY is not set."
+          else
+            case "$rc_trimmed" in
+              appl_*) ;;
+              test_*) problem "REVENUECAT_API_KEY is a Test Store key (test_…), which only works in debug builds. Use the public Apple SDK key (appl_…) from RevenueCat → Project Settings → API keys." ;;
+              goog_*) problem "REVENUECAT_API_KEY is the Google Play key (goog_…). iOS needs the Apple key (appl_…)." ;;
+              amzn_*) problem "REVENUECAT_API_KEY is the Amazon key (amzn_…). iOS needs the Apple key (appl_…)." ;;
+              rcb_*|strp_*) problem "REVENUECAT_API_KEY is a Web Billing key. iOS needs the Apple SDK key (appl_…)." ;;
+              sk_*) problem "REVENUECAT_API_KEY is a *secret* key (sk_…) — server-side only. The app needs the public Apple SDK key (appl_…)." ;;
+              *) problem "REVENUECAT_API_KEY does not look like an Apple SDK key (expected it to start with appl_)." ;;
+            esac
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Set or correct these under Settings → Secrets and variables → Actions, then re-run." >&2
+            exit 1
+          fi
+          echo "All build secrets present and correctly shaped."
+
       # Apple requires the iOS 26 SDK (Xcode 26+) for App Store uploads. The
       # runner ships several Xcode versions and may default to an older one, so
       # explicitly select the newest installed Xcode_*.app.

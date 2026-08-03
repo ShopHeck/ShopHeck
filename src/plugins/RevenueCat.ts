@@ -15,6 +15,21 @@ export interface RevenueCatPlugin {
   /** Detaches the account (returns to an anonymous subscriber). Safe to call
    *  when already anonymous — it's a no-op then. */
   logOut(): Promise<void>;
+  /** What this build's purchase stack actually looks like — whether the SDK
+   *  configured, what kind of API key it got, and whether an offering can be
+   *  fetched. Powers Settings → Diagnostics. Never rejects. */
+  getDiagnostics(): Promise<RevenueCatDiagnostics>;
+}
+
+export interface RevenueCatDiagnostics {
+  configured: boolean;
+  /** `appl_`, `test_`, `goog_`, `none`, … — the kind of key, never the key. */
+  keyPrefix: string;
+  /** Empty when the SDK configured cleanly. */
+  configurationError: string;
+  offeringsStatus: string;
+  appUserId?: string;
+  anonymous?: boolean;
 }
 
 export const RevenueCat = registerPlugin<RevenueCatPlugin>('RevenueCat', {
@@ -25,5 +40,11 @@ export const RevenueCat = registerPlugin<RevenueCatPlugin>('RevenueCat', {
     restorePurchases: async () => ({ isPro: false, tier: 'free' }),
     logIn: async () => ({ isPro: false, tier: 'free' }),
     logOut: async () => {},
+    getDiagnostics: async () => ({
+      configured: false,
+      keyPrefix: 'none',
+      configurationError: 'Purchases run through the App Store, so they are only available in the iOS app.',
+      offeringsStatus: 'n/a on web',
+    }),
   },
 });

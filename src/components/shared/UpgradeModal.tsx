@@ -53,6 +53,23 @@ const LINKS = {
   },
 };
 
+/**
+ * The native plugin already phrases its rejections for humans, so the job here
+ * is to pass them through rather than flatten every failure into one apologetic
+ * sentence. Only a genuinely empty error falls back to generic copy.
+ */
+function purchaseErrorMessage(e: unknown): string {
+  const raw = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+  const message = raw.trim();
+  if (!message) return 'The purchase screen couldn’t be opened. Please try again in a moment.';
+  // Capacitor rejects an unregistered plugin method with this; it means an old
+  // binary, not a user-facing problem worth restating verbatim.
+  if (/not implemented|unimplemented/i.test(message)) {
+    return 'Purchases aren’t available in this build. Please update to the latest version.';
+  }
+  return message;
+}
+
 export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
   const { dispatch } = useApp();
   const { user } = useAuth();
@@ -89,8 +106,11 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
         // no notice is shown for it.
         const result = await RevenueCat.presentPaywall();
         if (applyRevenueCatResult(result.isPro, result.tier)) onClose();
-      } catch {
-        setNotice('The purchase screen couldn’t be opened. Please try again in a moment.');
+      } catch (e) {
+        // The plugin rejects with a reason a user can act on (bad build config,
+        // no offering, offline). Swallowing it and saying "try again in a
+        // moment" sent people into a loop that could never succeed.
+        setNotice(purchaseErrorMessage(e));
       } finally {
         setLoading(false);
       }
@@ -125,8 +145,8 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
       } else {
         setNotice('No active subscription found to restore.');
       }
-    } catch {
-      setNotice('Restore failed. Please try again.');
+    } catch (e) {
+      setNotice(purchaseErrorMessage(e));
     } finally {
       setLoading(false);
     }
