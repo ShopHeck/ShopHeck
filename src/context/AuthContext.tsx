@@ -54,25 +54,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(next);
     };
 
-    if (!supabase) {
+    // Capture the configured client in a non-null local. TypeScript cannot keep
+    // a module-level nullable import narrowed inside later callback closures.
+    const client = supabase;
+    if (!client) {
       reconcileLocalAccount(null);
       setLoading(false);
       return;
     }
 
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    client.auth.getSession().then(({ data }) => {
       if (!active) return;
       applySession(data.session);
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = client.auth.onAuthStateChange((_event, next) => {
       applySession(next);
       setLoading(false);
     });
 
-    const requestedSignOut = () => { void supabase.auth.signOut(); };
+    const requestedSignOut = () => { void client.auth.signOut(); };
     window.addEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
 
     return () => {
