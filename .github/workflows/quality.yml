@@ -6,19 +6,18 @@ on:
     branches:
       - main
       - claude/fight-training-camp-app-ggs3g
-      - 'agent/**'
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.ref }}
+  group: quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -33,7 +32,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Lint, unit tests, security regressions and production build
+      - name: Lint, unit tests, security regressions, type checks and production build
         run: npm run quality
 
       - name: Production dependency audit
