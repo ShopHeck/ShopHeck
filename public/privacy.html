@@ -16,43 +16,64 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: June 2026</p>
+  <p class="meta">Last updated: August 2026</p>
 
-  <p>Fight Camp Training ("the app", "we") is an app for combat-sports athletes and coaches, available on the web and on iOS. This policy explains what information the app handles and how.</p>
+  <p>Fight Camp Training ("the app", "we", "us") is a training-planning and tracking service for combat-sports athletes and coaches, available on the web and on iOS. This policy explains what information the app handles, why it is used, and the choices available to you.</p>
 
-  <h2>Data we collect &amp; where it's stored</h2>
-  <p>Fight Camp Training is <strong>local-first</strong>: by default, your data is stored only on your device and is not transmitted to us. This includes:</p>
+  <h2>Information you enter</h2>
+  <p>The app may process information you choose to enter, including:</p>
   <ul>
-    <li>Your fighter profile (name, age, sport, weight class)</li>
-    <li>Your fight camps, workouts, sparring, weight entries, nutrition, and fight logs</li>
-    <li>Your Anthropic API key, if you enter one — stored on-device only and sent directly to Anthropic from your device (see below)</li>
+    <li>Profile details such as name, age, sport, weight class, experience level, gym and fight record</li>
+    <li>Fight-camp dates, opponent details, training plans and game plans</li>
+    <li>Workout, sparring, conditioning, heart-rate, HRV, weight, nutrition and recovery records</li>
+    <li>Fight results, round-by-round reflections, coach notes and free-text training notes</li>
+    <li>Account email address and subscription status</li>
   </ul>
+  <p>Please avoid entering information about another person unless you have permission to do so. This is especially important for opponent names, sparring-partner names and health-related notes.</p>
 
-  <h2>Accounts &amp; cloud sync (optional)</h2>
-  <p>Creating an account is optional. If you sign in (email/password or Sign in with Apple), we use <a href="https://supabase.com/privacy" target="_blank">Supabase</a> to authenticate you and to back up and sync your training data across your devices. When you do, the data listed above (other than your Anthropic API key, which always stays on-device) is transmitted to and stored on our backend, protected by per-user access controls. If you link with a coach via an invite code, that coach is granted read access to your training data. Sign out to stop syncing; deleting your account removes your cloud-stored data.</p>
+  <h2>Local-first storage</h2>
+  <p>The app is local-first. When you use it as a guest, your training data is stored on the device or browser you are using. Clearing the app, browser storage or device may remove guest data. When you reset the app or delete your account, Fight Camp-owned local records and preferences are removed from that device.</p>
 
-  <h2>Crash &amp; performance reporting (Sentry)</h2>
-  <p>We use <a href="https://sentry.io/privacy/" target="_blank">Sentry</a> to collect anonymous crash and performance diagnostics so we can fix bugs. This does not include your training content.</p>
+  <h2>Accounts and cloud sync</h2>
+  <p>Creating an account is optional for most free features, but is required for cloud sync, coach connections, server-provided AI features and web subscriptions. We use <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">Supabase</a> for authentication, database storage and synchronization. Signed-in training data is transmitted to our backend so it can be restored across devices.</p>
+  <p>Each signed-in account is isolated from other accounts on the same device. If you connect with a coach using an invite code, that active coach relationship allows the coach to view the training information required for the coach dashboard and to add coach notes. Either party can revoke the relationship.</p>
 
-  <h2>Anthropic API (AI Insights)</h2>
-  <p>If you use the AI Insights feature, your training data (workouts, weight, camp details — no personally identifying information) is sent from your device directly to Anthropic's API using your own API key. Your data is subject to <a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a>.</p>
+  <h2>AI Coach features</h2>
+  <p>AI Coach features are provided through our server using Anthropic's API. When you request an analysis, relevant camp information may be sent to our server and then to Anthropic, including training totals, workout and sparring notes, weight history, conditioning results, profile context, opponent context and fight reflections. Depending on what you entered, that information may include names or other identifying details.</p>
+  <p>The app does not require you to create or store an Anthropic developer key. AI usage is authenticated to your Fight Camp account and subject to plan limits. Anthropic processes requests under its <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>. AI output is informational and may be inaccurate.</p>
 
-  <h2>Payments &amp; Subscriptions</h2>
-  <p>On the web, subscription purchases are processed by Stripe; we never see or store your payment card details, and payments are subject to <a href="https://stripe.com/privacy" target="_blank">Stripe's Privacy Policy</a>. On iOS, subscriptions are handled by Apple In-App Purchase (managed via RevenueCat) and are subject to <a href="https://www.apple.com/legal/privacy/" target="_blank">Apple's</a> and <a href="https://www.revenuecat.com/privacy" target="_blank">RevenueCat's</a> privacy policies. Your subscription status — the plan and its renewal date, never card details — is stored to unlock Pro features across your devices.</p>
+  <h2>Apple Health and connected devices</h2>
+  <p>If you enable Apple Health or another supported integration, the app accesses only the categories you authorize. Imported information may include workouts, body weight, heart rate or recovery data. Apple Health data is not used for advertising. Fitbit access and refresh tokens remain on the device and are not synchronized to our database; non-secret connection settings may be synchronized.</p>
 
-  <h2>Advertising (Google AdSense)</h2>
-  <p>Free-tier users may see banner advertisements served by Google AdSense. Google may use cookies and device identifiers to serve personalised ads. You can review and manage your ad preferences at <a href="https://adssettings.google.com" target="_blank">adssettings.google.com</a>. Ads are subject to <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a>. Pro subscribers do not see ads.</p>
+  <h2>Payments and subscriptions</h2>
+  <p>Web subscription purchases are processed by <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer">Stripe</a>. iOS subscriptions are processed by Apple and managed through <a href="https://www.revenuecat.com/privacy" target="_blank" rel="noopener noreferrer">RevenueCat</a>. We do not receive full payment-card details. We store account identifiers, plan, status and expiration information needed to grant access, reconcile payments and prevent unauthorized entitlement changes.</p>
 
-  <h2>Cookies</h2>
-  <p>The app itself does not use cookies. Google AdSense (for free users) and Stripe may set cookies as described in their respective privacy policies.</p>
+  <h2>Diagnostics and security</h2>
+  <p>We use <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer">Sentry</a> for crash and performance diagnostics when it is enabled in a build. Diagnostic events may include device, operating-system, app-version and technical error information. We configure diagnostics to avoid intentionally sending training-note content, but an unexpected error may include limited surrounding technical context.</p>
+  <p>We also keep limited server logs and payment-webhook records for security, abuse prevention, troubleshooting and reconciliation.</p>
+
+  <h2>Advertising</h2>
+  <p>Free-tier web users may see advertisements served by Google AdSense when advertising is enabled. Google may use cookies or device identifiers under its <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">privacy policy</a>. Pro subscribers do not see the in-app banner advertisement.</p>
+
+  <h2>Retention and deletion</h2>
+  <p>Guest data remains on the device until you reset the app, clear storage or remove the app. Signed-in data remains while your account is active and as reasonably needed for backup, security, billing reconciliation and legal obligations. You can delete your account from Settings. Account deletion removes the authentication account and cloud training records associated with it. Deleting an account does not automatically cancel an Apple or Stripe subscription; cancel billing through the applicable subscription provider.</p>
 
   <h2>Children</h2>
-  <p>The app is not directed at children under 13. We do not knowingly collect information from children.</p>
+  <p>The app is not directed to children under 13, and the current onboarding experience is designed for users age 16 or older. We do not knowingly collect personal information from a child under 13.</p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Use guest mode for device-only storage</li>
+    <li>Choose whether to enable notifications, Apple Health, wearables or advertising preferences</li>
+    <li>Disconnect a coach relationship</li>
+    <li>Export available camp information through supported app features</li>
+    <li>Delete your account and synced data in Settings</li>
+  </ul>
 
   <h2>Changes to this policy</h2>
-  <p>We may update this policy occasionally. The "Last updated" date at the top will reflect any changes. Continued use of the app after changes constitutes acceptance.</p>
+  <p>We may update this policy as the app changes. The date above identifies the latest version. Material changes may also be communicated in the app or store listing.</p>
 
   <h2>Contact</h2>
-  <p>Questions? Email us at <a href="mailto:heck@kingkillers.co">heck@kingkillers.co</a>.</p>
+  <p>Questions or privacy requests can be sent to <a href="mailto:heck@kingkillers.co">heck@kingkillers.co</a>.</p>
 </body>
 </html>
