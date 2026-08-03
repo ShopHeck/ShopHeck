@@ -1,0 +1,1 @@
+Finalize Phase 0-2 only after captured lint, unit, security, and production-build gates pass.
