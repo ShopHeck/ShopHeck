@@ -1,0 +1,123 @@
+name: Apply validated Phase 0-2 hardening
+
+on:
+  push:
+    branches:
+      - agent/phase-0-2-hardening
+    paths:
+      - '.phase0-2/READY'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-validated-phase-0-2
+  cancel-in-progress: true
+
+jobs:
+  apply-validate-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout audited branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-0-2-hardening
+          fetch-depth: 0
+
+      - name: Reconstruct and verify implementation patch
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee "$RUNNER_TEMP/apply.log") 2>&1
+          cat .phase0-2/part-* | base64 --decode | xz -d > "$RUNNER_TEMP/phase0-2.patch"
+          echo "1166012c2fea46571d588cc30828cdb0b3e396b229601a1d5715cb6b3675ae75  $RUNNER_TEMP/phase0-2.patch" | sha256sum -c -
+          git apply --check "$RUNNER_TEMP/phase0-2.patch"
+          git apply "$RUNNER_TEMP/phase0-2.patch"
+          rm -rf .phase0-2
+          rm -f .github/workflows/apply-phase0-2.yml
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Security regression checks
+        run: npm run test:security
+
+      - name: Type-check server functions
+        run: npm run typecheck:functions
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end smoke tests
+        run: npm run test:e2e
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.101.0
+          github-token: ${{ github.token }}
+
+      - name: Start local Supabase
+        run: supabase start -x studio,imgproxy,logflare,vector,supavisor
+
+      - name: Run pgTAP security tests
+        run: supabase test db
+
+      - name: Lint database
+        run: supabase db lint --local --level error --fail-on error
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true
+
+      - name: Publish validated implementation commit
+        if: success()
+        run: |
+          git config user.name "OpenAI Agent"
+          git config user.email "noreply@openai.com"
+          git add -A
+          git commit -m "Implement Phase 0-2 security and reliability hardening"
+          git push origin HEAD:agent/phase-0-2-hardening
+
+      - name: Record failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          git reset --hard HEAD
+          mkdir -p .phase0-2
+          {
+            echo "apply=${{ steps.apply.outcome }}"
+            echo
+            if [ -f "$RUNNER_TEMP/apply.log" ]; then
+              echo "--- apply.log ---"
+              tail -n 200 "$RUNNER_TEMP/apply.log"
+            fi
+            echo
+            echo "A validation step failed. See the GitHub Actions job log for the exact command output."
+          } > .phase0-2/FAILURE.txt
+          git config user.name "OpenAI Agent"
+          git config user.email "noreply@openai.com"
+          git add .phase0-2/FAILURE.txt
+          git commit -m "Record Phase 0-2 validation failure"
+          git push origin HEAD:agent/phase-0-2-hardening
