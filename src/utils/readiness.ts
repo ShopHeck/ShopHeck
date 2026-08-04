@@ -2,7 +2,7 @@ import { addDays, differenceInDays, parseISO, subDays } from 'date-fns';
 import type { AppState, CampFactorWeights, TrainingWeek } from '../types';
 import { DEFAULT_FACTOR_WEIGHTS } from '../types';
 import { formatWeightDelta } from './units';
-import { getCurrentWeekNumber } from './campGenerator';
+import { getWeekNumberForDate } from './campGenerator';
 import { latestComparableTrend } from './conditioningMetrics';
 
 export interface ReadinessBreakdownItem {
@@ -54,7 +54,16 @@ function ratioFromRpe(avg: number, target: RpeTarget): number {
   return 0.35;
 }
 
-export function computeReadiness(state: AppState): ReadinessResult | null {
+/**
+ * Score fight readiness from the camp's logged data.
+ *
+ * `asOf` is the evaluation moment — it defaults to now for the live dashboard,
+ * and callers snapshotting a historical moment (readiness at fight time on a
+ * result logged days later) pass that moment instead. Every recency window is
+ * anchored to it, and entries dated after it are excluded so data logged later
+ * cannot leak into the snapshot.
+ */
+export function computeReadiness(state: AppState, asOf: Date = new Date()): ReadinessResult | null {
   const {
     activeCamp,
     workoutLogs,
@@ -77,7 +86,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
     nutrition: currentUser?.factorWeights?.nutrition ?? DEFAULT_FACTOR_WEIGHTS.nutrition,
   };
 
-  const now = new Date();
+  const now = asOf;
   const campStart = parseISO(activeCamp.startDate);
   // Off-season camps have no fight date — anchor on the scheduled end of the
   // block so every day-count below stays finite.
@@ -89,20 +98,24 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
   const totalCampDays = Math.max(1, differenceInDays(fightDate, campStart));
   const campProgress = Math.min(1, daysIntoCamp / totalCampDays);
 
-  const currentWeekNumber = getCurrentWeekNumber(activeCamp);
+  const currentWeekNumber = getWeekNumberForDate(activeCamp, now);
   const currentWeek = trainingSchedule[currentWeekNumber - 1];
   const phase: ReadinessResult['phase'] = currentWeek?.phase ?? 'Unscheduled';
   const sparringPrescribed = currentWeek
     ? currentWeek.days.some(day => day.sessions.some(session => session.type === 'sparring'))
     : phase !== 'Taper' && phase !== 'Active Recovery';
 
-  const campWorkouts = workoutLogs.filter(log => log.campId === activeCamp.id);
-  const campSparring = sparringLogs.filter(log => log.campId === activeCamp.id);
+  // Entries dated after the evaluation moment are excluded everywhere: for a
+  // historical snapshot they hadn't happened yet, and for the live dashboard a
+  // future-dated entry is dirty data that must not move the score.
+  const onOrBefore = (date: string) => parseISO(date) <= now;
+  const campWorkouts = workoutLogs.filter(log => log.campId === activeCamp.id && onOrBefore(log.date));
+  const campSparring = sparringLogs.filter(log => log.campId === activeCamp.id && onOrBefore(log.date));
   const campWeights = weightEntries
-    .filter(entry => entry.campId === activeCamp.id)
+    .filter(entry => entry.campId === activeCamp.id && onOrBefore(entry.date))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const campTests = conditioningTests
-    .filter(test => test.campId === activeCamp.id)
+    .filter(test => test.campId === activeCamp.id && onOrBefore(test.date))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const recent14 = subDays(now, 14);
@@ -235,7 +248,7 @@ export function computeReadiness(state: AppState): ReadinessResult | null {
 
   // ── 6. Nutrition & Recovery (max = w.nutrition) ──────────────────────────
   const recentNutrition = nutritionLogs.filter(
-    log => log.campId === activeCamp.id && parseISO(log.date) >= recent7,
+    log => log.campId === activeCamp.id && parseISO(log.date) >= recent7 && onOrBefore(log.date),
   );
   let nutritionRatio: number;
   let nutritionDetail: string;

@@ -78,14 +78,14 @@ Two entitlement-integrity issues sit in the same bucket:
 
 ### 1.5 Data-loss and correctness bugs that nuke trust (P0)
 
-Users don't subscribe to apps that lose their data. Four verified cases:
+Users don't subscribe to apps that lose their data. Four verified cases — all four since fixed and verified in code (Aug 2026):
 
-1. **Saving generated macros wipes the day's nutrition log.** `MealLibrary.tsx:260-280` dispatches a full `NutritionLog` payload with `waterOz: 0, mealRatings: {}`; the reducer spreads it over the existing row (`storage.ts:181`), silently destroying the day's water/meals/notes — then shows "✓ Saved". Also stamps a UTC date while every other screen uses local (`MealLibrary.tsx:262`).
-2. **Clearing the Total Rounds field deletes all round-by-round notes.** `FightResultForm.tsx:69-77`: `Number('') === NaN` passes the `n < 1` guard; `prev.slice(0, NaN)` → `[]`.
-3. **Editing an old fight re-parents it onto the current camp.** The form always receives `state.activeCamp` (`App.tsx:252-255`) and `submit()` overwrites `campId` (`FightResultForm.tsx:85,105`), corrupting camp history and every KPI join.
-4. **Back-dated workouts are stamped with today's week number** (`WorkoutLogger.tsx:104,116`), mis-filing them in the planner and analytics.
+1. ~~**Saving generated macros wipes the day's nutrition log.**~~ **Resolved:** `MealLibrary.handleSave` now carries the day's existing water/meals/notes through and stamps a local-calendar date.
+2. ~~**Clearing the Total Rounds field deletes all round-by-round notes.**~~ **Resolved:** `adjustTotalRounds` guards with `Number.isFinite` before slicing.
+3. ~~**Editing an old fight re-parents it onto the current camp.**~~ **Resolved:** `submit()` keeps `existing?.campId`, so edits stay on their original camp.
+4. ~~**Back-dated workouts are stamped with today's week number.**~~ **Resolved:** all three loggers stamp `getWeekNumberForDate(camp, parseISO(date))` — the week the session happened in.
 
-Related trust issues: outcome/method desync saves "KO" on a draw (`FightResultForm.tsx:58-63,166`); readiness is snapshotted at data-entry time, not fight time (`FightResultForm.tsx:82`); weigh-ins accept future dates (`WeightTracker.tsx:412`); ~~duplicate same-day weigh-ins chart as two points (`storage.ts:104-107`)~~ **resolved (Aug 2026):** `addWeightEntry` now corrects the same-day entry in place.
+Related trust issues — all resolved (Aug 2026): ~~outcome/method desync saves "KO" on a draw~~ (`selectOutcome` snaps the method when the outcome invalidates it); ~~readiness is snapshotted at data-entry time, not fight time~~ (`computeReadiness` takes an `asOf` moment; new results snapshot as of the fight date, and entries dated after the evaluation moment are excluded); ~~weigh-ins accept future dates~~ (every log-entry date picker is capped at today via `utils/dates`, and submits reject future dates — weigh-ins, workouts, sparring, conditioning tests, fight dates); ~~duplicate same-day weigh-ins chart as two points~~ (`addWeightEntry` corrects the same-day entry in place).
 
 ### 1.6 Revenue integrity (quick flags)
 

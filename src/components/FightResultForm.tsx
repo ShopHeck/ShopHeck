@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Trophy, XCircle, Minus, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
-import { format } from 'date-fns';
+import { endOfDay, format, isValid, parseISO } from 'date-fns';
+import { todayISO } from '../utils/dates';
 import type { FightCamp, FightMethod, FightOutcome, FightRound, DamageLevel, FightResult } from '../types';
 import { computeReadiness } from '../utils/readiness';
 import { buildFightResult } from '../utils/storage';
@@ -96,7 +97,15 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   function submit() {
     const effectiveRoundCount = roundStopped ?? totalRounds;
     const fightedRounds = rounds.slice(0, effectiveRoundCount);
-    const readiness = computeReadiness(state);
+    // Snapshot readiness as of the fight itself, not the moment the form is
+    // filled in — a result logged days later must not describe today's shape.
+    // The whole fight day counts (endOfDay), and a missing/invalid/future date
+    // falls back to now.
+    const fightMoment = parseISO(fightDate);
+    const asOf = isValid(fightMoment) && fightMoment <= new Date()
+      ? endOfDay(fightMoment)
+      : new Date();
+    const readiness = existing ? null : computeReadiness(state, asOf);
 
     const base: Omit<FightResult, 'id' | 'createdAt'> = {
       // Edits keep the fight on its original camp. The form always receives
@@ -234,7 +243,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           <div>
             <label className="block">
               <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fight Date</span>
-              <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} className="input" />
+              <input type="date" value={fightDate} max={todayISO()} onChange={e => setFightDate(e.target.value)} className="input" />
             </label>
           </div>
         </div>

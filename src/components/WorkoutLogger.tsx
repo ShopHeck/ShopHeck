@@ -7,6 +7,7 @@ import Modal from './shared/Modal';
 import ShareCard from './ShareCard';
 import type { SessionType, WorkoutLog } from '../types';
 import { writeWorkoutToHealth } from '../utils/healthSync';
+import { todayISO, isFutureISODate } from '../utils/dates';
 import type { LogPrefill } from '../App';
 
 const SESSION_TYPES: { value: SessionType; label: string; emoji: string }[] = [
@@ -105,7 +106,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   };
 
   function logWorkout() {
-    if (!wTitle.trim()) return;
+    // Logs are records of completed training — future dates would inflate
+    // weekly volume and streaks with sessions that haven't happened.
+    if (!wTitle.trim() || isFutureISODate(wDate)) return;
     const payload: Omit<WorkoutLog, 'id' | 'createdAt'> = {
       campId: camp.id,
       date: wDate,
@@ -126,6 +129,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   }
 
   function logSparring() {
+    if (isFutureISODate(sDate)) return;
     dispatch({
       type: 'LOG_SPARRING',
       payload: {
@@ -145,7 +149,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   }
 
   function logCondTest() {
-    if (!cValue) return;
+    if (!cValue || isFutureISODate(cDate)) return;
     dispatch({
       type: 'LOG_CONDITIONING',
       payload: {
@@ -328,7 +332,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
             <div>
               <label className="block">
                 <span className="label">Date</span>
-                <input className="input" type="date" value={wDate} onChange={e => setWDate(e.target.value)} />
+                <input className="input" type="date" value={wDate} max={todayISO()} onChange={e => setWDate(e.target.value)} />
               </label>
             </div>
             <div>
@@ -378,7 +382,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
             <div>
               <label className="block">
                 <span className="label">Date</span>
-                <input className="input" type="date" value={sDate} onChange={e => setSDate(e.target.value)} />
+                <input className="input" type="date" value={sDate} max={todayISO()} onChange={e => setSDate(e.target.value)} />
               </label>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -455,7 +459,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
             <div>
               <label className="block">
                 <span className="label">Date</span>
-                <input className="input" type="date" value={cDate} onChange={e => setCDate(e.target.value)} />
+                <input className="input" type="date" value={cDate} max={todayISO()} onChange={e => setCDate(e.target.value)} />
               </label>
             </div>
             <div>
