@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../plugins/RevenueCat';
-import type { SubscriptionState, SubscriptionTier } from '../types';
+import type { SubscriptionState } from '../types';
 
 const SUB_KEY = 'fightcamp_subscription';
 
@@ -29,9 +29,7 @@ export function saveSubscription(s: SubscriptionState): void {
  * Comp ("complimentary") access — founder / internal-test accounts that get the
  * full Coach Pro tier for free, tied to their signed-in account email. The owner
  * account is built in; add more testers via VITE_COMP_PRO_EMAILS (comma-separated)
- * with no code change. Safe even though entitlement checks are client-side: a
- * person must actually authenticate as one of these emails (via Supabase) for it
- * to apply, and it grants nothing to anyone else.
+ * with no code change.
  */
 const COMP_PRO_EMAILS: ReadonlySet<string> = new Set(
   ['michaelheckert@heckholdings.com', ...(import.meta.env.VITE_COMP_PRO_EMAILS ?? '').split(',')]
@@ -78,13 +76,7 @@ export async function checkNativeSubscription(): Promise<{ isPro: boolean; tier:
 
 /**
  * Ties this device's RevenueCat subscriber to the signed-in Supabase account
- * (native iOS only) — the piece that makes App Store purchases attributable
- * server-side, because webhook events then carry the Supabase user id. Pass
- * null on sign-out to detach (a no-op when already anonymous).
- *
- * Returns the identified account's entitlements when signing in (so a
- * subscription bought on another device under this account can be applied),
- * or null on web / sign-out / error — callers leave state unchanged then.
+ * (native iOS only) so webhook events carry the Supabase user id.
  */
 export async function identifyNativeSubscriber(
   userId: string | null,
@@ -100,32 +92,35 @@ export async function identifyNativeSubscriber(
 }
 
 /**
- * Reads Stripe Payment Link return params from the URL, writes a 30-day soft
- * unlock to localStorage, and strips the params from the URL.
- * Returns the new subscription state if a valid return was detected, else null.
+ * Consume Stripe return parameters without granting any local access.
+ * Entitlements are applied only after the signature-verified webhook records a
+ * server row in Supabase. Returns true only for a successful checkout so
+ * AppContext can briefly poll for that row.
+ *
+ * The legacy tier/session shape is accepted as a success signal during rollout,
+ * but remains non-authoritative and grants nothing by itself.
  */
-export function processStripeReturn(): SubscriptionState | null {
+export function processStripeReturn(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
-    const tier = params.get('tier') as SubscriptionTier | null;
-    const session = params.get('stripe_session');
+    const checkout = params.get('checkout');
+    const legacyTier = params.get('tier');
+    const legacySession = params.get('stripe_session');
+    const legacySuccess =
+      (legacyTier === 'fighter_pro' || legacyTier === 'coach_pro') &&
+      Boolean(legacySession);
+    const success = checkout === 'success' || legacySuccess;
+    const hasReturnParams = checkout === 'success' || checkout === 'cancelled' || legacySuccess;
 
-    if (!tier || !session) return null;
-    if (!['fighter_pro', 'coach_pro'].includes(tier)) return null;
+    if (!hasReturnParams) return false;
 
-    // 30-day soft unlock (client-side only — acceptable for MVP)
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const sub: SubscriptionState = { tier, expiresAt, source: 'stripe_payment_link' };
-    saveSubscription(sub);
-
-    // Clean up URL
     const url = new URL(window.location.href);
+    url.searchParams.delete('checkout');
     url.searchParams.delete('tier');
     url.searchParams.delete('stripe_session');
     window.history.replaceState({}, '', url.toString());
-
-    return sub;
+    return success;
   } catch {
-    return null;
+    return false;
   }
 }

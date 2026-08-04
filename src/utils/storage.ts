@@ -4,28 +4,33 @@ import { defaultGamificationState } from './gamification';
 
 const STORAGE_KEY = 'fightcamp_app';
 
-export const defaultState: AppState = {
-  currentUser: null,
-  activeCamp: null,
-  camps: [],
-  trainingSchedule: [],
-  workoutLogs: [],
-  sparringLogs: [],
-  conditioningTests: [],
-  weightEntries: [],
-  fighters: [],
-  coaches: [],
-  completedSessions: {},
-  dayOverrides: {},
-  gamePlans: {},
-  nutritionLogs: [],
-  coachNotes: [],
-  subscription: DEFAULT_SUBSCRIPTION,
-  hrvEntries: [],
-  fightResults: [],
-  gamification: defaultGamificationState(),
-  dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false },
-};
+/** A new object graph for first run, reset and account-boundary changes. */
+export function createDefaultState(): AppState {
+  return {
+    currentUser: null,
+    activeCamp: null,
+    camps: [],
+    trainingSchedule: [],
+    workoutLogs: [],
+    sparringLogs: [],
+    conditioningTests: [],
+    weightEntries: [],
+    fighters: [],
+    coaches: [],
+    completedSessions: {},
+    dayOverrides: {},
+    gamePlans: {},
+    nutritionLogs: [],
+    coachNotes: [],
+    subscription: { ...DEFAULT_SUBSCRIPTION },
+    hrvEntries: [],
+    fightResults: [],
+    gamification: defaultGamificationState(),
+    dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false },
+  };
+}
+
+export const defaultState: AppState = createDefaultState();
 
 export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs>): AppState {
   // Rebuilt key-by-key (not `...state.dashboardPrefs`) so the shape stays the
@@ -58,10 +63,10 @@ export function toggleSessionComplete(state: AppState, key: string): AppState {
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState;
-    return { ...defaultState, ...JSON.parse(raw) };
+    if (!raw) return createDefaultState();
+    return { ...createDefaultState(), ...JSON.parse(raw) };
   } catch {
-    return defaultState;
+    return createDefaultState();
   }
 }
 
@@ -109,6 +114,21 @@ export function addConditioningTest(state: AppState, test: Omit<ConditioningTest
 }
 
 export function addWeightEntry(state: AppState, entry: Omit<WeightEntry, 'id' | 'createdAt'>): AppState {
+  // One canonical weigh-in per camp/date. Re-logging the same day corrects the
+  // existing value instead of creating duplicate chart points and conflicting
+  // cut projections. The original id/createdAt stay stable for cloud sync.
+  const existing = state.weightEntries.find(
+    item => item.campId === entry.campId && item.date === entry.date,
+  );
+  if (existing) {
+    return {
+      ...state,
+      weightEntries: state.weightEntries.map(item =>
+        item.id === existing.id ? { ...existing, ...entry } : item
+      ),
+    };
+  }
+
   const newEntry: WeightEntry = { ...entry, id: generateId(), createdAt: new Date().toISOString() };
   return { ...state, weightEntries: [newEntry, ...state.weightEntries] };
 }

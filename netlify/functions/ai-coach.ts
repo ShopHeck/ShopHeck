@@ -13,23 +13,16 @@
 //           401 signin_required · 403/402-style upgrade_required ·
 //           429 quota_exhausted · 400 bad request · 503 not_configured
 //
-// Entitlement is resolved most-trusted-first:
+// Entitlement is resolved only from server-authoritative sources:
 //   1. COMP_PRO_EMAILS      — server env allowlist (founder/reviewer accounts)
-//   2. stripe_subscriptions — server-authoritative (Stripe webhook writes it)
-//   3. revenuecat_subscriptions — server-authoritative for the App Store (the
-//      RevenueCat webhook writes it; requires the native app's
-//      RevenueCat.logIn(<supabase user id>) so events are attributable)
-//   4. user_state.subscription — the client-synced mirror, client-attested and
-//      therefore forgeable. Kept as a transition fallback for iOS subscribers
-//      still on builds that predate logIn (their webhook events are anonymous,
-//      so source 3 has no row for them). The monthly quota caps worst-case
-//      abuse at well under a dollar. Drop this source once logIn-enabled
-//      builds are the oldest supported version.
+//   2. stripe_subscriptions — Stripe signature-verified webhook writes it
+//   3. revenuecat_subscriptions — RevenueCat authenticated webhook writes it
 //
-// Cost control (why this can't run away):
-//   - AI_MODEL defaults to claude-haiku-4-5 ($1/M in, $5/M out). A worst-case
-//     call (~2K in / 2K out) is about one cent; a Pro user exhausting the
-//     default 40-call monthly quota costs $0.26–0.48 — under 6% of $7.99.
+// Client-synced user_state is intentionally never consulted. A device may cache
+// UI access for offline use, but it cannot authorize spend from the server key.
+//
+// Cost control:
+//   - AI_MODEL defaults to claude-haiku-4-5.
 //   - Quotas are enforced atomically in Postgres (increment_ai_usage), input
 //     length is capped, and max_tokens is fixed per feature.
 //
@@ -124,7 +117,7 @@ export default async (req: Request): Promise<Response> => {
     return json(400, 'bad_request', 'Prompt too large.');
   }
 
-  // ── Entitlement (most-trusted source first) ───────────────────────────────
+  // ── Entitlement (server-authoritative sources only) ───────────────────────
   const compEmails = new Set(
     (process.env.COMP_PRO_EMAILS ?? '')
       .split(',')
@@ -134,11 +127,12 @@ export default async (req: Request): Promise<Response> => {
   let isPro = !!user.email && compEmails.has(user.email.toLowerCase());
 
   if (!isPro) {
-    const { data: sub } = await supabase
+    const { data: sub, error } = await supabase
       .from('stripe_subscriptions')
       .select('tier,status,current_period_end')
       .eq('user_id', user.id)
       .maybeSingle();
+    if (error) console.error('ai-coach Stripe entitlement read:', error.message);
     if (sub) {
       const activeStatus = sub.status === 'active' || sub.status === 'trialing' || sub.status === 'past_due';
       const unexpired = !sub.current_period_end || new Date(sub.current_period_end) > new Date();
@@ -147,30 +141,14 @@ export default async (req: Request): Promise<Response> => {
   }
 
   if (!isPro) {
-    // Server-verified App Store entitlement (the RevenueCat webhook writes it).
-    // Active = unexpired: a canceled sub keeps its future expires_at until it
-    // actually lapses, matching App Store semantics.
-    const { data: rc } = await supabase
+    const { data: rc, error } = await supabase
       .from('revenuecat_subscriptions')
       .select('tier,expires_at')
       .eq('user_id', user.id)
       .maybeSingle();
+    if (error) console.error('ai-coach RevenueCat entitlement read:', error.message);
     if (rc && (rc.tier === 'fighter_pro' || rc.tier === 'coach_pro')) {
       isPro = !rc.expires_at || new Date(rc.expires_at) > new Date();
-    }
-  }
-
-  if (!isPro) {
-    // Client-attested fallback for App Store subscribers on builds that
-    // predate RevenueCat.logIn — see the header note; drop when those age out.
-    const { data: st } = await supabase
-      .from('user_state')
-      .select('subscription')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    const mirror = st?.subscription as { tier?: string; expiresAt?: string | null } | null;
-    if (mirror && (mirror.tier === 'fighter_pro' || mirror.tier === 'coach_pro')) {
-      isPro = !mirror.expiresAt || new Date(mirror.expiresAt) > new Date();
     }
   }
 
@@ -178,7 +156,7 @@ export default async (req: Request): Promise<Response> => {
     return json(403, 'upgrade_required', 'This analysis is part of Fighter Pro.');
   }
 
-  // ── Monthly quota (atomic; see increment_ai_usage in supabase/schema.sql) ─
+  // ── Monthly quota (atomic; see increment_ai_usage in Supabase migration) ──
   const quota = isPro
     ? Number(process.env.AI_QUOTA_PRO ?? 40)
     : Number(process.env.AI_QUOTA_FREE ?? 3);
@@ -191,7 +169,7 @@ export default async (req: Request): Promise<Response> => {
   });
   if (quotaErr) {
     console.error('ai-coach quota error:', quotaErr.message);
-    return json(503, 'not_configured', 'The AI coach is not fully configured (usage table missing).');
+    return json(503, 'not_configured', 'The AI coach is not fully configured (usage table or permissions missing).');
   }
   if (typeof remaining === 'number' && remaining < 0) {
     return isPro
@@ -211,9 +189,9 @@ export default async (req: Request): Promise<Response> => {
   });
 
   // Give the consumed quota unit back — best-effort — when generation fails
-  // before the user received anything (bad key/model, provider outage). Once
-  // text has streamed, the unit stays spent: partial output has value, and
-  // refunding after output would let induced disconnects mint free calls.
+  // before the user received anything. Once text has streamed, the unit stays
+  // spent: partial output has value, and refunding after output would allow
+  // induced disconnects to mint free calls.
   const refundQuota = async (): Promise<void> => {
     const { error } = await supabase.rpc('refund_ai_usage', {
       p_user_id: user.id,
@@ -235,8 +213,6 @@ export default async (req: Request): Promise<Response> => {
         }
         controller.close();
       } catch (err) {
-        // Failure before any output → refund. Mid-stream failure → the client
-        // keeps whatever streamed; erroring the controller aborts its reader.
         console.error('ai-coach stream error:', err);
         if (!sentAny) await refundQuota();
         controller.error(err);

@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
   saveState,
+  createDefaultState,
   createProfile,
   createCamp,
   addWorkoutLog,
@@ -34,15 +35,21 @@ import {
   setDashboardPrefs,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
-import { applyGamificationUpdates, dismissCelebration, defaultGamificationState } from '../utils/gamification';
+import { applyGamificationUpdates, dismissCelebration } from '../utils/gamification';
 import { useAuth } from './AuthContext';
 import { fetchServerSubscription, clearIdMap } from '../lib/sync';
 import { syncStreakRiskAlert, syncWeeklyReport } from '../utils/notifications';
 import { computeWeekReportStats } from '../utils/weeklyReport';
 import { seedDemoState } from '../utils/demoSeed';
+import {
+  clearFightCampLocalData,
+  LOCAL_DATA_CLEARED_EVENT,
+  requestLocalSignOut,
+} from '../utils/localData';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
+  | { type: 'CLEAR_LOCAL_STATE' }
   | { type: 'CREATE_PROFILE'; payload: Omit<FighterProfile, 'id' | 'createdAt'> }
   | { type: 'UPDATE_PROFILE'; payload: FighterProfile }
   | { type: 'CREATE_CAMP'; payload: Omit<FightCamp, 'id' | 'createdAt'> }
@@ -94,6 +101,10 @@ function baseReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_STATE':
       return action.payload;
+
+    case 'CLEAR_LOCAL_STATE':
+      clearIdMap();
+      return createDefaultState();
 
     case 'CREATE_PROFILE': {
       const profile = createProfile(action.payload);
@@ -230,19 +241,13 @@ function baseReducer(state: AppState, action: Action): AppState {
       return setDashboardPrefs(state, action.payload);
 
     case 'RESET':
-      // Drop the local↔cloud id ledger too, so a later sign-in restores the
-      // whole account from the cloud instead of reading the wiped records as
-      // deliberate local deletions.
+      // Reset is intentionally broader than the app-state document: timer,
+      // presets, custom audio, notification prefs, sync ledgers and cached
+      // entitlements all use Fight Camp-prefixed keys and must disappear too.
+      clearFightCampLocalData();
       clearIdMap();
-      return {
-        ...loadState(),
-        currentUser: null,
-        activeCamp: null,
-        camps: [],
-        fighters: [],
-        coaches: [],
-        gamification: defaultGamificationState(),
-      };
+      requestLocalSignOut();
+      return createDefaultState();
 
     default:
       return state;
@@ -279,13 +284,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const { user, loading: authLoading } = useAuth();
+  const [stripeReturnPending, setStripeReturnPending] = useState(false);
 
-  // Process Stripe Payment Link return on web mount
+  // AuthProvider clears persisted Fight Camp data before exposing a different
+  // account. Reset the mounted reducer in the same boundary so the next user's
+  // cloud restore cannot merge with the previous user's in-memory state.
   useEffect(() => {
-    const sub = processStripeReturn();
-    if (sub) dispatch({ type: 'SET_SUBSCRIPTION', payload: sub });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const cleared = () => dispatch({ type: 'CLEAR_LOCAL_STATE' });
+    window.addEventListener(LOCAL_DATA_CLEARED_EVENT, cleared);
+    return () => window.removeEventListener(LOCAL_DATA_CLEARED_EVENT, cleared);
   }, []);
+
+  // Stripe return parameters are only a signal to look for the signed webhook
+  // row. They never grant local access by themselves.
+  useEffect(() => {
+    if (processStripeReturn()) setStripeReturnPending(true);
+  }, []);
+
+  // Webhooks can land a moment after the browser returns. Poll briefly for the
+  // server-authoritative row so a legitimate purchase unlocks without a reload.
+  useEffect(() => {
+    if (!stripeReturnPending || authLoading || !user?.id) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const poll = async () => {
+      const server = await fetchServerSubscription(user.id);
+      if (cancelled) return;
+      if (server && server.tier !== 'free') {
+        dispatch({ type: 'SET_SUBSCRIPTION', payload: server });
+        setStripeReturnPending(false);
+        return;
+      }
+      attempts += 1;
+      if (attempts >= 8) {
+        setStripeReturnPending(false);
+        return;
+      }
+      timer = setTimeout(() => { void poll(); }, 1500);
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [stripeReturnPending, authLoading, user?.id]);
 
   // On native iOS: sync subscription status from RevenueCat on every launch.
   // null = error/offline — leave state unchanged to avoid downgrading offline users.
@@ -320,12 +365,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Native: tie this device's RevenueCat subscriber to the signed-in Supabase
   // account (detach on sign-out). This is what makes App Store purchases
   // attributable server-side — webhook events start carrying the Supabase user
-  // id — closing the "client-attested iOS entitlement" gap documented in
-  // docs/ai-coach.md. Upgrade-only on the client: logIn also returns the
-  // account's entitlements, so a subscription bought on another device under
-  // this account unlocks here immediately; the no-entitlement case is left to
-  // the launch sync above and the server check below, which know how to
-  // downgrade without clobbering comp/Stripe grants.
+  // id. Upgrade-only on the client: logIn also returns the account's
+  // entitlements, so a subscription bought on another device under this account
+  // unlocks here immediately.
   useEffect(() => {
     if (authLoading) return;
     identifyNativeSubscriber(user?.id ?? null).then(result => {
@@ -342,11 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [authLoading, user?.id]);
 
   // Comp ("complimentary") access: founder / internal-test accounts (see
-  // isCompEmail) get lifetime Coach Pro tied to the signed-in email. This follows
-  // the account across devices/reinstalls and outranks the RevenueCat sync above,
-  // so testers reach every Pro feature without a real purchase. Reverts to free
-  // when a comp account signs out. Wait for the initial session restore
-  // (authLoading) before reconciling so we don't transiently revoke on reload.
+  // isCompEmail) get lifetime Coach Pro tied to the signed-in email.
   useEffect(() => {
     if (authLoading) return;
     const { source, tier } = state.subscription;
@@ -359,15 +397,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, user?.email, state.subscription]);
 
-  // Server-verified entitlement. Once a payment webhook records a subscription
-  // in Supabase (stripe_subscriptions from Stripe, revenuecat_subscriptions
-  // from the App Store), that row — not any client-side unlock — is the source
-  // of truth, and it follows the account onto every platform (an iOS
-  // subscriber gets Pro on the web too). After sign-in we fetch and apply it.
-  // We only *downgrade* a subscription that was itself server-verified, so we
-  // never clobber the optimistic soft unlock from a checkout return before the
-  // webhook lands, nor a comp / device-verified RevenueCat grant. Comp
-  // accounts are skipped entirely (comp wins).
+  // Server-verified entitlement. Stripe and RevenueCat webhook tables are the
+  // cross-platform source of truth; no client-synced state can authorize Pro.
   useEffect(() => {
     if (authLoading || !user?.id || isCompEmail(user.email)) return;
     let cancelled = false;
@@ -399,10 +430,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  // Keep the scheduled streak-at-risk push in step with the live streak: every
-  // new workout renews it (new lastWorkoutAt), and a lost or too-short streak
-  // clears it. Platform/preference/permission checks all live in the util, so
-  // this is a no-op on web or with reminders off.
+  // Keep the scheduled streak-at-risk push in step with the live streak.
   useEffect(() => {
     const streak = state.gamification?.streak;
     if (streak) void syncStreakRiskAlert(streak);
@@ -413,10 +441,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     state.gamification?.streak.expired,
   ]);
 
-  // Arm the Sunday-evening Fight Ready recap with this week's real numbers,
-  // re-armed on every log so the body stays current. One-shot by design (see
-  // syncWeeklyReport) — an abandoned install gets one re-engagement ping, not
-  // a stale weekly drumbeat. No-op on web / reminders off / empty week.
+  // Arm the Sunday-evening Fight Ready recap with this week's real numbers.
   useEffect(() => {
     void syncWeeklyReport(computeWeekReportStats(state));
   // eslint-disable-next-line react-hooks/exhaustive-deps

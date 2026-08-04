@@ -11,6 +11,7 @@ import { useApp } from '../context/AppContext';
 import { isPro as hasProAccess } from '../utils/subscription';
 import { writeWorkoutToHealth } from '../utils/healthSync';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
+import { timerSessionMinutes } from '../utils/timerSession';
 import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import GymDisplay from './GymDisplay';
@@ -175,7 +176,7 @@ export default function RoundTimer() {
     const preset = selectedPreset < PRESETS.length
       ? PRESETS[selectedPreset].label
       : customPresets[selectedPreset - PRESETS.length]?.label ?? 'Custom';
-    const totalSec = rounds * (workSec + restSec);
+    const totalMinutes = timerSessionMinutes(rounds, workSec, restSec);
     // Local calendar date (not UTC) so streak/adherence day-bucketing matches
     // WorkoutLogger; toISOString() is UTC and splits an evening session onto the
     // next day for UTC-negative users, inflating uniqueDays.
@@ -189,7 +190,7 @@ export default function RoundTimer() {
         dayLabel: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
         sessionType: 'conditioning',
         title: `Round Timer — ${preset} ${rounds}×${fmt(workSec)}`,
-        duration: Math.round(totalSec / 60),
+        duration: totalMinutes,
         rpe: 7,
         notes: `${rounds} rounds, ${fmt(workSec)} work / ${fmt(restSec)} rest`,
         completed: true,
@@ -199,7 +200,7 @@ export default function RoundTimer() {
     void writeWorkoutToHealth({
       sessionType: 'conditioning',
       date: todayLocal,
-      duration: Math.round(totalSec / 60),
+      duration: totalMinutes,
     });
     try { localStorage.setItem(TIMER_LOGGED_KEY, sessionId); } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
