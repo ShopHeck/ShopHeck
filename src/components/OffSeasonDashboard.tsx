@@ -146,7 +146,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
           </div>
           {streak.best > 0 && (
             <div className="text-right flex-shrink-0">
-              <p className="text-xs text-gray-500">Best</p>
+              <p className="text-xs text-gray-450">Best</p>
               <p className="text-lg font-black text-teal-400">{streak.best}</p>
             </div>
           )}
@@ -157,13 +157,13 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
       <div className="mx-4">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">This Week</p>
-          <span className="text-xs text-gray-500">Week {currentWeekNum}</span>
+          <span className="text-xs text-gray-450">Week {currentWeekNum}</span>
         </div>
         <div className="card">
           <div className="grid grid-cols-3 gap-3 text-center">
             <div>
               <div className="text-lg font-black text-white">
-                {weekDone}<span className="text-gray-500 font-medium text-sm">/{weekPlanned}</span>
+                {weekDone}<span className="text-gray-450 font-medium text-sm">/{weekPlanned}</span>
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">sessions</div>
             </div>
@@ -211,7 +211,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
               {(Object.entries(typeCounts) as [string, number][]).map(([type, count]) => (
                 <div key={type} className="flex items-center gap-1.5">
                   <div className={`w-2 h-2 rounded-full ${SESSION_TYPE_COLORS[type] ?? 'bg-gray-500'}`} />
-                  <span className="text-xs text-gray-400 capitalize">{type} <span className="text-gray-500">×{count}</span></span>
+                  <span className="text-xs text-gray-400 capitalize">{type} <span className="text-gray-450">×{count}</span></span>
                 </div>
               ))}
             </div>
@@ -345,7 +345,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
                       }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-xs text-gray-450 mt-1">
                     <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
                     <span>{formatWeight(targetW, unit)}</span>
                   </div>

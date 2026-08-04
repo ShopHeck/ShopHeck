@@ -1,5 +1,5 @@
-import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users, Settings, Timer } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { tabsFor } from './navTabs';
 import { triggerHaptic, HAPTIC } from '../../hooks/useHaptics';
 
 interface Props {
@@ -11,21 +11,7 @@ export default function BottomNav({ active, onChange }: Props) {
   const { state } = useApp();
   const isCoach = state.currentUser?.role === 'coach';
 
-  const items = isCoach
-    ? [
-        { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { id: 'fighters', icon: Users, label: 'Fighters' },
-        { id: 'progress', icon: BarChart3, label: 'Progress' },
-        { id: 'settings', icon: Settings, label: 'Settings' },
-      ]
-    : [
-        { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-        { id: 'planner', icon: Calendar, label: 'Plan' },
-        { id: 'log', icon: Dumbbell, label: 'Log' },
-        { id: 'timer', icon: Timer, label: 'Timer' },
-        { id: 'weight', icon: Scale, label: 'Weight' },
-        { id: 'settings', icon: Settings, label: 'Settings' },
-      ];
+  const items = tabsFor(isCoach);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-dark-800 border-t border-dark-500 z-50 safe-area-bottom">

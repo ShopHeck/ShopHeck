@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { X, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AppleSignInButton from './shared/AppleSignInButton';
+import { useDialog } from '../hooks/useDialog';
 
 interface Props {
   onClose: () => void;
@@ -10,6 +11,8 @@ interface Props {
 type Mode = 'signin' | 'signup';
 
 export default function AuthScreen({ onClose }: Props) {
+  const titleId = useId();
+  const panelRef = useDialog({ onClose });
   const { signInEmail, signUpEmail, signInApple } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
@@ -51,15 +54,23 @@ export default function AuthScreen({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden outline-none"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div>
             <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Account</p>
-            <h2 className="text-lg font-black text-white leading-tight">
+            <h2 id={titleId} className="text-lg font-black text-white leading-tight">
               {mode === 'signin' ? 'Sign in' : 'Create account'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-1 transition-colors"><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2 transition-colors"><X size={20} /></button>
         </div>
 
         <div className="px-5 pb-5 space-y-3">
@@ -71,7 +82,7 @@ export default function AuthScreen({ onClose }: Props) {
 
           <div className="flex items-center gap-3 py-1">
             <div className="flex-1 h-px bg-dark-500" />
-            <span className="text-xs text-gray-500">or</span>
+            <span className="text-xs text-gray-450">or</span>
             <div className="flex-1 h-px bg-dark-500" />
           </div>
 

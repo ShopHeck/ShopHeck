@@ -55,7 +55,7 @@ export default function GymDisplay({
       <button
         onClick={onExitFullscreen}
         aria-label="Exit gym display"
-        className="absolute right-4 text-gray-500 hover:text-gray-400 transition-colors p-2"
+        className="absolute right-4 text-gray-450 hover:text-gray-400 transition-colors p-2"
         style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
       >
         <Minimize2 size={24} />
@@ -64,13 +64,13 @@ export default function GymDisplay({
       {/* Round label */}
       {phase !== 'idle' && phase !== 'done' && (
         <div className="text-center mb-4">
-          <p className="text-[2vw] font-bold tracking-[0.3em] text-gray-500 uppercase">
+          <p className="text-[2vw] font-bold tracking-[0.3em] text-gray-450 uppercase">
             {phase === 'prep' ? '' : 'ROUND'}
           </p>
           <p className="text-[22vw] font-black text-white leading-none">
             {phase === 'prep' ? '?' : currentRound}
           </p>
-          <p className="text-[2.5vw] text-gray-500 -mt-2">of {rounds}</p>
+          <p className="text-[2.5vw] text-gray-450 -mt-2">of {rounds}</p>
         </div>
       )}
 

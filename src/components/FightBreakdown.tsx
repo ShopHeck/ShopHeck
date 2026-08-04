@@ -166,7 +166,7 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
       )}
       {/* Header */}
       <div className="mx-4 mt-4 flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-white p-1">
+        <button onClick={onBack} aria-label="Go back" className="text-gray-400 hover:text-white p-3 -m-2">
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
@@ -174,14 +174,14 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
           <p className="text-white font-bold truncate">vs {fight.opponent || 'Opponent'} · {format(parseISO(fight.fightDate), 'MMM d, yyyy')}</p>
         </div>
         {fighterRef && (
-          <button onClick={shareResult} className="text-gray-400 hover:text-brand-400 p-1" aria-label="Share result">
+          <button onClick={shareResult} className="text-gray-400 hover:text-brand-400 p-3 -m-2" aria-label="Share result">
             <Share2 size={18} />
           </button>
         )}
-        <button onClick={() => onEdit(fight.id)} className="text-gray-400 hover:text-white p-1" aria-label="Edit">
+        <button onClick={() => onEdit(fight.id)} className="text-gray-400 hover:text-white p-3 -m-2" aria-label="Edit">
           <Pencil size={18} />
         </button>
-        <button onClick={() => setConfirmingDelete(true)} className="text-gray-400 hover:text-red-400 p-1" aria-label="Delete">
+        <button onClick={() => setConfirmingDelete(true)} className="text-gray-400 hover:text-red-400 p-3 -m-2" aria-label="Delete">
           <Trash2 size={18} />
         </button>
       </div>

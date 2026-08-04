@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import ConfirmDialog from './shared/ConfirmDialog';
 import Modal from './shared/Modal';
 import ProGate from './shared/ProGate';
 import CutCoach from './CutCoach';
@@ -265,7 +266,7 @@ export default function WeightTracker() {
               style={{ width: `${cutProgress}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1.5">
+          <div className="flex justify-between text-xs text-gray-450 mt-1.5">
             <span>Start: {formatWeight(startW, unit)}</span>
             <span>Target: {formatWeight(targetW, unit)}</span>
           </div>
@@ -318,7 +319,7 @@ export default function WeightTracker() {
       {chartData.length > 1 && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight Over Camp</p>
-          <div className="card p-2">
+          <div role="img" aria-label={`Line chart of weigh-ins across the camp, from ${formatWeight(startW, unit)} to ${formatWeight(currentW, unit)}, against a target of ${formatWeight(targetW, unit)} and the steady-cut pace line.`} className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -390,7 +391,7 @@ export default function WeightTracker() {
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-white">{formatWeight(entry.weight, unit)}</p>
                     <p className="text-xs text-gray-400">{format(parseISO(entry.date), 'EEEE, MMM d')}</p>
-                    {entry.notes && <p className="text-xs text-gray-500 italic mt-0.5">{entry.notes}</p>}
+                    {entry.notes && <p className="text-xs text-gray-450 italic mt-0.5">{entry.notes}</p>}
                   </div>
                   <div className="text-right">
                     {change !== null && (
@@ -398,12 +399,12 @@ export default function WeightTracker() {
                         {change > 0 ? '+' : ''}{formatWeightDelta(change, unit)}
                       </span>
                     )}
-                    {hasCutTarget && <p className="text-xs text-gray-500 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>}
+                    {hasCutTarget && <p className="text-xs text-gray-450 mt-1">{d(entry.weight - targetW).toFixed(1)} to go</p>}
                   </div>
                   <button
                     onClick={() => setDeleteConfirmId(entry.id)}
                     aria-label={`Delete weigh-in: ${formatWeight(entry.weight, unit)} on ${format(parseISO(entry.date), 'MMM d')}`}
-                    className="text-gray-500 hover:text-red-400 transition-colors -m-2 p-2"
+                    className="text-gray-450 hover:text-red-400 transition-colors -m-2 p-2"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -476,27 +477,15 @@ export default function WeightTracker() {
         </Modal>
       )}
 
-      {/* Delete Weight Entry Confirm */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)} />
-          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
-            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={22} className="text-red-400" />
-            </div>
-            <h3 className="text-base font-bold text-white text-center mb-2">Delete Weight Entry?</h3>
-            <p className="text-sm text-gray-400 text-center mb-6">This weight entry will be permanently deleted.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
-              <button
-                onClick={() => { dispatch({ type: 'DELETE_WEIGHT', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          danger
+          title="Delete Weight Entry?"
+          message="This weight entry will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { dispatch({ type: 'DELETE_WEIGHT', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
       )}
     </div>
   );

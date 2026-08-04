@@ -85,9 +85,9 @@ export default function GamePlanBuilder() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Shield size={40} className="text-gray-500 mx-auto mb-3" />
+        <Shield size={40} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
-        <p className="text-sm text-gray-500 mt-1">Set up a fight camp to build your game plan</p>
+        <p className="text-sm text-gray-450 mt-1">Set up a fight camp to build your game plan</p>
       </div>
     );
   }
@@ -290,7 +290,7 @@ export default function GamePlanBuilder() {
           {saved ? '✓ Game Plan Saved' : 'Save Game Plan'}
         </button>
         {existing && (
-          <p className="text-center text-xs text-gray-500 mt-2">
+          <p className="text-center text-xs text-gray-450 mt-2">
             Last updated {new Date(existing.updatedAt).toLocaleDateString()}
           </p>
         )}

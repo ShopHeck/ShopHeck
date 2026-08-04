@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { X, Share2, Download } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import type { WorkoutLog, FightCamp, FighterProfile } from '../types';
+import { useDialog } from '../hooks/useDialog';
 
 /** A shareable win that isn't a training session — belt, streak, PR, fight. */
 export interface MilestoneShare {
@@ -258,6 +259,8 @@ function buildMilestoneCard(m: MilestoneShare, user: FighterProfile): HTMLCanvas
 }
 
 export default function ShareCard({ content, user, onClose }: Props) {
+  const titleId = useId();
+  const panelRef = useDialog({ onClose });
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -327,10 +330,18 @@ export default function ShareCard({ content, user, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
-      <div className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5" style={{ maxHeight: 'calc(100dvh - 2rem)' }}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col gap-4 p-5 outline-none"
+        style={{ maxHeight: 'calc(100dvh - 2rem)' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between flex-shrink-0">
-          <p className="text-sm font-semibold text-white">
+          <p id={titleId} className="text-sm font-semibold text-white">
             {content.kind === 'session' ? 'Share Session' : 'Share the Win'}
           </p>
           <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white transition-colors w-11 h-11 flex items-center justify-center -m-2">

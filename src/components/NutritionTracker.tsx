@@ -42,7 +42,7 @@ function MacroBar({ label, actual, target, color }: {
         <span className="text-xs font-medium text-gray-400">{label}</span>
         <span className="text-xs text-gray-400">
           <span style={{ color: barColor }} className="font-semibold">{actual}</span>
-          {target > 0 && <span className="text-gray-500"> / {target}{unit}</span>}
+          {target > 0 && <span className="text-gray-450"> / {target}{unit}</span>}
         </span>
       </div>
       <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
@@ -70,9 +70,9 @@ export default function NutritionTracker() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Droplets size={40} className="text-gray-500 mx-auto mb-3" />
+        <Droplets size={40} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
-        <p className="text-sm text-gray-500 mt-1">Set up a fight camp to track nutrition</p>
+        <p className="text-sm text-gray-450 mt-1">Set up a fight camp to track nutrition</p>
       </div>
     );
   }
@@ -237,7 +237,7 @@ export default function NutritionTracker() {
                 className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90 ${
                   i < glasses
                     ? 'bg-blue-700 text-white'
-                    : 'bg-dark-600 text-gray-500 hover:bg-dark-500'
+                    : 'bg-dark-600 text-gray-450 hover:bg-dark-500'
                 }`}
                 title={i < glasses ? 'Remove glass' : 'Add glass'}
               >
@@ -287,6 +287,8 @@ export default function NutritionTracker() {
                     <button
                       key={rating}
                       onClick={() => setMeal(meal, rating)}
+                      aria-pressed={current === rating}
+                      aria-label={`${MEAL_LABELS[meal]}: ${rating}`}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-95 ${
                         current === rating ? MEAL_COLORS[rating] : MEAL_IDLE[rating]
                       }`}
@@ -406,13 +408,13 @@ export default function NutritionTracker() {
                       )}
                     </div>
                   ) : (
-                    <span className="text-gray-500 text-xs">No data</span>
+                    <span className="text-gray-450 text-xs">No data</span>
                   )}
                 </div>
                 {log && (
                   <button
                     onClick={e => { e.stopPropagation(); deleteLog(log.id); }}
-                    className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                    className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2"
                   >
                     <Trash2 size={13} />
                   </button>

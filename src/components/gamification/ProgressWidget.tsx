@@ -37,27 +37,29 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
   if (prefs.progressWidgetCollapsed) {
     return (
       <div className="mx-4">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={onOpenProgress}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onOpenProgress();
-            }
-          }}
-          className="w-full flex items-center gap-3 bg-dark-700/60 border border-dark-500 rounded-xl px-3 py-2 text-left hover:border-dark-300 transition-colors cursor-pointer"
-        >
-          <BeltBadge tier={belt.current} size="sm" />
-          <span className="text-xs text-gray-400 truncate flex-1">{BELT_LABELS[belt.current]}</span>
-          <div className="flex items-center gap-1">
-            <Flame size={12} className={flameColor} />
-            <span className="text-xs font-semibold text-white">{streak.current}</span>
-          </div>
+        {/* Two real buttons side by side. This was a role="button" div with a
+            second button nested inside it, which is invalid: assistive tech
+            announces the outer control and cannot reach the inner one. */}
+        {/* items-stretch + py on the button, not the wrapper, so the primary
+            control fills the whole row: the wrapper used to carry the onClick,
+            and putting the height on it would leave most of the visible row
+            dead to the touch. */}
+        <div className="w-full flex items-stretch gap-3 min-h-[44px] bg-dark-700/60 border border-dark-500 rounded-xl px-3 hover:border-dark-300 transition-colors">
+          <button
+            onClick={onOpenProgress}
+            aria-label={`Open progress. ${BELT_LABELS[belt.current]}, ${streak.current} day streak.`}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left py-2"
+          >
+            <BeltBadge tier={belt.current} size="sm" />
+            <span className="text-xs text-gray-400 truncate flex-1">{BELT_LABELS[belt.current]}</span>
+            <span className="flex items-center gap-1">
+              <Flame size={12} className={flameColor} />
+              <span className="text-xs font-semibold text-white">{streak.current}</span>
+            </span>
+          </button>
           <button
             onClick={toggleCollapsed}
-            className="text-gray-400 hover:text-gray-300 transition-colors"
+            className="self-center p-3 -mr-2 text-gray-400 hover:text-gray-300 transition-colors"
             aria-label="Expand progress widget"
           >
             <ChevronDown size={14} />
@@ -75,14 +77,14 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
           <div className="flex items-center gap-1">
             <button
               onClick={toggleCollapsed}
-              className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
+              className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
               aria-label="Collapse progress widget"
             >
               <ChevronUp size={14} />
             </button>
             <button
               onClick={hide}
-              className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
+              className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
               aria-label="Hide progress widget"
             >
               <X size={14} />

@@ -256,7 +256,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               <div className="mt-2">
                 <HRVSparkline values={rmssdValues} />
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">7-day RMSSD trend</p>
+              <p className="text-xs text-gray-450 mt-0.5">7-day RMSSD trend</p>
             </div>
           </div>
         </div>
@@ -375,7 +375,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
             <p className="text-sm font-semibold text-white">Apple Health Import</p>
             <p className="text-xs text-gray-400">Import workouts, weight + HRV from Health export</p>
           </div>
-          <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-400 transition-colors flex-shrink-0" />
+          <ChevronRight size={16} className="text-gray-450 group-hover:text-gray-400 transition-colors flex-shrink-0" />
         </button>
       </div>
 
@@ -459,7 +459,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               </button>
               <button
                 onClick={() => dispatch({ type: 'SET_FITBIT_CONFIG', payload: null })}
-                className="text-xs text-gray-500 hover:text-gray-400 transition-colors px-3"
+                className="text-xs text-gray-450 hover:text-gray-400 transition-colors px-3"
               >
                 Disconnect
               </button>
@@ -479,7 +479,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
             { name: 'Polar Flow / Vantage', tip: 'View Nightly Recharge HRV in Polar Flow, log manually below.' },
           ].map(d => (
             <div key={d.name} className="flex items-start gap-2.5">
-              <CheckCircle size={13} className="text-gray-500 flex-shrink-0 mt-0.5" />
+              <CheckCircle size={13} className="text-gray-450 flex-shrink-0 mt-0.5" />
               <div>
                 <span className="text-xs font-semibold text-gray-300">{d.name}</span>
                 <span className="text-xs text-gray-400"> — {d.tip}</span>
@@ -502,24 +502,24 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           <div className="card space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 mb-1 block">Date</label>
-                <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="input text-sm w-full" />
+                <label className="text-xs text-gray-400 mb-1 block" htmlFor="hrv-date">Date</label>
+                <input id="hrv-date" type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="input text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs text-gray-400 mb-1 block">RMSSD (ms)</label>
-                <input type="number" value={manualRmssd} onChange={e => setManualRmssd(e.target.value)}
+                <label className="text-xs text-gray-400 mb-1 block" htmlFor="hrv-rmssd">RMSSD (ms)</label>
+                <input id="hrv-rmssd" type="number" value={manualRmssd} onChange={e => setManualRmssd(e.target.value)}
                   placeholder="e.g. 55" className="input text-sm w-full" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 mb-1 block">Resting HR (bpm)</label>
-                <input type="number" value={manualHR} onChange={e => setManualHR(e.target.value)}
+                <label className="text-xs text-gray-400 mb-1 block" htmlFor="hrv-hr">Resting HR (bpm)</label>
+                <input id="hrv-hr" type="number" value={manualHR} onChange={e => setManualHR(e.target.value)}
                   placeholder="optional" className="input text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs text-gray-400 mb-1 block">Source</label>
-                <select value={manualSource} onChange={e => setManualSource(e.target.value as HRVSource)}
+                <label className="text-xs text-gray-400 mb-1 block" htmlFor="hrv-source">Source</label>
+                <select id="hrv-source" value={manualSource} onChange={e => setManualSource(e.target.value as HRVSource)}
                   className="input text-sm w-full">
                   <option value="garmin">Garmin</option>
                   <option value="polar_flow">Polar Flow</option>

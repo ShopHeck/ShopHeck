@@ -92,7 +92,7 @@ function BeltTab({ achievedAt, current }: { achievedAt: Partial<Record<BeltTier,
                 </p>
               </div>
             ) : (
-              <Lock size={16} className="text-gray-500 flex-shrink-0" />
+              <Lock size={16} className="text-gray-450 flex-shrink-0" />
             )}
           </div>
         );
@@ -117,7 +117,7 @@ function AchievementsTab({ unlocked }: { unlocked: { id: string; unlockedAt: str
               {earned ? (
                 <AchievementIcon name={def.icon} size={22} className="text-brand-400" />
               ) : (
-                <Lock size={18} className="text-gray-500" />
+                <Lock size={18} className="text-gray-450" />
               )}
             </div>
             <p className="text-xs font-bold text-white">{def.name}</p>
@@ -149,7 +149,7 @@ function PRsTab({ records }: { records: Partial<Record<PRType, { value: number; 
                 <p className="text-xs text-gray-400">
                   {format(parseISO(r.achievedAt), 'MMM d, yyyy')}
                   {r.previousValue != null && (
-                    <span className="text-gray-500"> · prev {r.previousValue} {PR_UNITS[type]}</span>
+                    <span className="text-gray-450"> · prev {r.previousValue} {PR_UNITS[type]}</span>
                   )}
                 </p>
               ) : (

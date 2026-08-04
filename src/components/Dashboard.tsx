@@ -183,7 +183,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           >
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fight Readiness</p>
-              <ChevronRight size={15} className="text-gray-500 group-hover:text-gray-400 transition-colors" />
+              <ChevronRight size={15} className="text-gray-450 group-hover:text-gray-400 transition-colors" />
             </div>
             <div className="flex items-center gap-4">
               {/* Score ring */}
@@ -231,8 +231,8 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold text-purple-400">{latestCoachNote.coachName}</span>
-                <span className="text-xs text-gray-500">·</span>
-                <span className="text-xs text-gray-500">{format(parseISO(latestCoachNote.createdAt), 'MMM d')}</span>
+                <span className="text-xs text-gray-450">·</span>
+                <span className="text-xs text-gray-450">{format(parseISO(latestCoachNote.createdAt), 'MMM d')}</span>
                 <span className="badge text-xs bg-dark-600 text-gray-400 ml-auto capitalize">{latestCoachNote.category}</span>
               </div>
               <p className="text-sm text-gray-300 leading-relaxed line-clamp-3">{latestCoachNote.content}</p>
@@ -315,13 +315,13 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">This Week</p>
-            <span className="text-xs text-gray-500">Week {currentWeekNum}</span>
+            <span className="text-xs text-gray-450">Week {currentWeekNum}</span>
           </div>
           <div className="card">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <div className="text-lg font-black text-white">
-                  {weekDone}<span className="text-gray-500 font-medium text-sm">/{weekPlanned}</span>
+                  {weekDone}<span className="text-gray-450 font-medium text-sm">/{weekPlanned}</span>
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">sessions</div>
               </div>
@@ -455,7 +455,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
                   );
                 })()}
               </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-gray-450 mt-1">
                 <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
                 <span>{formatWeight(activeCamp.targetWeight, unit)}</span>
               </div>

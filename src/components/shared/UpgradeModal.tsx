@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { X, Check, Zap, Trophy } from 'lucide-react';
+import { useDialog } from '../../hooks/useDialog';
 import { Capacitor } from '@capacitor/core';
 import { RevenueCat } from '../../plugins/RevenueCat';
 import { useApp } from '../../context/AppContext';
@@ -65,6 +66,8 @@ function purchaseErrorMessage(e: unknown): string {
 }
 
 export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
+  const titleId = useId();
+  const panelRef = useDialog({ onClose });
   const { dispatch } = useApp();
   const { user } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
@@ -151,13 +154,18 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
     <>
       <div className="fixed inset-0 bg-black/80 z-50 flex items-end justify-center p-4" onClick={onClose}>
         <div
-          className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden"
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+          className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm overflow-hidden outline-none"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
             <div>
               <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Upgrade</p>
-              <h2 className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
+              <h2 id={titleId} className="text-lg font-black text-white leading-tight">Unlock the full platform</h2>
             </div>
             <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2 transition-colors">
               <X size={20} />
@@ -267,7 +275,7 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
               <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>
             )}
 
-            <p className="text-center text-[11px] leading-relaxed text-gray-500">
+            <p className="text-center text-[11px] leading-relaxed text-gray-450">
               {showNativeFooter
                 ? 'Subscriptions auto-renew until canceled. Your Apple ID is charged at confirmation of purchase, then again within 24 hours before each period ends. Manage or cancel anytime in your device Settings.'
                 : 'Cancel anytime. No commitment required.'}

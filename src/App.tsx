@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
@@ -14,6 +14,8 @@ import Dashboard from './components/Dashboard';
 import OffSeasonDashboard from './components/OffSeasonDashboard';
 import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
+import { tabViewIds } from './components/shared/navTabs';
+import { nextHistory, popHistory, type NavigateOptions } from './utils/navigation';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
 import ProGate from './components/shared/ProGate';
@@ -51,7 +53,7 @@ function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => voi
   return (
     <div className="mx-4 mt-10 card text-center py-12">
       <p className="text-gray-400 font-semibold">No active camp</p>
-      <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+      <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">
         {feature} works inside a fight camp or off-season block.
       </p>
       <button onClick={onSetUp} className="btn-primary mt-4 mx-auto text-sm py-2 px-4">
@@ -102,7 +104,33 @@ function FlashOverlay() {
 
 function AppShell() {
   const { state } = useApp();
-  const [view, setView] = useState<View>('dashboard');
+
+  // Navigation is a stack, not a single value. Fourteen of the twenty views
+  // sit outside the tab bar, and with a bare `view` there was no way back out
+  // of them except the Home tab — the header's showBack/onBack were never
+  // wired to anything. The stack lets back return wherever the user actually
+  // came from rather than to a hardcoded parent.
+  const [history, setHistory] = useState<View[]>(['dashboard']);
+  const view = history[history.length - 1];
+  const canGoBack = history.length > 1;
+
+  const isCoach = state.currentUser?.role === 'coach';
+  const tabViews = tabViewIds(isCoach);
+
+  /**
+   * Tapping a tab resets to that tab's root, the way a native tab bar does;
+   * anything else pushes so it can be backed out of.
+   *
+   * `replace` swaps the current entry instead of stacking on it — for a screen
+   * that has finished its job and should not be returned to, like the fight
+   * result form handing off to the breakdown.
+   */
+  const navigate = useCallback((next: View, opts?: NavigateOptions) => {
+    setHistory(prev => nextHistory(prev, next, tabViews, opts));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabViews.join(',')]);
+
+  const goBack = useCallback(() => setHistory(popHistory), []);
 
   // Screenshot harness (?shot): expose the view setter and the upgrade paywall
   // so the Playwright capture scripts can navigate deterministically (the
@@ -111,7 +139,7 @@ function AppShell() {
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('shot')) {
       const w = window as unknown as { __setView?: (v: string) => void; __openUpgrade?: () => void };
-      w.__setView = (v) => setView(v as View);
+      w.__setView = (v) => setHistory([v as View]);
       w.__openUpgrade = () => setShowUpgrade(true);
     }
   }, []);
@@ -148,7 +176,6 @@ function AppShell() {
     return <Onboarding />;
   }
 
-  const isCoach = state.currentUser.role === 'coach';
   const { title, subtitle } = VIEW_TITLES[view];
 
   const camp = state.activeCamp;
@@ -160,7 +187,7 @@ function AppShell() {
 
   function navigateToLog(prefill?: LogPrefill) {
     if (prefill) setLogPrefill(prefill);
-    setView('log');
+    navigate('log');
   }
 
   // Free tier is capped at a single camp; creating another requires Fighter Pro.
@@ -180,8 +207,10 @@ function AppShell() {
       <Header
         title={view === 'dashboard' ? 'Fight Camp' : title}
         subtitle={view === 'dashboard' ? dashSubtitle : subtitle}
+        showBack={canGoBack}
+        onBack={goBack}
         currentView={view}
-        onNavigate={v => setView(v as View)}
+        onNavigate={v => navigate(v as View)}
       />
 
       <main
@@ -198,15 +227,15 @@ function AppShell() {
               <Dashboard
                 onNavigate={(v, prefill?) => {
                   if (v === 'log' && prefill) navigateToLog(prefill);
-                  else setView(v as View);
+                  else navigate(v as View);
                 }}
-                onShowFightBreakdown={(id) => { setActiveFightId(id); setView('fight-breakdown'); }}
+                onShowFightBreakdown={(id) => { setActiveFightId(id); navigate('fight-breakdown'); }}
               />
             )}
             {view === 'dashboard' && !isCoach && camp && camp.isOffSeason && (
               <OffSeasonDashboard onNavigate={(v, prefill?) => {
                 if (v === 'log' && prefill) navigateToLog(prefill);
-                else setView(v as View);
+                else navigate(v as View);
               }} />
             )}
             {view === 'dashboard' && !isCoach && !camp && (
@@ -243,7 +272,7 @@ function AppShell() {
             )}
             {view === 'dashboard' && isCoach && <CoachDashboard />}
             {view === 'planner' && (
-              camp ? <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} /> : <NoCampState feature="The weekly plan" onSetUp={() => setView('dashboard')} />
+              camp ? <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} /> : <NoCampState feature="The weekly plan" onSetUp={() => navigate('dashboard')} />
             )}
             {view === 'log' && (
               camp ? (
@@ -251,22 +280,22 @@ function AppShell() {
                   prefill={logPrefill}
                   onPrefillConsumed={() => setLogPrefill(null)}
                 />
-              ) : <NoCampState feature="Training logging" onSetUp={() => setView('dashboard')} />
+              ) : <NoCampState feature="Training logging" onSetUp={() => navigate('dashboard')} />
             )}
             {view === 'timer'           && <RoundTimer />}
-            {view === 'weight'          && (camp ? <WeightTracker /> : <NoCampState feature="Weight tracking" onSetUp={() => setView('dashboard')} />)}
+            {view === 'weight'          && (camp ? <WeightTracker /> : <NoCampState feature="Weight tracking" onSetUp={() => navigate('dashboard')} />)}
             {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut." bullets={['One-tap hydration & meal-quality tracking', 'Macro targets auto-suggested from your camp', 'Seven-day history at a glance']}><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
             {view === 'gameplan'        && <ProGate required="fighter_pro" page feature="Game Plan Builder" featureDescription="Build a round-by-round strategy for your opponent and keep it with your camp." bullets={['Opponent scouting & threat notes', 'Early / middle / late round game plans', 'Corner instructions for fight night']}><GamePlanBuilder /></ProGate>}
             {view === 'aiinsights'      && <ProGate required="fighter_pro" page feature="AI Insights" featureDescription="Get a coach-style analysis of your training load, weight cut and readiness — included with Pro, no setup." bullets={['Full camp analysis with 3 action items', 'AI Cut Coach on the weight screen', 'Post-fight breakdowns after every bout']}><AIInsights /></ProGate>}
             {view === 'health'          && <ProGate required="fighter_pro" page feature="Apple Health Sync" featureDescription="Keep your training in one place across apps." bullets={['Import workouts & weight from Apple Health', 'Write logged sessions back to Health', 'Export your full camp data']}><AppleHealthSync /></ProGate>}
             {view === 'readiness'       && <FightReadiness />}
-            {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => setView(v as View)} />}
+            {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => navigate(v as View)} />}
             {view === 'workout-library' && <WorkoutLibrary />}
             {view === 'meal-library'    && <MealLibrary />}
             {view === 'camp-history'    && (
               <CampComparison
-                onOpenFight={(id) => { setActiveFightId(id); setView('fight-breakdown'); }}
+                onOpenFight={(id) => { setActiveFightId(id); navigate('fight-breakdown'); }}
               />
             )}
             {view === 'fight-log' && camp && (
@@ -276,22 +305,24 @@ function AppShell() {
                 onDone={(id) => {
                   setEditingFightId(null);
                   setActiveFightId(id);
-                  setView('fight-breakdown');
+                  // Replace, not push: backing out of the breakdown must not
+                  // land on a freshly mounted (and now blank) result form.
+                  navigate('fight-breakdown', { replace: true });
                 }}
-                onCancel={() => { setEditingFightId(null); setView('dashboard'); }}
+                onCancel={() => { setEditingFightId(null); goBack(); }}
               />
             )}
             {view === 'fight-breakdown' && activeFightId && (
               <FightBreakdown
                 fightId={activeFightId}
-                onBack={() => setView('camp-history')}
-                onEdit={(id) => { setEditingFightId(id); setView('fight-log'); }}
+                onBack={goBack}
+                onEdit={(id) => { setEditingFightId(id); navigate('fight-log'); }}
               />
             )}
             {view === 'fighters'        && <CoachDashboard />}
             {view === 'achievements'    && <ProgressScreen />}
             {view === 'settings'        && (
-              <Settings onNewCamp={() => requestNewCamp(false)} onNavigate={v => setView(v as View)} />
+              <Settings onNewCamp={() => requestNewCamp(false)} onNavigate={v => navigate(v as View)} />
             )}
 
           </div>
@@ -299,7 +330,7 @@ function AppShell() {
       </main>
 
       <AdBanner />
-      <BottomNav active={view} onChange={(v) => setView(v as View)} />
+      <BottomNav active={view} onChange={(v) => navigate(v as View)} />
 
       {/* New Camp modal — reuses Onboarding camp step */}
       {showNewCamp && (
