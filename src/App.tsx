@@ -15,6 +15,7 @@ import OffSeasonDashboard from './components/OffSeasonDashboard';
 import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import { tabViewIds } from './components/shared/navTabs';
+import { nextHistory, popHistory, type NavigateOptions } from './utils/navigation';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
 import ProGate from './components/shared/ProGate';
@@ -119,19 +120,17 @@ function AppShell() {
   /**
    * Tapping a tab resets to that tab's root, the way a native tab bar does;
    * anything else pushes so it can be backed out of.
+   *
+   * `replace` swaps the current entry instead of stacking on it — for a screen
+   * that has finished its job and should not be returned to, like the fight
+   * result form handing off to the breakdown.
    */
-  const navigate = useCallback((next: View) => {
-    setHistory(prev => {
-      if (prev[prev.length - 1] === next) return prev;
-      if (tabViews.includes(next)) return [next];
-      return [...prev, next];
-    });
+  const navigate = useCallback((next: View, opts?: NavigateOptions) => {
+    setHistory(prev => nextHistory(prev, next, tabViews, opts));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabViews.join(',')]);
 
-  const goBack = useCallback(() => {
-    setHistory(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
-  }, []);
+  const goBack = useCallback(() => setHistory(popHistory), []);
 
   // Screenshot harness (?shot): expose the view setter and the upgrade paywall
   // so the Playwright capture scripts can navigate deterministically (the
@@ -306,9 +305,11 @@ function AppShell() {
                 onDone={(id) => {
                   setEditingFightId(null);
                   setActiveFightId(id);
-                  navigate('fight-breakdown');
+                  // Replace, not push: backing out of the breakdown must not
+                  // land on a freshly mounted (and now blank) result form.
+                  navigate('fight-breakdown', { replace: true });
                 }}
-                onCancel={() => { setEditingFightId(null); navigate('dashboard'); }}
+                onCancel={() => { setEditingFightId(null); goBack(); }}
               />
             )}
             {view === 'fight-breakdown' && activeFightId && (

@@ -40,11 +40,15 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
         {/* Two real buttons side by side. This was a role="button" div with a
             second button nested inside it, which is invalid: assistive tech
             announces the outer control and cannot reach the inner one. */}
-        <div className="w-full flex items-center gap-3 min-h-[44px] bg-dark-700/60 border border-dark-500 rounded-xl px-3 py-2 hover:border-dark-300 transition-colors">
+        {/* items-stretch + py on the button, not the wrapper, so the primary
+            control fills the whole row: the wrapper used to carry the onClick,
+            and putting the height on it would leave most of the visible row
+            dead to the touch. */}
+        <div className="w-full flex items-stretch gap-3 min-h-[44px] bg-dark-700/60 border border-dark-500 rounded-xl px-3 hover:border-dark-300 transition-colors">
           <button
             onClick={onOpenProgress}
             aria-label={`Open progress. ${BELT_LABELS[belt.current]}, ${streak.current} day streak.`}
-            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            className="flex items-center gap-3 flex-1 min-w-0 text-left py-2"
           >
             <BeltBadge tier={belt.current} size="sm" />
             <span className="text-xs text-gray-400 truncate flex-1">{BELT_LABELS[belt.current]}</span>
@@ -55,7 +59,7 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
           </button>
           <button
             onClick={toggleCollapsed}
-            className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
+            className="self-center p-3 -mr-2 text-gray-400 hover:text-gray-300 transition-colors"
             aria-label="Expand progress widget"
           >
             <ChevronDown size={14} />

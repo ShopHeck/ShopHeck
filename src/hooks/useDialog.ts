@@ -3,6 +3,18 @@ import { useEffect, useRef } from 'react';
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Currently-open dialogs, outermost first.
+ *
+ * Dialogs stack — the paywall opens the sign-in sheet over itself. Every
+ * instance listens on `document`, and `stopPropagation()` does not stop other
+ * listeners bound to the same target, so without this one Escape would run
+ * every dialog's close callback and collapse the whole stack instead of just
+ * the top sheet. Tab has the same problem: two focus traps would fight over
+ * the same keypress.
+ */
+const openDialogs: symbol[] = [];
+
 interface Options {
   /** Called on Escape and used as the dismiss action. */
   onClose: () => void;
@@ -41,6 +53,10 @@ export function useDialog({ onClose, initialFocus = 'panel', lockScroll = true }
   }, [onClose]);
 
   useEffect(() => {
+    const id = Symbol('dialog');
+    openDialogs.push(id);
+    const isTopmost = () => openDialogs[openDialogs.length - 1] === id;
+
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const prevOverflow = document.body.style.overflow;
     if (lockScroll) document.body.style.overflow = 'hidden';
@@ -53,6 +69,8 @@ export function useDialog({ onClose, initialFocus = 'panel', lockScroll = true }
     else panelRef.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // A dialog underneath this one must ignore the key entirely.
+      if (!isTopmost()) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
         onCloseRef.current();
@@ -78,6 +96,10 @@ export function useDialog({ onClose, initialFocus = 'panel', lockScroll = true }
     document.addEventListener('keydown', onKeyDown, true);
 
     return () => {
+      const i = openDialogs.indexOf(id);
+      if (i !== -1) openDialogs.splice(i, 1);
+      // prevOverflow is whatever an enclosing dialog had already set, so a
+      // nested sheet closing does not unlock scroll behind the one still open.
       if (lockScroll) document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKeyDown, true);
       opener?.focus();
