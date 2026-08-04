@@ -52,8 +52,16 @@ export default function AuthScreen({ onClose }: Props) {
     // On success the OAuth redirect takes over.
   }
 
+  // A backdrop tap used to discard a half-typed form silently. Only the
+  // explicit close button does that now; tapping outside is a no-op once
+  // there's something on the form to lose.
+  const hasDraft = !!(name || email || password);
+
   return (
-    <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center p-4"
+      onClick={hasDraft ? undefined : onClose}
+    >
       <div
         ref={panelRef}
         role="dialog"

@@ -312,6 +312,10 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                   >
                     Apple Health Import
                   </button>
+                  {' '}
+                  {/* Named up front — the link lands on a Pro-gated screen (App.tsx),
+                      so a free user should know before tapping, not after. */}
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400/70">(Pro)</span>
                   {' '}below — MyZone syncs to Apple Health automatically via the MyZone app.
                 </p>
               </div>
