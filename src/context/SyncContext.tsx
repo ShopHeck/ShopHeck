@@ -33,6 +33,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   stateRef.current = state;
   const inFlight = useRef(false);
   /**
+   * An edit arrived while a push was in flight. That push already read
+   * `stateRef.current`, so the newer edit is not in it — and the debounce timer
+   * that would have sent it has been cleared by the run that skipped. Without
+   * this flag the change sits unsynced until some unrelated state change
+   * happens to schedule another push.
+   */
+  const pending = useRef(false);
+  /**
    * Whether a pull has succeeded since sign-in. Deleting cloud rows is gated on
    * this: until we have confirmed what the account actually contains, an empty
    * or partial local store is indistinguishable from "the user deleted it all",
@@ -41,22 +49,37 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const restored = useRef(false);
 
   const syncNow = useCallback(async () => {
-    if (!user || inFlight.current) return;
+    if (!user) return;
+    // Do not drop this request — remember it and let the in-flight run pick it
+    // up when it settles.
+    if (inFlight.current) { pending.current = true; return; }
     inFlight.current = true;
-    setStatus('syncing');
-    setError(null);
-    const res = await pushState(user.id, stateRef.current, { prune: restored.current });
-    inFlight.current = false;
-    if (res.ok) {
-      setStatus('synced');
-      // pushState only writes rows whose content changed. A push that sent
-      // nothing means the cloud was already current, so leave the "Backed up
-      // 14:32" stamp pointing at the last real upload rather than advancing it
-      // every time an unrelated bit of state moves.
-      if (res.pushed > 0) setLastSyncedAt(new Date().toISOString());
-    } else {
-      setStatus('error');
-      setError(res.error ?? 'Sync failed.');
+    try {
+      // Loops rather than recurses so a burst of edits during a slow upload
+      // costs one extra push, not one stack frame per edit.
+      do {
+        pending.current = false;
+        setStatus('syncing');
+        setError(null);
+        const res = await pushState(user.id, stateRef.current, { prune: restored.current });
+        if (!res.ok) {
+          setStatus('error');
+          setError(res.error ?? 'Sync failed.');
+          // Stop here rather than immediately retrying: a failing server would
+          // otherwise be hammered in a tight loop. The debounce on the next
+          // state change is the retry.
+          break;
+        }
+        setStatus('synced');
+        // pushState only writes rows whose content changed. A push that sent
+        // nothing means the cloud was already current, so leave the "Backed up
+        // 14:32" stamp pointing at the last real upload rather than advancing it
+        // every time an unrelated bit of state moves.
+        if (res.pushed > 0) setLastSyncedAt(new Date().toISOString());
+      } while (pending.current);
+    } finally {
+      inFlight.current = false;
+      pending.current = false;
     }
   }, [user]);
 

@@ -3,7 +3,8 @@ import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, Cond
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
-  saveState,
+  scheduleSaveState,
+  flushSaveState,
   createDefaultState,
   createProfile,
   createCamp,
@@ -418,9 +419,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, user?.email]);
 
+  // Coalesced, idle-scheduled persistence — see scheduleSaveState. The flush
+  // handlers below are what make deferring safe: `hidden` covers backgrounding
+  // the native app and switching tabs, `pagehide` covers navigation and tab
+  // close (iOS Safari does not reliably fire `beforeunload`).
   useEffect(() => {
-    saveState(state);
+    scheduleSaveState(state);
   }, [state]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushSaveState();
+    };
+    const onPageHide = () => flushSaveState();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+      // Unmounting the provider ends persistence for this tree; do not leave a
+      // coalesced write stranded in the module.
+      flushSaveState();
+    };
+  }, []);
 
   // Refresh gamification on boot (catches week rollover, streak expiry while app was closed)
   // and re-evaluate hourly so the streak at-risk warning updates while the app stays open.

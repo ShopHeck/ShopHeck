@@ -14,7 +14,11 @@ function buildPrompt(state: ReturnType<typeof useApp>['state']): string {
 
   const campWorkouts = workoutLogs.filter(l => l.campId === activeCamp.id);
   const campSparring = sparringLogs.filter(l => l.campId === activeCamp.id);
-  const campCond = conditioningTests.filter(l => l.campId === activeCamp.id);
+  // Sorted newest-first before the prompt slices it — an unsorted slice fed
+  // an arbitrary six tests into an analysis the subscription paid for.
+  const campCond = conditioningTests
+    .filter(l => l.campId === activeCamp.id)
+    .sort((a, b) => b.date.localeCompare(a.date));
   const campWeights = weightEntries
     .filter(e => e.campId === activeCamp.id)
     .sort((a, b) => b.date.localeCompare(a.date));

@@ -28,7 +28,14 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // woff2 only, never woff: the .woff files exist purely as a fallback for
+        // browsers that predate woff2, and no browser fetches both. Precaching
+        // both would double the font cost for bytes nothing requests.
+        // Without the fonts here, an installed PWA opened offline (a gym with no
+        // signal — the actual use case) falls back to system-ui and swaps on
+        // every cold start; @fontsource sets font-display: swap, so the text is
+        // never invisible, but the reflow is.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Two large images live in public/ for other consumers, not for the
         // app: the 1024px App Store submission icon and the Open Graph card
         // (fetched by crawlers, never by the page). Precaching them cost ~1.8 MB

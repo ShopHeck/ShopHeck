@@ -475,7 +475,9 @@ export default function CoachDashboard() {
           <div className="mx-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Recent Sparring</p>
             <div className="space-y-2">
-              {campSparring.slice(0, 5).map(s => (
+              {/* Sorted before slicing, matching the cloud-fighter branch
+                  above — array position is not recency after a cloud restore. */}
+              {[...campSparring].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map(s => (
                 <div key={s.id} className="card flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partnerName && s.partnerName !== 'Unknown' ? ` vs ${s.partnerName}` : ''}</p>

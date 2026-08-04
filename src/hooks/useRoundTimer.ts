@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useTimerContext } from '../context/TimerContext';
+import { useTimerSignalSetter } from '../context/TimerContext';
 import { useWakeLock } from './useWakeLock';
 import { useHaptics, HAPTIC } from './useHaptics';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
@@ -283,7 +283,7 @@ function playTick(ctx: AudioContext) {
 // ─── Hook ─────────────────────────────────────────────────────────────────
 
 export function useRoundTimer() {
-  const { setSignal } = useTimerContext();
+  const setSignal = useTimerSignalSetter();
 
   // Settings state
   const [selectedPreset, setSelectedPreset] = useState(0);
@@ -435,6 +435,21 @@ export function useRoundTimer() {
   }, [setSignal]);
 
   // ── Persist ──────────────────────────────────────────────────────────────
+  //
+  // Deliberately NOT keyed on `timeLeft`. It changes once a second, and
+  // localStorage.setItem is synchronous — a 12-round boxing session was
+  // performing ~2,900 blocking writes to save a value that is already implied
+  // by `phaseDeadline`, which is an absolute wall-clock instant and only moves
+  // at a phase transition (see nextPhaseDeadline). Restore recomputes the
+  // remaining seconds from it via fastForward, so a mid-phase write adds
+  // nothing.
+  //
+  // `pausedTimeLeft` is the one reader of `timeLeft` here, and it is only used
+  // when `!isRunning` — a state in which `timeLeft` is constant: nothing writes
+  // it while paused except the idle-sync effect below, which is gated on
+  // `phase === 'idle'` and so cannot fire before this effect's own early
+  // return. The transition into pause re-runs this effect via `isRunning` and
+  // reads the settled value from that render.
   useEffect(() => {
     if (phase === 'idle') return;
     saveTimer({
@@ -444,7 +459,8 @@ export function useRoundTimer() {
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
     });
-  }, [phase, currentRound, isRunning, timeLeft, sessionId,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, currentRound, isRunning, sessionId,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
@@ -455,7 +471,6 @@ export function useRoundTimer() {
 
     // Mount-only hydration of an in-progress session from localStorage — an
     // external system, so the setState cascade is the point, not an accident.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedPreset(saved.selectedPreset);
     setRounds(saved.rounds);       roundsRef.current    = saved.rounds;
     setWorkSec(saved.workSec);     workSecRef.current   = saved.workSec;
@@ -797,9 +812,11 @@ export function useRoundTimer() {
     playRoundStartBell, scheduleCtxSuspend, flash, vibrate, speak, unlock,
   ]);
 
-  // Sync idle display when workSec changes
+  // Sync idle display when workSec changes.
+  // No set-state-in-effect suppression needed any more: this write used to feed
+  // the persist effect through its `timeLeft` dependency, and dropping that
+  // dependency (see Persist above) broke the cascade the rule was reporting.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (phase === 'idle') setTimeLeft(workSec);
   }, [workSec, phase]);
 

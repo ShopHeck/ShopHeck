@@ -4,7 +4,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
 import { SyncProvider } from './context/SyncContext';
-import { TimerProvider, useTimerContext } from './context/TimerContext';
+import { TimerProvider, useTimerSignal } from './context/TimerContext';
 import ViewSkeleton from './components/shared/ViewSkeleton';
 import type { SessionType } from './types';
 
@@ -95,7 +95,7 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
 };
 
 function FlashOverlay() {
-  const { signal } = useTimerContext();
+  const signal = useTimerSignal();
   if (!signal.flashColor) return null;
   return (
     <div className={`fixed inset-0 ${signal.flashColor} pointer-events-none z-50 phase-flash`} />

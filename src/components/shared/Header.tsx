@@ -1,6 +1,6 @@
 import { Settings, ChevronLeft, Timer } from 'lucide-react';
 import AppMark from './AppMark';
-import { useTimerContext } from '../../context/TimerContext';
+import { useTimerSignal } from '../../context/TimerContext';
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export default function Header({ title, showBack, onBack, onSettings, subtitle, currentView, onNavigate }: Props) {
-  const { signal } = useTimerContext();
+  const signal = useTimerSignal();
   const showTimerPill = signal.isRunning && currentView !== 'timer' && onNavigate;
 
   return (

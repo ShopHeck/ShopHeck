@@ -507,14 +507,21 @@ export async function pullState(userId: string): Promise<PullResult> {
       // mergeCloud only ever ADDS cloud rows to local state — so a device that
       // already held the row would keep showing it forever. They are split out
       // below and carried through as an explicit delete signal instead.
-      supabase.from('camps').select('*').eq('user_id', userId),
-      supabase.from('workout_logs').select('*').eq('user_id', userId),
-      supabase.from('sparring_logs').select('*').eq('user_id', userId),
-      supabase.from('conditioning_tests').select('*').eq('user_id', userId),
-      supabase.from('weight_entries').select('*').eq('user_id', userId),
-      supabase.from('nutrition_logs').select('*').eq('user_id', userId),
-      supabase.from('hrv_entries').select('*').eq('user_id', userId),
-      supabase.from('fight_results').select('*').eq('user_id', userId),
+      // Ordered newest-first, to match the order local state is built in
+      // (addWorkoutLog and friends prepend — see utils/storage.ts). Postgres
+      // makes no ordering promise without an ORDER BY, and every pushState
+      // upsert rewrites the row, so unordered results genuinely scramble as an
+      // account is used. mergeCloud appends these rows verbatim, and several
+      // screens read recency off array position, so the pull is where the
+      // invariant has to be established.
+      supabase.from('camps').select('*').eq('user_id', userId).order('start_date', { ascending: false }),
+      supabase.from('workout_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('sparring_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('conditioning_tests').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('weight_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('nutrition_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('hrv_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('fight_results').select('*').eq('user_id', userId).order('fight_date', { ascending: false }),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
