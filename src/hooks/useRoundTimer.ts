@@ -429,9 +429,23 @@ export function useRoundTimer() {
   }, []);
 
   // Flash helper — sets flashColor in context for 600ms
+  // The 600ms clear is tracked so unmounting mid-flash cannot write to a
+  // torn-down provider — and so the overlay can never be left stuck on.
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flash = useCallback((color: string) => {
     setSignal(s => ({ ...s, flashColor: color }));
-    setTimeout(() => setSignal(s => ({ ...s, flashColor: null })), 600);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      flashTimerRef.current = null;
+      setSignal(s => ({ ...s, flashColor: null }));
+    }, 600);
+  }, [setSignal]);
+
+  useEffect(() => () => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    // Leaving the timer to fire would repaint a full-screen colour overlay over
+    // whatever replaced the timer view.
+    setSignal(s => (s.flashColor === null ? s : { ...s, flashColor: null }));
   }, [setSignal]);
 
   // ── Persist ──────────────────────────────────────────────────────────────

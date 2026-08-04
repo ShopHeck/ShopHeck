@@ -1,7 +1,7 @@
 import type {
   AppState, FighterProfile, FightCamp, WorkoutLog, WeightEntry, SparringLog, SessionType,
 } from '../types';
-import { defaultState, createProfile, createCamp, generateId } from './storage';
+import { createDefaultState, createProfile, createCamp, generateId } from './storage';
 
 /**
  * Builds a realistic, fully-populated demo AppState for App Store screenshots.
@@ -130,7 +130,7 @@ export function seedDemoState(): AppState {
   ];
 
   return {
-    ...defaultState,
+    ...createDefaultState(),
     currentUser: fighter,
     fighters: [fighter],
     camps: [camp],

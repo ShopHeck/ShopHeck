@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGenerator';
+import { weekAdherence } from '../utils/adherence';
 import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
 import ProgressWidget from './gamification/ProgressWidget';
@@ -60,10 +61,13 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const weekAvgRpe = weekLogs.length > 0
     ? Math.round(weekLogs.reduce((sum, l) => sum + l.rpe, 0) / weekLogs.length * 10) / 10
     : null;
-  const weekPlanned = currentWeek?.days.reduce((sum, d) => sum + (!d.isRestDay ? d.sessions.filter(s => s.type !== 'rest').length : 0), 0) ?? 0;
-  const weekDone = Object.keys(completedSessions).filter(
-    k => k.startsWith(`${activeCamp.id}-${currentWeekNum}-`) && completedSessions[k]
-  ).length;
+  // Shared definition (utils/adherence.ts). This previously excluded
+  // `type === 'rest'` sessions from the denominator while the key builder still
+  // numbered them, so `done` could exceed `planned` on top of the stale-tick
+  // problem described in Dashboard.tsx.
+  const weekScore = weekAdherence(completedSessions, activeCamp.id, currentWeek);
+  const weekPlanned = weekScore.planned;
+  const weekDone = weekScore.done;
 
   // Training variety (current week logs by type)
   const typeCounts = weekLogs.reduce<Record<string, number>>((acc, l) => {

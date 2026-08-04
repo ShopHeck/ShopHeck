@@ -2,6 +2,7 @@ import { BarChart3, TrendingUp, Activity, Zap, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
+import { weeklyAdherenceSeries } from '../utils/adherence';
 import {
   LineChart,
   Line,
@@ -232,20 +233,9 @@ export default function ProgressCharts() {
       rounds: l.rounds,
     }));
 
-  // Weekly adherence from completedSessions
-  const weeklyAdherence = trainingSchedule.map(week => {
-    const keys = week.days.flatMap(d =>
-      d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${week.weekNumber}-${d.dayOfWeek}-${si}`)
-    );
-    const total = keys.length;
-    const done = keys.filter(k => completedSessions[k]).length;
-    return {
-      week: week.weekNumber,
-      adherence: total > 0 ? Math.round((done / total) * 100) : 0,
-      done,
-      total,
-    };
-  });
+  // Weekly adherence — shared definition, see utils/adherence.ts.
+  const weeklyAdherence = weeklyAdherenceSeries(completedSessions, activeCamp.id, trainingSchedule)
+    .map(w => ({ week: w.week, adherence: w.pct ?? 0, done: w.done, total: w.planned }));
   const hasAnyAdherence = weeklyAdherence.some(w => w.total > 0);
 
   // Summary stats

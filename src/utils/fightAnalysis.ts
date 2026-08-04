@@ -115,13 +115,15 @@ export function analyzeFight(result: FightResult, kpis: CampKpis, unit: WeightUn
   if (weightCutImpact === 'severe') {
     campTakeaways.push(`Weight-cut pace of ${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk was too aggressive — start cut earlier next camp.`);
   }
-  if (kpis.adherence < 0.7) {
+  // `null` adherence means there was no schedule to score against, which is not
+  // evidence of missed sessions — stay silent rather than inventing a finding.
+  if (kpis.adherence !== null && kpis.adherence < 0.7) {
     campTakeaways.push(`Only ${Math.round(kpis.adherence * 100)}% schedule adherence — missed sessions show up on fight night.`);
   }
   if (kpis.conditioningDelta !== null && kpis.conditioningDelta < 0 && cardio !== 'held-up') {
     campTakeaways.push('Conditioning tests declined across camp and cardio struggled — rebuild aerobic base earlier.');
   }
-  if (result.outcome === 'win' && kpis.adherence >= 0.8 && cardio === 'held-up') {
+  if (result.outcome === 'win' && kpis.adherence !== null && kpis.adherence >= 0.8 && cardio === 'held-up') {
     campTakeaways.push(`Strong adherence (${Math.round(kpis.adherence * 100)}%) + cardio held — this camp blueprint worked.`);
   }
 

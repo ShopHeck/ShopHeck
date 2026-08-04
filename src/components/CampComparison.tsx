@@ -43,7 +43,7 @@ export default function CampComparison({ onOpenFight }: Props) {
       .map((r, i) => ({
         name: r.fight ? `${r.fight.outcome[0].toUpperCase()} #${i + 1}` : `#${i + 1}`,
         Sparring: r.kpis.sparringRoundsTotal,
-        Adherence: Math.round(r.kpis.adherence * 100),
+        Adherence: r.kpis.adherence === null ? 0 : Math.round(r.kpis.adherence * 100),
         Readiness: r.kpis.readinessAtFight ?? 0,
       }));
   }, [rows]);
@@ -134,7 +134,7 @@ export default function CampComparison({ onOpenFight }: Props) {
                   {camp.opponent || 'No opponent'} · {camp.weightClass}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d, yyyy') : 'No fight date'} · {camp.campWeeks}wk · {kpis.sparringRoundsTotal} spar rds · {Math.round(kpis.adherence * 100)}% adherence
+                  {camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d, yyyy') : 'No fight date'} · {camp.campWeeks}wk · {kpis.sparringRoundsTotal} spar rds{kpis.adherence !== null ? ` · ${Math.round(kpis.adherence * 100)}% adherence` : ''}
                 </p>
                 {fight && (
                   <p className="text-[11px] text-gray-400 mt-0.5">{fight.method}{fight.roundStopped ? ` R${fight.roundStopped}` : ''}</p>

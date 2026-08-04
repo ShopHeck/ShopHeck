@@ -1,11 +1,15 @@
 import { differenceInDays, parseISO } from 'date-fns';
 import type { AppState, FightResult } from '../types';
+import { campAdherence } from './adherence';
 
 export interface CampKpis {
   campId: string;
   totalSessions: number;
-  /** Ratio of logged sessions vs planned sessions in this camp's schedule. */
-  adherence: number;
+  /**
+   * Ticked sessions ÷ sessions this camp's schedule defines, 0..1.
+   * `null` when the camp has no schedule to score against — not the same as 0.
+   */
+  adherence: number | null;
   avgRpe: number;
   totalMinutes: number;
   sparringRoundsTotal: number;
@@ -47,11 +51,18 @@ export function computeCampKpis(state: AppState, campId: string, fight?: FightRe
   const sparringSessionsCount = sparring.length;
   const sparringRoundsTotal = sparring.reduce((s, r) => s + r.rounds, 0);
 
-  // Planned sessions across this camp's schedule (session-level).
-  const plannedSessions = camp
-    ? Math.max(1, Math.round((camp.campWeeks * 4.5))) // ~4.5 sessions/wk mirrors readiness heuristic
-    : Math.max(1, totalSessions);
-  const adherence = Math.min(1, totalSessions / plannedSessions);
+  // Schedule adherence — the shared definition (utils/adherence.ts).
+  //
+  // This used to count LOGGED WORKOUTS against a `campWeeks * 4.5` estimate,
+  // while the field's own docstring and every label rendering it called it
+  // "schedule adherence". It now measures what it claims: sessions ticked
+  // complete against the sessions the camp's schedule actually defines.
+  //
+  // `null` (no schedule to score against) is distinct from 0 — consumers that
+  // generate advice or tune factor weights must not read "unmeasurable" as
+  // "the fighter missed everything".
+  const adherenceScore = campAdherence(state, campId);
+  const adherence = adherenceScore.pct === null ? null : adherenceScore.pct / 100;
 
   // Weight cut: start → weigh-in (the low point). Prefer weigh-in weight, then a
   // logged weigh-in-morning entry, over fight-night weight — that's the

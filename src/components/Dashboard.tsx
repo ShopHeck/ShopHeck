@@ -5,6 +5,7 @@ import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
 import { todayISO } from '../utils/dates';
+import { weekAdherence } from '../utils/adherence';
 import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
@@ -97,10 +98,13 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const weekAvgRpe = weekLogs.length > 0
     ? Math.round(weekLogs.reduce((sum, l) => sum + l.rpe, 0) / weekLogs.length * 10) / 10
     : null;
-  const weekPlanned = currentWeek?.days.reduce((sum, d) => sum + (!d.isRestDay ? d.sessions.length : 0), 0) ?? 0;
-  const weekDone = Object.keys(completedSessions).filter(
-    k => k.startsWith(`${activeCamp.id}-${currentWeekNum}-`) && completedSessions[k]
-  ).length;
+  // Shared definition (utils/adherence.ts). The old prefix scan over
+  // completedSessions also counted ticks whose session no longer exists — the
+  // schedule is regenerated on every camp edit, so a shrunk week left orphaned
+  // `true` entries behind and this could render "7/5 sessions this week".
+  const weekScore = weekAdherence(completedSessions, activeCamp.id, currentWeek);
+  const weekPlanned = weekScore.planned;
+  const weekDone = weekScore.done;
 
   const pro = isPro(state.subscription);
 

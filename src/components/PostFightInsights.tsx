@@ -39,7 +39,7 @@ Style plan followed: ${fight.stylePlanFollowed}/5
 ${roundLines}
 
 ## Camp KPIs (${camp.campWeeks}-week camp)
-- Total sessions: ${kpis.totalSessions} · adherence ${Math.round(kpis.adherence * 100)}%
+- Total sessions: ${kpis.totalSessions}${kpis.adherence !== null ? ` · adherence ${Math.round(kpis.adherence * 100)}%` : ''}
 - Avg RPE: ${kpis.avgRpe.toFixed(1)}
 - Sparring: ${kpis.sparringRoundsTotal} rounds across ${kpis.sparringSessionsCount} sessions
 - Weight cut: ${formatWeightDelta(kpis.weightCutLbs, unit)} (${formatWeightDelta(kpis.weightCutPaceLbsPerWeek, unit)}/wk)

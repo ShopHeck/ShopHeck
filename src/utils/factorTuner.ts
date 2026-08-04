@@ -62,10 +62,12 @@ export function proposeFactorWeights(
     rationale.push('Struggled under pressure → sparring +2 (prioritise live rounds & varied partners)');
   }
 
-  if (kpis.adherence < 0.7) {
+  // Only tune on a measured signal. `null` means the camp had no schedule to
+  // score against, and moving a weight on that would be tuning on noise.
+  if (kpis.adherence !== null && kpis.adherence < 0.7) {
     nudges.trainingVolume += 2;
     rationale.push(`Schedule adherence ${Math.round(kpis.adherence * 100)}% → trainingVolume weight raised`);
-  } else if (kpis.adherence >= 0.9 && fight.outcome === 'win') {
+  } else if (kpis.adherence !== null && kpis.adherence >= 0.9 && fight.outcome === 'win') {
     nudges.trainingVolume -= 1;
     rationale.push('High adherence already — redistribute weight toward weaker factors');
   }
