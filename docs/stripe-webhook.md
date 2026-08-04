@@ -6,9 +6,10 @@ this is the web path only.)
 
 ## How it works
 
-1. **Checkout is tied to the account.** When a signed-in user taps *Start Free
-   Trial*, `UpgradeModal` appends `client_reference_id=<supabase user id>` (and
-   `prefilled_email`) to the Stripe Payment Link.
+1. **Checkout is tied to the account.** Web checkout requires sign-in:
+   `UpgradeModal` appends `client_reference_id=<supabase user id>` (and
+   `prefilled_email`) to the Stripe Payment Link, and shows the auth screen
+   first when the user isn't signed in.
 2. **Stripe → webhook.** On `checkout.session.completed` /
    `customer.subscription.updated` / `customer.subscription.deleted`, Stripe
    calls [`netlify/functions/stripe-webhook.ts`](../netlify/functions/stripe-webhook.ts).
@@ -17,10 +18,18 @@ this is the web path only.)
 3. **Client reads the truth.** `fetchServerSubscription()` (in
    [`src/lib/sync.ts`](../src/lib/sync.ts)) reads the user's own row (RLS lets a
    user read only their row, and nothing client-side can write it). `AppContext`
-   applies it after sign-in, overriding the optimistic client-side soft unlock.
+   applies it after sign-in. The checkout return URL grants nothing by itself —
+   `processStripeReturn()` only signals `AppContext` to poll briefly for the
+   webhook-written row so the purchase unlocks without a reload.
 
 Source of truth precedence on web: **comp** (founder/test emails) → **server
-Stripe entitlement** → optimistic soft unlock from the checkout return.
+Stripe entitlement**. There is no client-side unlock path.
+
+### Payment Link success URL
+Configure each Payment Link's confirmation redirect back to the app with
+`?checkout=success` (the legacy `?tier=<tier>&stripe_session={CHECKOUT_SESSION_ID}`
+form is still accepted as a success signal during rollout, but is
+non-authoritative either way).
 
 ## One-time setup
 
@@ -56,9 +65,11 @@ prefix with `VITE_`):
 Redeploy after setting them.
 
 ## Tier mapping
-The webhook maps the purchased product to a tier by **name**: a product whose
-name contains "coach" → `coach_pro`, otherwise `fighter_pro`. Keep the Stripe
-products named **Fighter Pro** / **Coach Pro**.
+The webhook maps the purchased product to a tier by **exact name** (case- and
+whitespace-insensitive): "Fighter Pro" → `fighter_pro`, "Coach Pro" →
+`coach_pro`. Any other product name grants **nothing** (fail closed) and is
+logged with the event id. Keep the Stripe products named exactly
+**Fighter Pro** / **Coach Pro**, or update `tierFor` when renaming.
 
 ## Testing
 - Stripe CLI: `stripe listen --forward-to https://fightcamp.netlify.app/.netlify/functions/stripe-webhook`
@@ -67,9 +78,10 @@ products named **Fighter Pro** / **Coach Pro**.
   appears in `stripe_subscriptions` and the app shows Pro after a reload.
 
 ## Notes / limitations
-- **Guest checkout isn't linked.** Without a signed-in user there's no
-  `client_reference_id`, so the webhook can't attribute the purchase. The user
-  still gets the client-side soft unlock; consider gating the upgrade flow behind
-  sign-in for a fully durable entitlement.
+- **Guest checkout is blocked in the app.** `UpgradeModal` requires sign-in
+  before opening a Payment Link, so every checkout carries a
+  `client_reference_id`. A checkout completed without one (e.g. a link opened
+  outside the app) cannot be attributed and is logged by the webhook.
 - `user_state.subscription` remains a non-authoritative client mirror and is
-  intentionally never pulled back down (see `mergeCloud`).
+  intentionally never pulled back down (see `mergeCloud`). Server code never
+  consults it for authorization.

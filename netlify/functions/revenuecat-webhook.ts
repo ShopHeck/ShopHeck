@@ -78,15 +78,46 @@ export default async (req: Request): Promise<Response> => {
 
   // TRANSFER is the only event RevenueCat guarantees for moving an entitlement
   // between subscriber identities. Move the latest mirrored source grant to the
-  // destination, then remove every source row so the former account cannot keep
-  // server-side access. Redelivery is safe: once sources are gone the already-
-  // moved destination row is left intact.
+  // destination, then remove the source rows this event is allowed to touch so
+  // the former account cannot keep server-side access. Redelivery is safe: once
+  // sources are gone the already-moved destination row is left intact.
   if (event.type === 'TRANSFER') {
     const fromIds = (event.transferred_from ?? []).filter(id => UUID_RE.test(id));
     const toId = (event.transferred_to ?? []).find(id => UUID_RE.test(id));
-    if (!toId) return ok('transfer has no Supabase destination id');
+
+    // Mirror record_revenuecat_event's environment precedence: only an
+    // explicitly PRODUCTION transfer may touch a PRODUCTION row, so a
+    // TestFlight/sandbox transfer can never move or revoke a real purchase.
+    const productionEvent = event.environment === 'PRODUCTION';
+    const NON_PRODUCTION_ROWS = 'environment.neq.PRODUCTION,environment.is.null';
+    const eventAtIso = event.event_timestamp_ms
+      ? new Date(event.event_timestamp_ms).toISOString()
+      : null;
+
+    // The subscription now belongs to the destination subscriber, so the
+    // source accounts lose their mirrored grant — guarded so a sandbox
+    // transfer never deletes a production row, and a late-redelivered
+    // transfer never deletes state written by a newer event.
+    const revokeSourceGrants = async (): Promise<void> => {
+      if (fromIds.length === 0) return;
+      let query = supabase
+        .from('revenuecat_subscriptions')
+        .delete()
+        .in('user_id', fromIds);
+      if (!productionEvent) query = query.or(NON_PRODUCTION_ROWS);
+      if (eventAtIso) query = query.or(`last_event_at.is.null,last_event_at.lte.${eventAtIso}`);
+      const { error } = await query;
+      if (error) throw new Error(`transfer source revoke failed: ${error.message}`);
+    };
 
     try {
+      // Even when the destination is anonymous and there is no account to move
+      // the grant onto, the sources still lose theirs.
+      if (!toId) {
+        await revokeSourceGrants();
+        return ok('transfer destination is not a Supabase account; source grants revoked');
+      }
+
       let source: {
         tier: string;
         product_id: string | null;
@@ -96,10 +127,14 @@ export default async (req: Request): Promise<Response> => {
       } | null = null;
 
       if (fromIds.length > 0) {
-        const { data, error } = await supabase
+        // Only rows this event may revoke are candidates to move, so the
+        // copied grant and the revoked grants stay the same set.
+        let query = supabase
           .from('revenuecat_subscriptions')
           .select('tier,product_id,environment,expires_at,last_event_at')
-          .in('user_id', fromIds)
+          .in('user_id', fromIds);
+        if (!productionEvent) query = query.or(NON_PRODUCTION_ROWS);
+        const { data, error } = await query
           .order('last_event_at', { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
@@ -123,13 +158,7 @@ export default async (req: Request): Promise<Response> => {
         if (error) throw new Error(`transfer destination write failed: ${error.message}`);
       }
 
-      if (fromIds.length > 0) {
-        const { error } = await supabase
-          .from('revenuecat_subscriptions')
-          .delete()
-          .in('user_id', fromIds);
-        if (error) throw new Error(`transfer source revoke failed: ${error.message}`);
-      }
+      await revokeSourceGrants();
 
       return ok(source ? 'entitlement transferred' : 'source grant absent; destination left unchanged');
     } catch (err) {

@@ -453,6 +453,9 @@ export function useRoundTimer() {
     const saved = loadTimer();
     if (!saved || saved.phase === 'idle') return;
 
+    // Mount-only hydration of an in-progress session from localStorage — an
+    // external system, so the setState cascade is the point, not an accident.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedPreset(saved.selectedPreset);
     setRounds(saved.rounds);       roundsRef.current    = saved.rounds;
     setWorkSec(saved.workSec);     workSecRef.current   = saved.workSec;
@@ -494,7 +497,6 @@ export function useRoundTimer() {
       setTimeLeft(saved.pausedTimeLeft); timeLeftRef.current = saved.pausedTimeLeft;
       deadlineRef.current = nextPhaseDeadline(0, saved.pausedTimeLeft);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -797,6 +799,7 @@ export function useRoundTimer() {
 
   // Sync idle display when workSec changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (phase === 'idle') setTimeLeft(workSec);
   }, [workSec, phase]);
 

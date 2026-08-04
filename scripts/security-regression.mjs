@@ -14,6 +14,7 @@ function forbidText(source, forbidden, label) {
 const [
   aiCoach,
   stripeWebhook,
+  revenuecatWebhook,
   subscription,
   upgradeModal,
   appContext,
@@ -24,6 +25,7 @@ const [
 ] = await Promise.all([
   read('netlify/functions/ai-coach.ts'),
   read('netlify/functions/stripe-webhook.ts'),
+  read('netlify/functions/revenuecat-webhook.ts'),
   read('src/utils/subscription.ts'),
   read('src/components/shared/UpgradeModal.tsx'),
   read('src/context/AppContext.tsx'),
@@ -45,6 +47,15 @@ requireText(upgradeModal, "if (!user?.id || !user.email)", 'Web checkout authent
 requireText(upgradeModal, "url.searchParams.set('client_reference_id', user.id)", 'Web checkout attribution');
 requireText(upgradeModal, "url.searchParams.set('prefilled_email', user.email)", 'Web checkout attribution');
 forbidText(upgradeModal, '/.netlify/functions/create-checkout', 'Existing web checkout');
+
+// A TRANSFER must always revoke the source accounts' mirrored grants — even
+// when the destination subscriber is anonymous and nothing can be moved.
+requireText(revenuecatWebhook, 'source grants revoked', 'RevenueCat transfer revocation');
+forbidText(revenuecatWebhook, "if (!toId) return ok('transfer has no Supabase destination id')", 'RevenueCat transfer revocation');
+// …but a sandbox transfer must never see or delete a PRODUCTION row, matching
+// record_revenuecat_event's environment precedence.
+requireText(revenuecatWebhook, "event.environment === 'PRODUCTION'", 'RevenueCat transfer sandbox guard');
+requireText(revenuecatWebhook, 'environment.neq.PRODUCTION,environment.is.null', 'RevenueCat transfer sandbox guard');
 
 requireText(stripeWebhook, "normalized === 'coach pro'", 'Stripe fail-closed mapping');
 requireText(stripeWebhook, "normalized === 'fighter pro'", 'Stripe fail-closed mapping');
