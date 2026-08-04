@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import * as LucideIcons from 'lucide-react';
+import { Share2, X } from 'lucide-react';
+import { AchievementIcon } from './achievementIcons';
 import { useApp } from '../../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../../hooks/useHaptics';
 import ShareCard, { type MilestoneShare } from '../ShareCard';
@@ -64,18 +65,13 @@ export default function CelebrationToast() {
 
   if (!event && !shareMilestone) return null;
 
-  const IconComponent = event
-    ? (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[event.icon] ||
-      LucideIcons.Award
-    : LucideIcons.Award;
-
   return (
     <>
       {event && !shareMilestone && (
         <div className="fixed inset-x-0 top-4 z-[70] flex justify-center pointer-events-none px-4">
           <div className="pointer-events-auto max-w-sm w-full bg-gradient-to-br from-brand-700 to-purple-800 border border-brand-500 rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3 celebration-slide">
             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <IconComponent size={20} className="text-white" />
+              <AchievementIcon name={event.icon} size={20} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{event.title}</p>
@@ -87,7 +83,7 @@ export default function CelebrationToast() {
                 className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 transition-colors flex-shrink-0"
                 aria-label={`Share: ${event.title}`}
               >
-                <LucideIcons.Share2 size={13} /> Share
+                <Share2 size={13} /> Share
               </button>
             )}
             <button
@@ -95,7 +91,7 @@ export default function CelebrationToast() {
               className="text-white/70 hover:text-white transition-colors flex-shrink-0 w-11 h-11 flex items-center justify-center -m-2"
               aria-label="Dismiss"
             >
-              <LucideIcons.X size={16} />
+              <X size={16} />
             </button>
           </div>
         </div>
