@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useId } from 'react';
 import { ChevronLeft, ChevronRight, Trophy, XCircle, Minus, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
@@ -182,6 +182,7 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
                 <button
                   key={opt.v}
                   onClick={() => selectOutcome(opt.v)}
+                  aria-pressed={outcome === opt.v}
                   className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-xs font-bold ${
                     outcome === opt.v ? opt.color : 'bg-dark-700 border-dark-500 text-gray-400'
                   }`}
@@ -275,8 +276,9 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">What worked</label>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1" htmlFor={`round-${idx}-worked`}>What worked</label>
                 <input
+                  id={`round-${idx}-worked`}
                   type="text"
                   value={r.workedWell}
                   onChange={e => setRoundField(idx, 'workedWell', e.target.value)}
@@ -285,8 +287,9 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">What didn't</label>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1" htmlFor={`round-${idx}-didnt`}>What didn't</label>
                 <input
+                  id={`round-${idx}-didnt`}
                   type="text"
                   value={r.didntWork}
                   onChange={e => setRoundField(idx, 'didntWork', e.target.value)}
@@ -431,10 +434,11 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
 }
 
 function DamageSelect({ label, value, onChange }: { label: string; value: DamageLevel; onChange: (v: DamageLevel) => void }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value as DamageLevel)} className="input text-sm">
+      <label className="block text-[10px] uppercase tracking-wider text-gray-400 mb-1" htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={e => onChange(e.target.value as DamageLevel)} className="input text-sm">
         {DAMAGE_LEVELS.map(d => <option key={d} value={d}>{d}</option>)}
       </select>
     </div>

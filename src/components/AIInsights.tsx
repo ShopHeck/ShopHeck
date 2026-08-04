@@ -185,7 +185,7 @@ export default function AIInsights() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Brain size={40} className="text-gray-500 mx-auto mb-3" />
+        <Brain size={40} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
       </div>
     );

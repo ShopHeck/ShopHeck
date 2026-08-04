@@ -95,7 +95,7 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
                     <ul className="space-y-0.5">
                       {meal.ingredients.map((ing, j) => (
                         <li key={j} className="text-xs text-gray-300 flex items-start gap-1.5">
-                          <span className="text-gray-500 mt-0.5">·</span>{ing}
+                          <span className="text-gray-450 mt-0.5">·</span>{ing}
                         </li>
                       ))}
                     </ul>
@@ -302,9 +302,10 @@ function MacroGenerator() {
           { label: 'Fat',        value: fat,        set: setFat,      unit: 'g',    color: 'text-purple-400' },
         ].map(row => (
           <div key={row.label} className="flex items-center justify-between gap-3">
-            <label className="text-sm font-medium text-white w-20">{row.label}</label>
+            <label className="text-sm font-medium text-white w-20" htmlFor={`macro-${row.label}`}>{row.label}</label>
             <div className="flex items-center gap-2 flex-1">
               <input
+                id={`macro-${row.label}`}
                 type="number"
                 inputMode="numeric"
                 className="input text-sm text-right flex-1"

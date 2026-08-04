@@ -110,7 +110,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
               )}
             </p>
             {isOffSeason && selectedCycle !== null && selectedCyclePhase !== null && (
-              <p className="text-[11px] text-gray-500 mt-0.5">
+              <p className="text-[11px] text-gray-450 mt-0.5">
                 Cycle {selectedCycle} · Phase {selectedCyclePhase} of 4
               </p>
             )}
@@ -216,7 +216,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                 </span>
                 <span className={`text-[10px] leading-none ${
                   isSelected ? (isOffSeason ? 'text-teal-500' : 'text-brand-500') :
-                  isToday ? (isOffSeason ? 'text-teal-600' : 'text-brand-600') : 'text-gray-500'
+                  isToday ? (isOffSeason ? 'text-teal-600' : 'text-brand-600') : 'text-gray-450'
                 }`}>
                   {format(dayDate, 'd')}
                 </span>
@@ -288,7 +288,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                       >
                         {isDone
                           ? <CheckCircle2 size={22} className="text-green-400" />
-                          : <Circle size={22} className="text-gray-500 hover:text-gray-400 transition-colors" />
+                          : <Circle size={22} className="text-gray-450 hover:text-gray-400 transition-colors" />
                         }
                       </button>
 
@@ -360,7 +360,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                     {DAY_LABELS[day.dayOfWeek]}
                   </span>
                   {day.isRestDay ? (
-                    <span className="text-xs text-gray-500 italic">Rest Day</span>
+                    <span className="text-xs text-gray-450 italic">Rest Day</span>
                   ) : (
                     <div className="flex gap-1.5 flex-wrap flex-1">
                       {day.sessions.map((s, i) => {
@@ -375,7 +375,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                     </div>
                   )}
                   {daySessions.length > 0 && (
-                    <span className={`text-xs font-medium flex-shrink-0 ${doneCount === daySessions.length ? 'text-green-400' : 'text-gray-500'}`}>
+                    <span className={`text-xs font-medium flex-shrink-0 ${doneCount === daySessions.length ? 'text-green-400' : 'text-gray-450'}`}>
                       {doneCount}/{daySessions.length}
                     </span>
                   )}

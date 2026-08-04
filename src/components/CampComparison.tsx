@@ -51,7 +51,7 @@ export default function CampComparison({ onOpenFight }: Props) {
   if (rows.length === 0) {
     return (
       <div className="mx-4 mt-10 text-center">
-        <History size={40} className="text-gray-500 mx-auto mb-3" />
+        <History size={40} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No camps yet</p>
         <p className="text-xs text-gray-400 mt-1">Your past camps will appear here for comparison.</p>
       </div>
@@ -88,6 +88,7 @@ export default function CampComparison({ onOpenFight }: Props) {
       {chartData.length >= 2 && (
         <div className="mx-4 mt-4 card">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">KPIs by Fight</p>
+          <div role="img" aria-label="Grouped bar chart comparing key performance indicators across past fights.">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
@@ -103,6 +104,7 @@ export default function CampComparison({ onOpenFight }: Props) {
               <Bar dataKey="Readiness" fill="#a855f7" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
           <p className="text-[11px] text-gray-400 mt-2">Labels on x-axis use the outcome letter (W/L/D) for quick scan.</p>
         </div>
       )}

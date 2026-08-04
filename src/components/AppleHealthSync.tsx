@@ -230,7 +230,7 @@ export default function AppleHealthSync() {
   if (!activeCamp) {
     return (
       <div className="mx-4 mt-4 card text-center py-12">
-        <Heart size={40} className="text-gray-500 mx-auto mb-3" />
+        <Heart size={40} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-semibold">No active fight camp</p>
       </div>
     );
@@ -288,7 +288,7 @@ export default function AppleHealthSync() {
                   <li>Unzip the file and find <strong className="text-white">export.xml</strong></li>
                   <li>Upload that file below</li>
                 </ol>
-                <p className="text-xs text-gray-500 pt-1">
+                <p className="text-xs text-gray-450 pt-1">
                   Only workouts and weight data within your current camp dates will be imported.
                 </p>
               </div>
@@ -368,7 +368,7 @@ export default function AppleHealthSync() {
                         {preview.weights.slice(0, 3).map((w, i) => (
                           <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {formatWeight(w.weight, unit)}</p>
                         ))}
-                        {preview.weights.length > 3 && <p className="text-xs text-gray-500">… and {preview.weights.length - 3} more</p>}
+                        {preview.weights.length > 3 && <p className="text-xs text-gray-450">… and {preview.weights.length - 3} more</p>}
                       </div>
                     )}
                     {preview.workouts.slice(0, 3).length > 0 && (
@@ -377,10 +377,10 @@ export default function AppleHealthSync() {
                         {preview.workouts.slice(0, 3).map((w, i) => (
                           <p key={i} className="text-xs text-gray-300">• {format(parseISO(w.date), 'MMM d')}: {w.title} ({w.duration}min)</p>
                         ))}
-                        {preview.workouts.length > 3 && <p className="text-xs text-gray-500">… and {preview.workouts.length - 3} more</p>}
+                        {preview.workouts.length > 3 && <p className="text-xs text-gray-450">… and {preview.workouts.length - 3} more</p>}
                       </div>
                     )}
-                    <p className="text-xs text-gray-500">Workouts imported with default RPE 7 — adjust in Training Log.</p>
+                    <p className="text-xs text-gray-450">Workouts imported with default RPE 7 — adjust in Training Log.</p>
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={doImport}

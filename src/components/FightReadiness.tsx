@@ -179,7 +179,7 @@ export default function FightReadiness() {
     return (
       <div className="mx-4 mt-10 card text-center py-12">
         <p className="text-gray-400 font-semibold">Readiness needs a fight to aim at</p>
-        <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+        <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">
           The readiness score weighs your training, cut and recovery against a fight date.
           Start a fight camp to see it — off-season blocks don't have a countdown to score against.
         </p>
@@ -207,10 +207,17 @@ export default function FightReadiness() {
           </div>
         </div>
 
-        <GaugeArc score={displayScore} color={statusColor} />
+        {/* The arc itself is decorative (aria-hidden) and its score lives in SVG
+            <text>, which assistive tech does not reach — the wrapper carries the
+            accessible name so the number is actually readable. */}
+        <div role="img" aria-label={`Fight readiness ${displayScore} out of 100. ${status}.`}>
+          <GaugeArc score={displayScore} color={statusColor} />
+        </div>
 
-        {/* Zone legend */}
-        <div className="flex items-center justify-center gap-3 mt-1 flex-wrap">
+        {/* Zone legend. The zone name is what makes a range mean anything; it
+            was defined here but never rendered, leaving colour as the only
+            thing separating the bands. */}
+        <div className="flex items-center justify-center gap-x-3 gap-y-1 mt-1 flex-wrap">
           {[
             { label: 'Needs Work', color: '#ef4444', range: '0–39' },
             { label: 'Building',   color: '#f97316', range: '40–59' },
@@ -218,9 +225,11 @@ export default function FightReadiness() {
             { label: 'Fight Ready',color: '#22c55e', range: '75–89' },
             { label: 'Peak',       color: '#10b981', range: '90+' },
           ].map(z => (
-            <div key={z.label} className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: z.color }} />
-              <span className="text-xs text-gray-500">{z.range}</span>
+            <div key={z.label} className="flex items-center gap-1" title={`${z.label}: ${z.range}`}>
+              <div className="w-2 h-2 rounded-full flex-shrink-0" aria-hidden="true" style={{ backgroundColor: z.color }} />
+              <span className="text-xs text-gray-450">
+                {z.label} <span className="text-gray-450/70">{z.range}</span>
+              </span>
             </div>
           ))}
         </div>

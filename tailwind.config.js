@@ -7,6 +7,16 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Tertiary text tone. Tailwind's gray-500 (#6b7280) was carrying every
+        // hint, timestamp and caption in the app, but it never clears WCAG AA
+        // on these surfaces — 3.29:1 on dark-600, 2.97:1 on dark-500, against a
+        // 4.5:1 floor for the 11-12px sizes it runs at. Bumping it all the way
+        // to gray-400 would have fixed contrast by collapsing two tiers of
+        // hierarchy into one, so this sits between them: dimmer than gray-400,
+        // and still >= 4.6:1 on every background the app actually puts text on.
+        gray: {
+          450: '#8c94a1',
+        },
         brand: {
           50: '#fff7ed',
           100: '#ffedd5',

@@ -158,9 +158,9 @@ export default function ProgressCharts() {
     const isCoach = currentUser?.role === 'coach';
     return (
       <div className="mx-4 mt-10 card text-center py-12">
-        <BarChart3 size={32} className="text-gray-500 mx-auto mb-3" />
+        <BarChart3 size={32} className="text-gray-450 mx-auto mb-3" />
         <p className="text-gray-400 font-medium">No progress to show yet</p>
-        <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
+        <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">
           {isCoach
             ? 'Progress charts track an individual camp. Open the Fighters tab to view each athlete’s training progress.'
             : 'Start a fight camp or off-season plan to see your training charts here.'}
@@ -323,7 +323,7 @@ export default function ProgressCharts() {
       {hasAnyAdherence && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Adherence</p>
-          <div className="card p-2">
+          <div role="img" aria-label="Bar chart of planned sessions completed each week of the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weeklyAdherence} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -359,7 +359,7 @@ export default function ProgressCharts() {
       {weeklyVolume.some(w => w.sessions > 0) && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Training Volume</p>
-          <div className="card p-2">
+          <div role="img" aria-label="Bar chart of training minutes logged each week of the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={weeklyVolume} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -378,7 +378,7 @@ export default function ProgressCharts() {
       {rpeTrend.length > 1 && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Training Intensity (RPE Trend)</p>
-          <div className="card p-2">
+          <div role="img" aria-label="Line chart of session intensity, rated 1 to 10, over the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={rpeTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -417,6 +417,16 @@ export default function ProgressCharts() {
                       </span>
                     )}
                   </div>
+                  {/* Only the graphic gets role="img" — the test name and trend
+                      badge above it are real text worth reading. */}
+                  <div
+                    role="img"
+                    aria-label={
+                      data.length >= 2
+                        ? `${testType} over time: ${first} to ${last}, ${actuallyImproved ? 'improving' : 'declining'}.`
+                        : `${testType}: single result of ${last}.`
+                    }
+                  >
                   <ResponsiveContainer width="100%" height={100}>
                     <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -433,6 +443,7 @@ export default function ProgressCharts() {
                       />
                     </LineChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
               );
             })}
@@ -444,7 +455,7 @@ export default function ProgressCharts() {
       {sparringPerf.length > 1 && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sparring Performance</p>
-          <div className="card p-2">
+          <div role="img" aria-label="Line chart of self-rated sparring performance, 1 to 5, per session." className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={sparringPerf} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -455,7 +466,7 @@ export default function ProgressCharts() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-between text-xs text-gray-500 px-2 mt-1">
+          <div className="flex justify-between text-xs text-gray-450 px-2 mt-1">
             <span>1=Poor</span><span>2=Below</span><span>3=Avg</span><span>4=Good</span><span>5=Excellent</span>
           </div>
         </div>
@@ -465,7 +476,7 @@ export default function ProgressCharts() {
       {weeklyVolume.some(w => w.avgRpe > 0) && (
         <div className="mx-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weekly Avg RPE</p>
-          <div className="card p-2">
+          <div role="img" aria-label="Bar chart of average session intensity per week." className="card p-2">
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={weeklyVolume.filter(w => w.avgRpe > 0)} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -482,9 +493,9 @@ export default function ProgressCharts() {
       {/* Empty State */}
       {campWorkouts.length === 0 && campSparring.length === 0 && campCond.length === 0 && (
         <div className="mx-4 card text-center py-12">
-          <BarChart3 size={40} className="text-gray-500 mx-auto mb-3" />
+          <BarChart3 size={40} className="text-gray-450 mx-auto mb-3" />
           <p className="text-gray-400 font-semibold">No data yet</p>
-          <p className="text-sm text-gray-500 mt-1">Start logging workouts and tests to see your progress charts</p>
+          <p className="text-sm text-gray-450 mt-1">Start logging workouts and tests to see your progress charts</p>
         </div>
       )}
     </div>

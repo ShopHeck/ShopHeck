@@ -180,7 +180,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 ? (isOffSeason ? 'Off Season Plan' : 'New Fight Camp')
                 : (isOffSeason ? 'Plan Ready!' : 'Camp Generated!')}
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2">
               <X size={20} />
             </button>
           </div>
@@ -215,7 +215,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                       {OFF_SEASON_GOALS.map(g => (
                         <button
                           key={g.value}
-                          onClick={() => setOffSeasonGoal(g.value)}
+                          onClick={() => setOffSeasonGoal(g.value)} aria-pressed={offSeasonGoal === g.value}
                           className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${offSeasonGoal === g.value ? 'border-teal-500 bg-teal-900/20' : 'border-dark-400 bg-dark-700 hover:border-dark-300'}`}
                         >
                           <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
@@ -305,7 +305,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                     <label className="label">Camp Length</label>
                     <div role="group" aria-label="Camp Length" className="grid grid-cols-3 gap-2">
                       {['6','8','10'].map(w => (
-                        <button key={w} onClick={() => setCampWeeks(w)}
+                        <button key={w} onClick={() => setCampWeeks(w)} aria-pressed={campWeeks === w}
                           className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${campWeeks === w ? 'border-brand-500 bg-brand-900/30 text-brand-400' : 'border-dark-400 bg-dark-600 text-gray-400'}`}>
                           {w} Weeks
                         </button>
@@ -447,11 +447,11 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
           <div className="flex flex-col gap-5 mt-2">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">I am a...</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div role="group" aria-label="I am a" className="grid grid-cols-2 gap-3">
                 {(['fighter', 'coach'] as UserRole[]).map(r => (
                   <button
                     key={r}
-                    onClick={() => setRole(r)}
+                    onClick={() => setRole(r)} aria-pressed={role === r}
                     className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                       role === r
                         ? 'border-brand-500 bg-brand-900/30 text-brand-400'
@@ -504,7 +504,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                 {EXPERIENCE_LEVELS.map(level => (
                   <button
                     key={level}
-                    onClick={() => setExperience(level)}
+                    onClick={() => setExperience(level)} aria-pressed={experience === level}
                     className={`py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
                       experience === level
                         ? 'border-brand-500 bg-brand-900/30 text-brand-400'
@@ -571,7 +571,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                   {OFF_SEASON_GOALS.map(g => (
                     <button
                       key={g.value}
-                      onClick={() => setOffSeasonGoal(g.value)}
+                      onClick={() => setOffSeasonGoal(g.value)} aria-pressed={offSeasonGoal === g.value}
                       className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${offSeasonGoal === g.value ? 'border-teal-500 bg-teal-900/20' : 'border-dark-400 bg-dark-700 hover:border-dark-300'}`}
                     >
                       <div className={`mt-0.5 w-3 h-3 rounded-full border-2 flex-shrink-0 ${offSeasonGoal === g.value ? 'border-teal-400 bg-teal-400' : 'border-gray-600'}`} />
@@ -665,7 +665,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
                   {['6', '8', '10'].map(w => (
                     <button
                       key={w}
-                      onClick={() => setCampWeeks(w)}
+                      onClick={() => setCampWeeks(w)} aria-pressed={campWeeks === w}
                       className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
                         campWeeks === w
                           ? 'border-brand-500 bg-brand-900/30 text-brand-400'
@@ -903,7 +903,7 @@ export default function Onboarding({ campOnly = false, offSeasonOnly = false, on
               <ChevronRight size={20} />
             </button>
 
-            <p className="text-xs text-gray-500 -mt-2">
+            <p className="text-xs text-gray-450 -mt-2">
               By continuing you agree to our{' '}
               <a href="https://fightcamp.netlify.app/terms.html" target="_blank" rel="noopener noreferrer" className="text-gray-400 underline hover:text-gray-400">Terms of Service</a>
               {' '}and{' '}

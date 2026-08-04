@@ -300,7 +300,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
 
           {camps.length === 0 ? (
             <div className="card text-center py-8">
-              <Flame size={28} className="text-gray-500 mx-auto mb-2" />
+              <Flame size={28} className="text-gray-450 mx-auto mb-2" />
               <p className="text-gray-400 text-sm">No fight camps yet</p>
             </div>
           ) : (
@@ -355,7 +355,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                         <button
                           onClick={() => setConfirmDeleteCamp(camp.id)}
                           aria-label={`Delete camp: ${camp.weightClass}${camp.opponent ? ` vs ${camp.opponent}` : ''}`}
-                          className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+                          className="p-2 text-gray-450 hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -365,11 +365,11 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                     <div className="flex items-center gap-4 pt-2 border-t border-dark-500">
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{stats.workouts}</p>
-                        <p className="text-xs text-gray-500">sessions</p>
+                        <p className="text-xs text-gray-450">sessions</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-white">{stats.sparring}</p>
-                        <p className="text-xs text-gray-500">spar rds</p>
+                        <p className="text-xs text-gray-450">spar rds</p>
                       </div>
                       <div className="flex-1" />
                       {!isActive && (
@@ -403,7 +403,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             {coaches.length > 0 && currentUser.coachId && (
               <button
                 onClick={() => dispatch({ type: 'LINK_COACH', payload: null })}
-                className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                className="text-xs text-gray-450 hover:text-red-400 transition-colors"
               >
                 Unlink
               </button>
@@ -411,9 +411,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
           {coaches.length === 0 ? (
             <div className="card text-center py-6">
-              <Users size={24} className="text-gray-500 mx-auto mb-2" />
+              <Users size={24} className="text-gray-450 mx-auto mb-2" />
               <p className="text-sm text-gray-400">No coaches in the system yet</p>
-              <p className="text-xs text-gray-500 mt-1">A coach needs to create a profile on this device first</p>
+              <p className="text-xs text-gray-450 mt-1">A coach needs to create a profile on this device first</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -431,7 +431,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                     <div className="flex-1 min-w-0">
                       <p className={`font-semibold text-sm ${isLinked ? 'text-white' : 'text-gray-300'}`}>{coach.name}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {coach.gym && <span className="text-xs text-gray-500">{coach.gym}</span>}
+                        {coach.gym && <span className="text-xs text-gray-450">{coach.gym}</span>}
                         <span className="badge bg-dark-500 text-gray-400 text-xs">{coach.sport}</span>
                       </div>
                     </div>
@@ -441,7 +441,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                         <span className="text-xs font-semibold">Linked</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-500">Link</span>
+                      <span className="text-xs text-gray-450">Link</span>
                     )}
                   </button>
                 );
@@ -618,9 +618,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Camp History & Fight Breakdowns</p>
-              <p className="text-xs text-gray-500">Compare camps · tune next camp</p>
+              <p className="text-xs text-gray-450">Compare camps · tune next camp</p>
             </div>
-            <ChevronRight size={15} className="text-gray-500" />
+            <ChevronRight size={15} className="text-gray-450" />
           </button>
 
           {/* Achievements & Belt */}
@@ -633,9 +633,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Achievements & Belt</p>
-              <p className="text-xs text-gray-500">Rank · streak · PRs · weekly challenges</p>
+              <p className="text-xs text-gray-450">Rank · streak · PRs · weekly challenges</p>
             </div>
-            <ChevronRight size={15} className="text-gray-500" />
+            <ChevronRight size={15} className="text-gray-450" />
           </button>
 
           {/* AI Insights */}
@@ -648,9 +648,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">AI Coach Insights</p>
-              <p className="text-xs text-gray-500">Included with Pro — no setup needed</p>
+              <p className="text-xs text-gray-450">Included with Pro — no setup needed</p>
             </div>
-            <ChevronRight size={15} className="text-gray-500" />
+            <ChevronRight size={15} className="text-gray-450" />
           </button>
 
           {/* Custom Round Bell */}
@@ -665,7 +665,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                   <span className="text-xs text-green-400 font-semibold">✓ Set</span>
                   <button
                     onClick={() => { clearCustomBell(); setHasBell(false); }}
-                    className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                    className="text-xs text-gray-450 hover:text-red-400 transition-colors"
                   >
                     Remove
                   </button>
@@ -711,9 +711,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Apple Health</p>
-              <p className="text-xs text-gray-500">Import workouts & weight · Export data</p>
+              <p className="text-xs text-gray-450">Import workouts & weight · Export data</p>
             </div>
-            <ChevronRight size={15} className="text-gray-500" />
+            <ChevronRight size={15} className="text-gray-450" />
           </button>
         </div>
       </div>
@@ -732,7 +732,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-white">Accounts unavailable in this build</p>
                   <p className="text-xs text-gray-400 mt-0.5">{supabaseConfigError}</p>
-                  <p className="text-xs text-gray-500 mt-1.5">
+                  <p className="text-xs text-gray-450 mt-1.5">
                     Your camps, sessions and weight history are all stored on this device and are unaffected.
                   </p>
                 </div>
@@ -769,9 +769,9 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                 <Trash2 size={14} className="text-red-400 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-400">Delete account</p>
-                  <p className="text-xs text-gray-500">Permanently remove your account and all synced data</p>
+                  <p className="text-xs text-gray-450">Permanently remove your account and all synced data</p>
                 </div>
-                <ChevronRight size={15} className="text-gray-500" />
+                <ChevronRight size={15} className="text-gray-450" />
               </button>
             )}
             {!authUser && authConfigured && (
@@ -783,7 +783,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                   <p className="text-sm font-medium text-white">Sign in / Create account</p>
                   <p className="text-xs text-gray-400">Sync your camps &amp; connect with your coach</p>
                 </div>
-                <ChevronRight size={16} className="text-gray-500" />
+                <ChevronRight size={16} className="text-gray-450" />
               </button>
             )}
           </div>
@@ -808,7 +808,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <p className="text-sm font-medium text-white">Connection diagnostics</p>
               <p className="text-xs text-gray-400">Check sign-in and purchases if something isn&apos;t working</p>
             </div>
-            <ChevronRight size={15} className="text-gray-500" />
+            <ChevronRight size={15} className="text-gray-450" />
           </button>
           {notificationsSupported() && (
             <button
@@ -820,7 +820,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Training reminders</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-450">
                   {reminders ? 'On — daily check-in & weigh-in nudges' : 'Off — tap to enable'}
                 </p>
               </div>
@@ -839,7 +839,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Sync to Apple Health</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-450">
                   {healthSync ? 'On — new workouts & weigh-ins saved to Health' : 'Off — tap to enable'}
                 </p>
               </div>
@@ -857,7 +857,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Weight units</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-450">
                 {weightUnit === 'kg' ? 'Kilograms (kg) — tap for lbs' : 'Pounds (lbs) — tap for kg'}
               </p>
             </div>
@@ -877,7 +877,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Progress widget on dashboard</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-450">
                 {state.dashboardPrefs?.progressWidgetHidden ? 'Hidden — tap to show' : 'Visible — tap to hide'}
               </p>
             </div>
@@ -892,7 +892,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <div>
               <p className="text-sm font-medium text-red-400">Reset & Log Out</p>
-              <p className="text-xs text-gray-500">Delete all data and start over</p>
+              <p className="text-xs text-gray-450">Delete all data and start over</p>
             </div>
           </button>
         </div>
@@ -905,7 +905,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             href="https://fightcamp.netlify.app/privacy.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-500 hover:text-gray-400 underline transition-colors"
+            className="text-xs text-gray-450 hover:text-gray-400 underline transition-colors"
           >
             Privacy Policy
           </a>
@@ -914,7 +914,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             href="https://fightcamp.netlify.app/terms.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-500 hover:text-gray-400 underline transition-colors"
+            className="text-xs text-gray-450 hover:text-gray-400 underline transition-colors"
           >
             Terms of Use (EULA)
           </a>

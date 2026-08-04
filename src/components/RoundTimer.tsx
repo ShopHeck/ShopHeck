@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useId } from 'react';
 import {
   Play, Pause, RotateCcw, ChevronUp, ChevronDown,
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
@@ -14,6 +14,7 @@ import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { timerSessionMinutes } from '../utils/timerSession';
 import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
+import { useDialog } from '../hooks/useDialog';
 import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
@@ -31,6 +32,8 @@ interface PresetModalProps {
 }
 
 function PresetModal({ onSave, onClose }: PresetModalProps) {
+  const titleId = useId();
+  const panelRef = useDialog({ onClose });
   const [label,    setLabel]    = useState('');
   const [rounds,   setRounds]   = useState(3);
   const [workSec,  setWorkSec]  = useState(180);
@@ -42,14 +45,19 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-dark-800 rounded-2xl border border-dark-500 w-full max-w-sm flex flex-col outline-none"
         style={{ maxHeight: 'calc(100dvh - 2rem)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Fixed header */}
         <div className="flex items-center justify-between p-5 flex-shrink-0 border-b border-dark-600">
-          <h3 className="text-base font-bold text-white">New Preset</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-1"><X size={18} /></button>
+          <h3 id={titleId} className="text-base font-bold text-white">New Preset</h3>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-white p-3 -m-2"><X size={18} /></button>
         </div>
 
         {/* Scrollable body */}
@@ -369,7 +377,7 @@ export default function RoundTimer() {
         {/* Large round number */}
         {phase !== 'idle' && phase !== 'done' && (
           <div className="text-center mb-3">
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-gray-500 uppercase">
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-gray-450 uppercase">
               {phase === 'prep' ? 'Get Ready' : 'Round'}
             </p>
             <p className="text-6xl font-black text-white leading-none">
@@ -429,7 +437,7 @@ export default function RoundTimer() {
             <span className="text-xs text-gray-400">{ZONE_LABELS[hr.zone]}</span>
             {mep > 0 && (
               <>
-                <span className="text-gray-500">·</span>
+                <span className="text-gray-450">·</span>
                 <span className="text-xs font-semibold text-gray-300">{mep} MEP</span>
               </>
             )}

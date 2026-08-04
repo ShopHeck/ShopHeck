@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Trash2, Clock, Zap, AlertTriangle, Activity, Share2 } from 'lucide-react';
+import { Plus, Dumbbell, Trash2, Clock, Zap, Activity, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getWeekNumberForDate } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
+import ConfirmDialog from './shared/ConfirmDialog';
 import Modal from './shared/Modal';
 import ShareCard from './ShareCard';
 import type { SessionType, WorkoutLog } from '../types';
@@ -203,9 +204,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campWorkouts.length === 0 ? (
             <div className="card text-center py-10">
-              <Dumbbell size={32} className="text-gray-500 mx-auto mb-3" />
+              <Dumbbell size={32} className="text-gray-450 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No workouts logged yet</p>
-              <p className="text-sm text-gray-500 mt-1">Tap "Log Workout" to record your first session</p>
+              <p className="text-sm text-gray-450 mt-1">Tap "Log Workout" to record your first session</p>
             </div>
           ) : (
             campWorkouts.map(log => (
@@ -220,12 +221,12 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       <div className="flex items-center flex-shrink-0">
                         <button onClick={() => setShareLog(log)}
                           aria-label={`Share workout: ${log.title}`}
-                          className="text-gray-500 hover:text-brand-400 transition-colors -m-2 p-2">
+                          className="text-gray-450 hover:text-brand-400 transition-colors -m-2 p-2">
                           <Share2 size={14} />
                         </button>
                         <button onClick={() => setDeleteConfirmId(log.id)}
                           aria-label={`Delete workout: ${log.title}`}
-                          className="text-gray-500 hover:text-red-400 transition-colors -m-2 p-2 ml-2">
+                          className="text-gray-450 hover:text-red-400 transition-colors -m-2 p-2 ml-2">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -235,7 +236,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       <span className="flex items-center gap-1"><Zap size={11} /> RPE {log.rpe}/10</span>
                       <span>{format(parseISO(log.date), 'MMM d')}</span>
                     </div>
-                    {log.notes && <p className="text-xs text-gray-500 mt-1 italic">{log.notes}</p>}
+                    {log.notes && <p className="text-xs text-gray-450 mt-1 italic">{log.notes}</p>}
                   </div>
                 </div>
               </div>
@@ -252,9 +253,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campSparring.length === 0 ? (
             <div className="card text-center py-10">
-              <Zap size={32} className="text-gray-500 mx-auto mb-3" />
+              <Zap size={32} className="text-gray-450 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No sparring logged yet</p>
-              <p className="text-sm text-gray-500 mt-1">Log rounds to track your progress</p>
+              <p className="text-sm text-gray-450 mt-1">Log rounds to track your progress</p>
             </div>
           ) : (
             campSparring.map(log => (
@@ -270,11 +271,11 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                       {log.partnerName && log.partnerName !== 'Unknown' ? `vs ${log.partnerName} (${log.partnerLevel})` : `${log.partnerLevel}-level partner`} · {format(parseISO(log.date), 'MMM d')}
                     </p>
                     {log.focus && <p className="text-xs text-gray-400 mt-1">Focus: {log.focus}</p>}
-                    {log.notes && <p className="text-xs text-gray-500 mt-1 italic">{log.notes}</p>}
+                    {log.notes && <p className="text-xs text-gray-450 mt-1 italic">{log.notes}</p>}
                   </div>
                   <button onClick={() => setDeleteSparConfirmId(log.id)}
                     aria-label={`Delete sparring session${log.partnerName && log.partnerName !== 'Unknown' ? ` with ${log.partnerName}` : ''}`}
-                    className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
+                    className="text-gray-450 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -292,9 +293,9 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
           </button>
           {campCond.length === 0 ? (
             <div className="card text-center py-10">
-              <Clock size={32} className="text-gray-500 mx-auto mb-3" />
+              <Clock size={32} className="text-gray-450 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No conditioning tests yet</p>
-              <p className="text-sm text-gray-500 mt-1">Track benchmark tests throughout camp</p>
+              <p className="text-sm text-gray-450 mt-1">Track benchmark tests throughout camp</p>
             </div>
           ) : (
             campCond.map(test => (
@@ -303,7 +304,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-sm">{test.testType}</p>
                     <p className="text-xs text-gray-400">{format(parseISO(test.date), 'MMM d')} · Week {test.weekNumber}</p>
-                    {test.notes && <p className="text-xs text-gray-500 mt-1 italic">{test.notes}</p>}
+                    {test.notes && <p className="text-xs text-gray-450 mt-1 italic">{test.notes}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-right">
@@ -312,7 +313,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                     </div>
                     <button onClick={() => setDeleteCondConfirmId(test.id)}
                       aria-label={`Delete ${test.testType} test result`}
-                      className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
+                      className="text-gray-450 hover:text-red-400 transition-colors flex-shrink-0 -m-2 p-2">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -359,8 +360,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               </label>
             </div>
             <div>
-              <label className="label mb-0">Effort: {wRpe}/10</label>
-              <input type="range" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)}
+              <label className="label mb-0" htmlFor="wl-rpe">Effort: {wRpe}/10</label>
+              <input id="wl-rpe" type="range" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)}
                 className="w-full accent-brand-500 mt-2" />
             </div>
             <div>
@@ -490,73 +491,39 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
         </Modal>
       )}
 
-      {/* Delete Workout Confirm */}
+      {/* These three were inlined copies of ConfirmDialog's markup, which meant
+          they missed its focus trap, Escape handling and alertdialog role. */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)} />
-          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
-            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={22} className="text-red-400" />
-            </div>
-            <h3 className="text-base font-bold text-white text-center mb-2">Delete Workout?</h3>
-            <p className="text-sm text-gray-400 text-center mb-6">This workout log will be permanently deleted.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
-              <button
-                onClick={() => { dispatch({ type: 'DELETE_WORKOUT', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          danger
+          title="Delete Workout?"
+          message="This workout log will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { dispatch({ type: 'DELETE_WORKOUT', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
       )}
 
-      {/* Delete Sparring Confirm */}
       {deleteSparConfirmId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteSparConfirmId(null)} />
-          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
-            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={22} className="text-red-400" />
-            </div>
-            <h3 className="text-base font-bold text-white text-center mb-2">Delete Sparring Log?</h3>
-            <p className="text-sm text-gray-400 text-center mb-6">This sparring session will be permanently deleted.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteSparConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
-              <button
-                onClick={() => { dispatch({ type: 'DELETE_SPARRING', payload: deleteSparConfirmId }); setDeleteSparConfirmId(null); }}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          danger
+          title="Delete Sparring Log?"
+          message="This sparring session will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { dispatch({ type: 'DELETE_SPARRING', payload: deleteSparConfirmId }); setDeleteSparConfirmId(null); }}
+          onCancel={() => setDeleteSparConfirmId(null)}
+        />
       )}
 
-      {/* Delete Conditioning Test Confirm */}
       {deleteCondConfirmId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteCondConfirmId(null)} />
-          <div className="relative bg-dark-700 rounded-2xl border border-dark-400 p-5 w-full max-w-sm">
-            <div className="w-12 h-12 bg-red-900/40 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={22} className="text-red-400" />
-            </div>
-            <h3 className="text-base font-bold text-white text-center mb-2">Delete Test Result?</h3>
-            <p className="text-sm text-gray-400 text-center mb-6">This conditioning test result will be permanently deleted.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteCondConfirmId(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
-              <button
-                onClick={() => { dispatch({ type: 'DELETE_CONDITIONING', payload: deleteCondConfirmId }); setDeleteCondConfirmId(null); }}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-700 hover:bg-red-600 text-white transition-all active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          danger
+          title="Delete Test Result?"
+          message="This conditioning test result will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { dispatch({ type: 'DELETE_CONDITIONING', payload: deleteCondConfirmId }); setDeleteCondConfirmId(null); }}
+          onCancel={() => setDeleteCondConfirmId(null)}
+        />
       )}
     </div>
   );

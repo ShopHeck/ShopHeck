@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { useDialog } from '../../hooks/useDialog';
 
 interface Props {
   title: string;
@@ -9,19 +10,10 @@ interface Props {
   footer?: React.ReactNode;
 }
 
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 export default function Modal({ title, onClose, children, footer }: Props) {
   const titleId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  // Latest onClose without re-running the mount effect (which owns body scroll
-  // lock and focus restore, and must run exactly once per open). Synced in an
-  // effect — writing a ref during render breaks the compiler's purity rules.
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  // Focus trap, Escape, body scroll lock and focus restore.
+  const panelRef = useDialog({ onClose });
 
   // Use JS-computed pixel height instead of dvh/vh CSS units.
   // visualViewport shrinks when keyboard opens (works with resize:'native' in Capacitor).
@@ -33,42 +25,6 @@ export default function Modal({ title, onClose, children, footer }: Props) {
   });
 
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
-
-    // Dialog semantics: take focus on open, hold Tab inside, hand focus back
-    // to the opener on close (keyboard and VoiceOver users otherwise land in
-    // the page behind the sheet).
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panelRef.current?.focus();
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onCloseRef.current();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const panel = panelRef.current;
-      if (!panel) return;
-      const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
-        .filter(el => el.offsetParent !== null);
-      if (focusables.length === 0) {
-        e.preventDefault();
-        return;
-      }
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === panel)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-
     const update = () => {
       const h = window.visualViewport?.height ?? window.innerHeight;
       setMaxH(`${Math.floor(h * 0.92)}px`);
@@ -78,11 +34,8 @@ export default function Modal({ title, onClose, children, footer }: Props) {
     window.addEventListener('resize', update);
 
     return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', onKeyDown, true);
       window.visualViewport?.removeEventListener('resize', update);
       window.removeEventListener('resize', update);
-      opener?.focus();
     };
   }, []);
 

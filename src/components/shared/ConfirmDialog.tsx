@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useDialog } from '../../hooks/useDialog';
 
 interface Props {
   title: string;
@@ -18,43 +18,8 @@ interface Props {
  * buttons, Escape cancels, and focus returns to the opener on close.
  */
 export default function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }: Props) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const onCancelRef = useRef(onCancel);
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const buttons = () => Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button') ?? []);
-    buttons()[0]?.focus();
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onCancelRef.current();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const els = buttons();
-      if (els.length === 0) return;
-      const first = els[0];
-      const last = els[els.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === panelRef.current)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
-      opener?.focus();
-    };
-  }, []);
+  // 'first' focuses Cancel, the safe action for a destructive ask.
+  const panelRef = useDialog({ onClose: onCancel, initialFocus: 'first' });
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">

@@ -99,7 +99,7 @@ export default function CutCoach({ camp, user, proj, entries }: Props) {
       <div className="flex items-center gap-2">
         <Sparkles size={16} className="text-brand-400" />
         <p className="text-sm font-bold text-white">AI Cut Coach</p>
-        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-gray-500">Included with Pro</span>
+        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-gray-450">Included with Pro</span>
       </div>
 
       {!advice && !loading && (

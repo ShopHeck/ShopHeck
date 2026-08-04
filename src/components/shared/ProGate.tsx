@@ -85,7 +85,7 @@ export default function ProGate({
             Unlock with {tierLabel}
           </button>
           {/* Trial exists only on the App Store (RevenueCat); web Stripe links have none. */}
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-gray-450 mt-3">
             {Capacitor.isNativePlatform() ? '7-day free trial · cancel anytime' : 'Cancel anytime'}
           </p>
         </div>
