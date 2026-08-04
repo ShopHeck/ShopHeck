@@ -52,6 +52,10 @@ forbidText(upgradeModal, '/.netlify/functions/create-checkout', 'Existing web ch
 // when the destination subscriber is anonymous and nothing can be moved.
 requireText(revenuecatWebhook, 'source grants revoked', 'RevenueCat transfer revocation');
 forbidText(revenuecatWebhook, "if (!toId) return ok('transfer has no Supabase destination id')", 'RevenueCat transfer revocation');
+// …but a sandbox transfer must never see or delete a PRODUCTION row, matching
+// record_revenuecat_event's environment precedence.
+requireText(revenuecatWebhook, "event.environment === 'PRODUCTION'", 'RevenueCat transfer sandbox guard');
+requireText(revenuecatWebhook, 'environment.neq.PRODUCTION,environment.is.null', 'RevenueCat transfer sandbox guard');
 
 requireText(stripeWebhook, "normalized === 'coach pro'", 'Stripe fail-closed mapping');
 requireText(stripeWebhook, "normalized === 'fighter pro'", 'Stripe fail-closed mapping');
