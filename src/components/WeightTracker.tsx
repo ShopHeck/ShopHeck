@@ -22,6 +22,7 @@ import ProGate from './shared/ProGate';
 import CutCoach from './CutCoach';
 import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
 import { parseWeightInput, weightRangeHint } from '../utils/validation';
+import { todayISO, isFutureISODate } from '../utils/dates';
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -129,7 +130,9 @@ export default function WeightTracker() {
   const parsedWeight = parseWeightInput(weight, unit);
 
   function logWeight() {
-    if (parsedWeight === null) return;
+    // A weigh-in is a record of a real measurement. A future date would become
+    // the "latest weight" and skew the cut projection and the unsafe-cut alert.
+    if (parsedWeight === null || isFutureISODate(date)) return;
     triggerHaptic(HAPTIC.sessionComplete);
     // P0-4 earned moment: the rating ask fires only when THIS weigh-in takes
     // the cut from not-made to made — never on merely opening the tab with an
@@ -417,7 +420,7 @@ export default function WeightTracker() {
           title="Log Weight"
           onClose={() => setShowModal(false)}
           footer={
-            <button onClick={logWeight} disabled={parsedWeight === null} className="btn-primary w-full disabled:opacity-50">
+            <button onClick={logWeight} disabled={parsedWeight === null || isFutureISODate(date)} className="btn-primary w-full disabled:opacity-50">
               Save Weight
             </button>
           }
@@ -426,7 +429,7 @@ export default function WeightTracker() {
             <div>
               <label className="block">
                 <span className="label">Date</span>
-                <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                <input className="input" type="date" value={date} max={todayISO()} onChange={e => setDate(e.target.value)} />
               </label>
             </div>
             <div>

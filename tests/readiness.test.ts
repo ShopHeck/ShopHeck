@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { endOfDay, parseISO } from 'date-fns';
 import { createDefaultState } from '../src/utils/storage';
 import { computeReadiness } from '../src/utils/readiness';
 import type { FightCamp, TrainingWeek, WorkoutLog, ConditioningTest } from '../src/types';
@@ -36,11 +37,11 @@ const taperWeek: TrainingWeek = {
   ],
 };
 
-function workout(rpe: number): WorkoutLog {
+function workout(rpe: number, date = '2026-08-02', id = 'workout-1'): WorkoutLog {
   return {
-    id: 'workout-1',
+    id,
     campId: camp.id,
-    date: '2026-08-02',
+    date,
     weekNumber: 1,
     dayLabel: 'Sunday',
     sessionType: 'recovery',
@@ -49,7 +50,7 @@ function workout(rpe: number): WorkoutLog {
     rpe,
     notes: '',
     completed: true,
-    createdAt: '2026-08-02T12:00:00.000Z',
+    createdAt: `${date}T12:00:00.000Z`,
   };
 }
 
@@ -104,6 +105,45 @@ describe('phase-aware readiness', () => {
     expect(sparring?.score).toBe(sparring?.max);
     expect(sparring?.detail).toContain('No sparring prescribed');
     expect(result?.insights.join(' ')).not.toContain('coordinate the next live-work session');
+  });
+
+  it('snapshots a historical asOf without letting later data leak in', () => {
+    // Logging the result 12 days after the fight: the snapshot must describe
+    // fight day, so entries dated after the fight cannot move the score.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-20T12:00:00.000Z'));
+    const fightDay = endOfDay(parseISO('2026-08-08'));
+
+    const state = createDefaultState();
+    state.activeCamp = camp;
+    state.camps = [camp];
+    state.trainingSchedule = [taperWeek];
+    state.workoutLogs = [workout(5)];
+    const atFight = computeReadiness(state, fightDay);
+
+    state.workoutLogs = [workout(5), workout(9, '2026-08-15', 'workout-2')];
+    const withLaterLog = computeReadiness(state, fightDay);
+
+    expect(atFight?.phase).toBe('Taper');
+    expect(withLaterLog?.overall).toBe(atFight?.overall);
+    expect(withLaterLog?.breakdown).toEqual(atFight?.breakdown);
+  });
+
+  it('ignores future-dated entries on the live dashboard', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-03T12:00:00.000Z'));
+    const state = createDefaultState();
+    state.activeCamp = camp;
+    state.camps = [camp];
+    state.trainingSchedule = [taperWeek];
+    state.workoutLogs = [workout(5)];
+    const clean = computeReadiness(state);
+
+    state.workoutLogs = [workout(5), workout(9, '2026-08-06', 'workout-future')];
+    const withFutureLog = computeReadiness(state);
+
+    expect(withFutureLog?.overall).toBe(clean?.overall);
+    expect(withFutureLog?.breakdown).toEqual(clean?.breakdown);
   });
 
   it('scores a faster repeated run as conditioning improvement', () => {

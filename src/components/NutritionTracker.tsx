@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Droplets, Minus, Trash2, UtensilsCrossed, Flame, Settings2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { todayISO } from '../utils/dates';
 import { format, parseISO, subDays, differenceInDays } from 'date-fns';
 import type { NutritionLog, MacroEntry } from '../types';
 import Modal from './shared/Modal';
@@ -28,10 +29,6 @@ const MEAL_IDLE: Record<MealRating, string> = {
   ok: 'bg-dark-600 border-dark-400 text-gray-400 hover:border-yellow-700',
   poor: 'bg-dark-600 border-dark-400 text-gray-400 hover:border-red-800',
 };
-
-function todayStr() {
-  return format(new Date(), 'yyyy-MM-dd');
-}
 
 function MacroBar({ label, actual, target, color }: {
   label: string; actual: number; target: number; color: string;
@@ -62,7 +59,7 @@ export default function NutritionTracker() {
   const { state, dispatch } = useApp();
   const { activeCamp, nutritionLogs, currentUser, weightEntries } = state;
 
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [showMacroEntry, setShowMacroEntry] = useState(false);
@@ -197,7 +194,7 @@ export default function NutritionTracker() {
             aria-label="Tracking date"
             className="input w-auto text-sm py-1.5 px-3"
             value={selectedDate}
-            max={todayStr()}
+            max={todayISO()}
             onChange={e => {
               setSelectedDate(e.target.value);
               setNotes(campLogs.find(n => n.date === e.target.value)?.notes ?? '');
@@ -374,7 +371,7 @@ export default function NutritionTracker() {
         <div className="card divide-y divide-dark-600">
           {last7.map(({ date, log }) => {
             const score = mealScore(log);
-            const isToday = date === todayStr();
+            const isToday = date === todayISO();
             const isSelected = date === selectedDate;
             return (
               <button

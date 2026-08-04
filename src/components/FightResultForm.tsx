@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Trophy, XCircle, Minus, Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
-import { format } from 'date-fns';
+import { endOfDay, format, isValid, parseISO } from 'date-fns';
+import { todayISO, isFutureISODate } from '../utils/dates';
 import type { FightCamp, FightMethod, FightOutcome, FightRound, DamageLevel, FightResult } from '../types';
 import { computeReadiness } from '../utils/readiness';
 import { buildFightResult } from '../utils/storage';
@@ -66,6 +67,12 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
 
   const methodOptions = useMemo(() => methodsFor(outcome), [outcome]);
 
+  // The picker's `max` can't stop the wizard's plain Next/Save buttons, and
+  // fightDate initializes from camp.fightDate — which is in the future when
+  // the form is opened before the scheduled fight. A result is a record of a
+  // fight that happened, so a future or unparseable date blocks advancing.
+  const fightDateInvalid = !isValid(parseISO(fightDate)) || isFutureISODate(fightDate);
+
   // Changing the outcome can invalidate the chosen method (a draw has no KO).
   // The select would display the first option while state kept the stale
   // value, so "KO" could be saved on a draw — snap method along with outcome.
@@ -94,9 +101,14 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   }
 
   function submit() {
+    if (fightDateInvalid) return;
     const effectiveRoundCount = roundStopped ?? totalRounds;
     const fightedRounds = rounds.slice(0, effectiveRoundCount);
-    const readiness = computeReadiness(state);
+    // Snapshot readiness as of the fight itself, not the moment the form is
+    // filled in — a result logged days later must not describe today's shape.
+    // The guard above guarantees a valid, non-future date; the whole fight
+    // day counts (endOfDay).
+    const readiness = existing ? null : computeReadiness(state, endOfDay(parseISO(fightDate)));
 
     const base: Omit<FightResult, 'id' | 'createdAt'> = {
       // Edits keep the fight on its original camp. The form always receives
@@ -234,8 +246,13 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           <div>
             <label className="block">
               <span className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fight Date</span>
-              <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} className="input" />
+              <input type="date" value={fightDate} max={todayISO()} aria-invalid={fightDateInvalid} onChange={e => setFightDate(e.target.value)} className="input" />
             </label>
+            {fightDateInvalid && (
+              <p className="text-xs text-yellow-500 mt-1.5">
+                Fight results are logged after the fight — use today or an earlier date.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -368,11 +385,19 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           </button>
         )}
         {step < 3 ? (
-          <button onClick={() => setStep(step + 1)} className="btn-primary flex-1 flex items-center justify-center gap-1">
+          <button
+            onClick={() => setStep(step + 1)}
+            disabled={step === 0 && fightDateInvalid}
+            className="btn-primary flex-1 flex items-center justify-center gap-1 disabled:opacity-50"
+          >
             Next <ChevronRight size={16} />
           </button>
         ) : (
-          <button onClick={submit} className="btn-primary flex-1 flex items-center justify-center gap-1">
+          <button
+            onClick={submit}
+            disabled={fightDateInvalid}
+            className="btn-primary flex-1 flex items-center justify-center gap-1 disabled:opacity-50"
+          >
             <Check size={16} /> Save Fight Result
           </button>
         )}
