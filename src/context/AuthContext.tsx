@@ -2,8 +2,13 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { supabase, isSupabaseConfigured, supabaseConfigError, supabaseHost, supabaseUrl } from '../lib/supabase';
+import {
+  notifyLocalDataCleared,
+  reconcileLocalAccount,
+} from '../utils/localData';
 
 const APPLE_BUNDLE_ID = 'app.fightcamptraining';
+const REQUEST_SIGN_OUT_EVENT = 'fightcamp:request-sign-out';
 
 function randomNonce(length = 32): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._';
@@ -38,13 +43,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    /**
+     * Apply local account isolation before exposing the new session to the app.
+     * This ordering prevents SyncProvider from seeing user B while user A's
+     * local state and sync-id ledger are still mounted.
+     */
+    const applySession = (next: Session | null) => {
+      const changedAccount = reconcileLocalAccount(next?.user.id ?? null);
+      if (changedAccount) notifyLocalDataCleared();
+      setSession(next);
+    };
+
+    // Capture the configured client in a non-null local. TypeScript cannot keep
+    // a module-level nullable import narrowed inside later callback closures.
+    const client = supabase;
+    if (!client) {
+      reconcileLocalAccount(null);
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    client.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      applySession(data.session);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
+
+    const { data: sub } = client.auth.onAuthStateChange((_event, next) => {
+      applySession(next);
+      setLoading(false);
+    });
+
+    const requestedSignOut = () => { void client.auth.signOut(); };
+    window.addEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+      window.removeEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+    };
   }, []);
 
   /** Supabase's own auth copy ("Invalid login credentials") reads fine, but
@@ -144,7 +182,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Server-side cascade delete via SECURITY DEFINER RPC (see supabase/schema.sql).
     const { error } = await supabase.rpc('delete_account');
     if (error) return { error: error.message };
-    // The auth row is gone; clear the local session so the app returns to signed-out.
+    // The auth row is gone; clear the local session. Auth-state handling clears
+    // every Fight Camp-owned local key before exposing the signed-out session.
     await supabase.auth.signOut();
     return {};
   }
