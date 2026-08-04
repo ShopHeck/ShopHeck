@@ -15,6 +15,14 @@ interface Props {
    * leaves the page. Lets onboarding persist its draft profile/camp first.
    */
   onBeforeWebCheckout?: () => void;
+  /**
+   * Which card leads. Every entry point used to open the same modal with
+   * Fighter Pro shown first regardless of context, so a coach tapping
+   * "Unlock Coach Pro" had to scroll past the tier that wouldn't unlock what
+   * they tapped. Callers that gate a coach-specific action should pass
+   * 'coach'; everything else can omit this and get the original order.
+   */
+  defaultTier?: 'fighter' | 'coach';
 }
 
 // Every line here must describe something that actually ships — this list is
@@ -65,7 +73,7 @@ function purchaseErrorMessage(e: unknown): string {
   return message;
 }
 
-export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
+export default function UpgradeModal({ onClose, onBeforeWebCheckout, defaultTier }: Props) {
   const titleId = useId();
   const panelRef = useDialog({ onClose });
   const { dispatch } = useApp();
@@ -192,84 +200,95 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout }: Props) {
           </div>
 
           <div className="px-5 pb-5 space-y-4">
-            <div className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-brand-400" />
-                <span className="text-sm font-bold text-white">Fighter Pro</span>
-                <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
-              </div>
-              <ul className="space-y-1.5">
-                {FIGHTER_PRO_FEATURES.slice(0, 5).map(feature => (
-                  <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
-                    <Check size={11} className="text-brand-400 mt-0.5 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-                <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
-              </ul>
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  {billing === 'monthly' ? (
-                    <>
-                      <span className="text-xl font-black text-white">{PRICES.fighter.monthly}</span>
-                      <span className="text-xs text-gray-400">/mo</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xl font-black text-white">{PRICES.fighter.annual}</span>
-                      <span className="text-xs text-gray-400">/yr</span>
-                      <p className="text-xs text-brand-400">{PRICES.fighter.annualMonthly}/mo · save {PRICES.fighter.saving}</p>
-                    </>
-                  )}
+            {(() => {
+              const fighterCard = (
+                <div key="fighter" className="bg-gradient-to-br from-brand-900/40 to-dark-700 border border-brand-700/50 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Zap size={16} className="text-brand-400" />
+                    <span className="text-sm font-bold text-white">Fighter Pro</span>
+                    <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {FIGHTER_PRO_FEATURES.slice(0, 5).map(feature => (
+                      <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
+                        <Check size={11} className="text-brand-400 mt-0.5 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                    <li className="text-xs text-gray-400">+ {FIGHTER_PRO_FEATURES.length - 5} more features</li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      {billing === 'monthly' ? (
+                        <>
+                          <span className="text-xl font-black text-white">{PRICES.fighter.monthly}</span>
+                          <span className="text-xs text-gray-400">/mo</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl font-black text-white">{PRICES.fighter.annual}</span>
+                          <span className="text-xs text-gray-400">/yr</span>
+                          <p className="text-xs text-brand-400">{PRICES.fighter.annualMonthly}/mo · save {PRICES.fighter.saving}</p>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleSubscribe('fighter')}
+                      disabled={loading}
+                      className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                    >
+                      {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleSubscribe('fighter')}
-                  disabled={loading}
-                  className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
-                >
-                  {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
-                </button>
-              </div>
-            </div>
+              );
 
-            <div className="bg-gradient-to-br from-purple-900/30 to-dark-700 border border-purple-700/40 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Trophy size={16} className="text-purple-400" />
-                <span className="text-sm font-bold text-white">Coach Pro</span>
-                <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
-              </div>
-              <ul className="space-y-1.5">
-                {COACH_PRO_FEATURES.map(feature => (
-                  <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
-                    <Check size={11} className="text-purple-400 mt-0.5 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  {billing === 'monthly' ? (
-                    <>
-                      <span className="text-xl font-black text-white">{PRICES.coach.monthly}</span>
-                      <span className="text-xs text-gray-400">/mo</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xl font-black text-white">{PRICES.coach.annual}</span>
-                      <span className="text-xs text-gray-400">/yr</span>
-                      <p className="text-xs text-purple-400">{PRICES.coach.annualMonthly}/mo · save {PRICES.coach.saving}</p>
-                    </>
-                  )}
+              const coachCard = (
+                <div key="coach" className="bg-gradient-to-br from-purple-900/30 to-dark-700 border border-purple-700/40 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy size={16} className="text-purple-400" />
+                    <span className="text-sm font-bold text-white">Coach Pro</span>
+                    <span className="ml-auto text-xs text-gray-400">{showNativeFooter ? '7-day free trial' : 'Cancel anytime'}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {COACH_PRO_FEATURES.map(feature => (
+                      <li key={feature} className="flex items-start gap-2 text-xs text-gray-300">
+                        <Check size={11} className="text-purple-400 mt-0.5 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      {billing === 'monthly' ? (
+                        <>
+                          <span className="text-xl font-black text-white">{PRICES.coach.monthly}</span>
+                          <span className="text-xs text-gray-400">/mo</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl font-black text-white">{PRICES.coach.annual}</span>
+                          <span className="text-xs text-gray-400">/yr</span>
+                          <p className="text-xs text-purple-400">{PRICES.coach.annualMonthly}/mo · save {PRICES.coach.saving}</p>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleSubscribe('coach')}
+                      disabled={loading}
+                      className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleSubscribe('coach')}
-                  disabled={loading}
-                  className="bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {loading ? '...' : showNativeFooter ? 'Start Free Trial' : 'Subscribe'}
-                </button>
-              </div>
-            </div>
+              );
+
+              // Whichever tier the entry point is actually gating leads, so a
+              // coach tapping "Unlock Coach Pro" doesn't have to scroll past
+              // the tier that wouldn't have unlocked what they tapped.
+              return defaultTier === 'coach' ? <>{coachCard}{fighterCard}</> : <>{fighterCard}{coachCard}</>;
+            })()}
 
             {notice && (
               <p className="text-center text-xs text-brand-400 font-medium">{notice}</p>

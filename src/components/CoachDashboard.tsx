@@ -673,7 +673,7 @@ export default function CoachDashboard() {
         </div>
       )}
 
-      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} defaultTier="coach" />}
     </div>
   );
 }
