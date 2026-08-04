@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import * as LucideIcons from 'lucide-react';
 import { Award, CheckCircle2, Flame, Lock, TrendingUp } from 'lucide-react';
+import { AchievementIcon } from './achievementIcons';
 import { useApp } from '../../context/AppContext';
 import {
   ACHIEVEMENTS,
@@ -108,9 +108,6 @@ function AchievementsTab({ unlocked }: { unlocked: { id: string; unlockedAt: str
       {ACHIEVEMENTS.map(def => {
         const earnedAt = unlockedMap.get(def.id);
         const earned = !!earnedAt;
-        const IconComponent =
-          (LucideIcons as unknown as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[def.icon] ||
-          Award;
         return (
           <div
             key={def.id}
@@ -118,7 +115,7 @@ function AchievementsTab({ unlocked }: { unlocked: { id: string; unlockedAt: str
           >
             <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${earned ? 'bg-brand-900/60' : 'bg-dark-600'}`}>
               {earned ? (
-                <IconComponent size={22} className="text-brand-400" />
+                <AchievementIcon name={def.icon} size={22} className="text-brand-400" />
               ) : (
                 <Lock size={18} className="text-gray-500" />
               )}
