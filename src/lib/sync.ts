@@ -507,14 +507,25 @@ export async function pullState(userId: string): Promise<PullResult> {
       // mergeCloud only ever ADDS cloud rows to local state — so a device that
       // already held the row would keep showing it forever. They are split out
       // below and carried through as an explicit delete signal instead.
-      // Ordered newest-first, to match the order local state is built in
-      // (addWorkoutLog and friends prepend — see utils/storage.ts). Postgres
-      // makes no ordering promise without an ORDER BY, and every pushState
-      // upsert rewrites the row, so unordered results genuinely scramble as an
-      // account is used. mergeCloud appends these rows verbatim, and several
-      // screens read recency off array position, so the pull is where the
-      // invariant has to be established.
-      supabase.from('camps').select('*').eq('user_id', userId).order('start_date', { ascending: false }),
+      // Ordered to match the order local state is built in. Postgres makes no
+      // ordering promise without an ORDER BY, and every pushState upsert
+      // rewrites the row, so unordered results genuinely scramble as an account
+      // is used. mergeCloud appends these rows verbatim and several screens read
+      // position, so the pull is where the invariant has to be established.
+      //
+      // The direction is NOT uniform, because the local conventions are not:
+      //
+      //   camps          CREATE_CAMP APPENDS  -> oldest first, newest LAST
+      //   everything else  add* PREPEND       -> newest first, newest FIRST
+      //
+      // Camps must therefore be ASCENDING. `camps[camps.length - 1]` is the
+      // idiom for "the current camp" in four places (mergeCloud's activeCamp
+      // fallback below, deleteCamp's promotion in utils/storage.ts, and
+      // CoachDashboard twice) — sorting camps newest-first would silently make
+      // every one of them pick the OLDEST camp, so a multi-camp account
+      // restored onto a new device would open on a finished camp and
+      // regenerate the schedule for it.
+      supabase.from('camps').select('*').eq('user_id', userId).order('start_date', { ascending: true }),
       supabase.from('workout_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('sparring_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
       supabase.from('conditioning_tests').select('*').eq('user_id', userId).order('date', { ascending: false }),
