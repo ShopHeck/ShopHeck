@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star, CheckCircle2, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
+import { sessionKey as buildSessionKey, weekAdherence } from '../utils/adherence';
 import { format, parseISO, addDays } from 'date-fns';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import type { SessionType } from '../types';
@@ -60,7 +61,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
     : null;
 
   function sessionKey(dayOfWeek: number, sessionIdx: number) {
-    return `${activeCamp!.id}-${selectedWeek}-${dayOfWeek}-${sessionIdx}`;
+    return buildSessionKey(activeCamp!.id, selectedWeek, dayOfWeek, sessionIdx);
   }
 
   function toggleDone(dayOfWeek: number, sessionIdx: number) {
@@ -78,13 +79,12 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
     dispatch({ type: 'TOGGLE_DAY_OVERRIDE', payload: dayOverrideKey(dayOfWeek) });
   }
 
-  // Adherence for the selected week: completed non-rest sessions / total non-rest sessions
-  const weekSessions = week.days.flatMap((d) =>
-    d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${selectedWeek}-${d.dayOfWeek}-${si}`)
-  );
-  const completedCount = weekSessions.filter(k => completedSessions[k]).length;
-  const totalCount = weekSessions.length;
-  const adherencePct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  // Adherence for the selected week — see utils/adherence.ts for the one
+  // definition every surface now shares.
+  const weekScore = weekAdherence(completedSessions, activeCamp.id, week);
+  const completedCount = weekScore.done;
+  const totalCount = weekScore.planned;
+  const adherencePct = weekScore.pct ?? 0;
 
   return (
     <div className="space-y-4 pb-4">

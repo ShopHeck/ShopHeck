@@ -30,8 +30,6 @@ export function createDefaultState(): AppState {
   };
 }
 
-export const defaultState: AppState = createDefaultState();
-
 export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs>): AppState {
   // Rebuilt key-by-key (not `...state.dashboardPrefs`) so the shape stays the
   // allowlist — but every key MUST be carried here, or dispatching one pref
@@ -163,6 +161,19 @@ export function flushSaveState(): void {
   const state = pendingState;
   pendingState = null;
   saveState(state);
+}
+
+/**
+ * Throw away a coalesced write without performing it.
+ *
+ * Pairs with wiping the store (reset, account switch): a queued write holds the
+ * state of the account being discarded, and letting it land after the wipe
+ * would write that data straight back.
+ */
+export function discardPendingSave(): void {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+  if (idleHandle !== null) { cancelIdle(idleHandle); idleHandle = null; }
+  pendingState = null;
 }
 
 export function generateId(): string {

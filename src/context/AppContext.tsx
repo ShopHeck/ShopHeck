@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
 import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
   scheduleSaveState,
   flushSaveState,
+  discardPendingSave,
   createDefaultState,
   createProfile,
   createCamp,
@@ -48,7 +49,7 @@ import {
   requestLocalSignOut,
 } from '../utils/localData';
 
-type Action =
+export type Action =
   | { type: 'SET_STATE'; payload: AppState }
   | { type: 'CLEAR_LOCAL_STATE' }
   | { type: 'CREATE_PROFILE'; payload: Omit<FighterProfile, 'id' | 'createdAt'> }
@@ -104,7 +105,6 @@ function baseReducer(state: AppState, action: Action): AppState {
       return action.payload;
 
     case 'CLEAR_LOCAL_STATE':
-      clearIdMap();
       return createDefaultState();
 
     case 'CREATE_PROFILE': {
@@ -206,10 +206,8 @@ function baseReducer(state: AppState, action: Action): AppState {
     case 'LINK_COACH':
       return linkCoach(state, action.payload);
 
-    case 'SET_SUBSCRIPTION': {
-      saveSubscription(action.payload);
+    case 'SET_SUBSCRIPTION':
       return { ...state, subscription: action.payload };
-    }
 
     case 'LOG_HRV':
       return addHRVEntry(state, action.payload);
@@ -242,12 +240,7 @@ function baseReducer(state: AppState, action: Action): AppState {
       return setDashboardPrefs(state, action.payload);
 
     case 'RESET':
-      // Reset is intentionally broader than the app-state document: timer,
-      // presets, custom audio, notification prefs, sync ledgers and cached
-      // entitlements all use Fight Camp-prefixed keys and must disappear too.
-      clearFightCampLocalData();
-      clearIdMap();
-      requestLocalSignOut();
+      // The wipe itself runs in `dispatch` below, not here — see runCommands.
       return createDefaultState();
 
     default:
@@ -255,7 +248,16 @@ function baseReducer(state: AppState, action: Action): AppState {
   }
 }
 
-function reducer(state: AppState, action: Action): AppState {
+/**
+ * Exported for tests only.
+ *
+ * The invariant worth pinning is that this is a PURE function of
+ * (state, action) — StrictMode invokes it twice per dispatch, so anything with
+ * an observable side effect here happens twice in development. Commands that
+ * touch localStorage or dispatch events live in AppProvider's `dispatch`
+ * wrapper instead.
+ */
+export function reducer(state: AppState, action: Action): AppState {
   const next = baseReducer(state, action);
   if (action.type === 'RECOMPUTE_GAMIFICATION' || GAMIFICATION_TRIGGERS.has(action.type)) {
     return applyGamificationUpdates(next, action.type);
@@ -271,7 +273,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, () => {
+  const [state, baseDispatch] = useReducer(reducer, undefined, () => {
     // Always regenerate trainingSchedule from activeCamp so cached stale week
     // dates (from before generator fixes) are never used.
     // `?shot` loads a demo state for App Store screenshot capture (see demoSeed).
@@ -284,8 +286,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return loaded;
   });
 
+  /**
+   * Commands that reach outside the state document.
+   *
+   * These used to run inside the reducer. A reducer must be a pure function of
+   * (state, action): StrictMode deliberately invokes it twice in development to
+   * surface exactly this, so every wipe and sign-out request fired twice. They
+   * are also not state transitions at all — clearing localStorage and asking
+   * AuthProvider to sign out are effects that merely accompany one.
+   *
+   * Running them in the dispatch wrapper keeps the reducer pure and fires each
+   * command exactly once per dispatch, in both development and production.
+   */
+  const dispatch = useCallback<React.Dispatch<Action>>((action) => {
+    switch (action.type) {
+      case 'CLEAR_LOCAL_STATE':
+        // The account boundary moved; this device's local↔cloud id ledger
+        // belongs to the previous account.
+        discardPendingSave();
+        clearIdMap();
+        break;
+      case 'RESET':
+        // Deliberately broader than the app-state document: timer, presets,
+        // custom audio, notification prefs, sync ledgers and cached entitlements
+        // all use Fight Camp-prefixed keys and must disappear too.
+        //
+        // The queued write is dropped first — it holds the state being erased,
+        // and letting it land after the wipe would write it straight back.
+        discardPendingSave();
+        clearFightCampLocalData();
+        clearIdMap();
+        requestLocalSignOut();
+        break;
+      default:
+        break;
+    }
+    baseDispatch(action);
+  }, []);
+
   const { user, loading: authLoading } = useAuth();
   const [stripeReturnPending, setStripeReturnPending] = useState(false);
+
+  // Cached entitlement follows the resulting value rather than being written
+  // from inside the reducer. Idempotent, so a StrictMode double-render is a
+  // duplicate write of identical bytes rather than a duplicated effect.
+  useEffect(() => {
+    saveSubscription(state.subscription);
+  }, [state.subscription]);
 
   // AuthProvider clears persisted Fight Camp data before exposing a different
   // account. Reset the mounted reducer in the same boundary so the next user's
@@ -294,7 +341,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const cleared = () => dispatch({ type: 'CLEAR_LOCAL_STATE' });
     window.addEventListener(LOCAL_DATA_CLEARED_EVENT, cleared);
     return () => window.removeEventListener(LOCAL_DATA_CLEARED_EVENT, cleared);
-  }, []);
+  }, [dispatch]);
 
   // Stripe return parameters are only a signal to look for the signed webhook
   // row. They never grant local access by themselves.
@@ -331,7 +378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [stripeReturnPending, authLoading, user?.id]);
+  }, [stripeReturnPending, authLoading, user?.id, dispatch]);
 
   // On native iOS: sync subscription status from RevenueCat on every launch.
   // null = error/offline — leave state unchanged to avoid downgrading offline users.
@@ -382,7 +429,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         },
       });
     });
-  }, [authLoading, user?.id]);
+  }, [authLoading, user?.id, dispatch]);
 
   // Comp ("complimentary") access: founder / internal-test accounts (see
   // isCompEmail) get lifetime Coach Pro tied to the signed-in email.
@@ -396,7 +443,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } else if (source === 'comp') {
       dispatch({ type: 'SET_SUBSCRIPTION', payload: DEFAULT_SUBSCRIPTION });
     }
-  }, [authLoading, user?.email, state.subscription]);
+  }, [authLoading, user?.email, state.subscription, dispatch]);
 
   // Server-verified entitlement. Stripe and RevenueCat webhook tables are the
   // cross-platform source of truth; no client-synced state can authorize Pro.
@@ -449,7 +496,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'RECOMPUTE_GAMIFICATION' });
     const id = setInterval(() => dispatch({ type: 'RECOMPUTE_GAMIFICATION' }), 60 * 60 * 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [dispatch]);
 
   // Keep the scheduled streak-at-risk push in step with the live streak.
   useEffect(() => {

@@ -239,7 +239,9 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
         <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-1"><Flame size={14} /> Camp KPIs</p>
         <div className="grid grid-cols-2 gap-y-2 text-sm">
           <KV label="Sessions" value={`${kpis.totalSessions}`} />
-          <KV label="Adherence" value={`${Math.round(kpis.adherence * 100)}%`} />
+          {/* Em dash for "no schedule to score against", matching avgRpe below
+              and the no-data handling elsewhere in this grid. */}
+          <KV label="Adherence" value={kpis.adherence === null ? '—' : `${Math.round(kpis.adherence * 100)}%`} />
           <KV label="Avg RPE" value={kpis.avgRpe ? kpis.avgRpe.toFixed(1) : '—'} />
           <KV label="Training" value={`${Math.round(kpis.totalMinutes / 60)}h`} />
           <KV label="Sparring rounds" value={`${kpis.sparringRoundsTotal}`} />

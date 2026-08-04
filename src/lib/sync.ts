@@ -742,7 +742,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
         .filter(([campId]) => liveCampIds.has(campId)),
     ),
     gamification: state.gamification ?? c.gamification ?? undefined,
-    // Per-KEY merge, unlike the object-level fields around it: defaultState
+    // Per-KEY merge, unlike the object-level fields around it: createDefaultState
     // always materializes a dashboardPrefs object, so object-level local-wins
     // would let a fresh device's defaults shadow the account's synced choices
     // forever (and the next push would overwrite them). A key the local

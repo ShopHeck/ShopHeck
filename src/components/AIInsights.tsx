@@ -3,6 +3,7 @@ import { Brain, RefreshCw, AlertCircle, Sparkles, User, Zap } from 'lucide-react
 import { useApp } from '../context/AppContext';
 import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
+import { scheduleAdherence } from '../utils/adherence';
 import { streamAiCoach, AiCoachError, type AiCoachErrorCode } from '../lib/aiCoach';
 import AuthScreen from './AuthScreen';
 import UpgradeModal from './shared/UpgradeModal';
@@ -40,17 +41,11 @@ function buildPrompt(state: ReturnType<typeof useApp>['state']): string {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 12);
 
-  const weeklyAdh = trainingSchedule.map(week => {
-    const keys = week.days.flatMap(d =>
-      d.isRestDay ? [] : d.sessions.map((_, si) => `${activeCamp.id}-${week.weekNumber}-${d.dayOfWeek}-${si}`)
-    );
-    const total = keys.length;
-    const done = keys.filter(k => completedSessions[k]).length;
-    return { done, total };
-  });
-  const totalDone = weeklyAdh.reduce((s, w) => s + w.done, 0);
-  const totalPlan = weeklyAdh.reduce((s, w) => s + w.total, 0);
-  const adherencePct = totalPlan > 0 ? Math.round((totalDone / totalPlan) * 100) : 0;
+  // Shared definition — see utils/adherence.ts.
+  const campScore = scheduleAdherence(completedSessions, activeCamp.id, trainingSchedule);
+  const totalDone = campScore.done;
+  const totalPlan = campScore.planned;
+  const adherencePct = campScore.pct ?? 0;
 
   const latestWeight = campWeights[0];
   const currentWeight = latestWeight?.weight ?? activeCamp.currentWeight;
