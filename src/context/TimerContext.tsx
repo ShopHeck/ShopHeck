@@ -11,10 +11,7 @@ export interface TimerSignal {
   flashColor: string | null;
 }
 
-interface TimerContextValue {
-  signal: TimerSignal;
-  setSignal: React.Dispatch<React.SetStateAction<TimerSignal>>;
-}
+type SetSignal = React.Dispatch<React.SetStateAction<TimerSignal>>;
 
 const defaultSignal: TimerSignal = {
   isRunning: false,
@@ -25,20 +22,37 @@ const defaultSignal: TimerSignal = {
   flashColor: null,
 };
 
-const TimerContext = createContext<TimerContextValue>({
-  signal: defaultSignal,
-  setSignal: () => {},
-});
+// Two contexts, not one.
+//
+// The signal ticks once a second for the whole length of a session. Handing out
+// `{ signal, setSignal }` as a single object literal meant that object was new
+// on every tick, so every consumer re-rendered every second — including the
+// producer, `useRoundTimer`, which only ever needs the setter and was being
+// re-rendered by its own writes.
+//
+// Split, the setter side is a `useState` setter (stable for the lifetime of the
+// provider), so writers subscribe to nothing and only genuine readers of the
+// countdown re-render.
+const TimerSignalContext = createContext<TimerSignal>(defaultSignal);
+const TimerSetterContext = createContext<SetSignal>(() => {});
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [signal, setSignal] = useState<TimerSignal>(defaultSignal);
   return (
-    <TimerContext.Provider value={{ signal, setSignal }}>
-      {children}
-    </TimerContext.Provider>
+    <TimerSetterContext.Provider value={setSignal}>
+      <TimerSignalContext.Provider value={signal}>
+        {children}
+      </TimerSignalContext.Provider>
+    </TimerSetterContext.Provider>
   );
 }
 
-export function useTimerContext() {
-  return useContext(TimerContext);
+/** Read the live timer signal. Re-renders once a second while a session runs. */
+export function useTimerSignal(): TimerSignal {
+  return useContext(TimerSignalContext);
+}
+
+/** Write the timer signal. Stable — subscribing to this never causes a render. */
+export function useTimerSignalSetter(): SetSignal {
+  return useContext(TimerSetterContext);
 }

@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
+import { todayISO } from '../utils/dates';
 import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
@@ -38,7 +40,24 @@ interface Props {
 export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const { state } = useApp();
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
-  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults } = state;
+  const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults, conditioningTests, nutritionLogs } = state;
+
+  // computeReadiness filters and sorts five collections and walks every camp
+  // workout, and this component re-renders on ANY dispatch — including the
+  // hourly gamification recompute and session toggles, neither of which is an
+  // input to the score. Keyed on the slices it actually reads (not on `state`,
+  // whose identity changes on every dispatch and would defeat the memo), plus a
+  // day key so the elapsed-time terms cannot go stale on a dashboard left open
+  // overnight. Must sit above the early return — hooks cannot be conditional.
+  // computeReadiness returns null without an active camp, so calling it here is
+  // safe. FightReadiness.tsx does the same thing for the full-page view.
+  const todayKey = todayISO();
+  const readiness = useMemo(
+    () => computeReadiness(state),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeCamp, workoutLogs, sparringLogs, weightEntries, conditioningTests,
+     nutritionLogs, currentUser, trainingSchedule, unit, todayKey],
+  );
 
   if (!activeCamp) return null;
 
@@ -64,7 +83,13 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const today = new Date();
   const todayDayOfWeek = today.getDay();
   const todaySessions = currentWeek?.days.find(d => d.dayOfWeek === todayDayOfWeek);
-  const recentLogs = workoutLogs.filter(l => l.campId === activeCamp.id).slice(0, 3);
+  // Sorted, not just sliced. Local state is built newest-first, but a cloud
+  // restore appends rows in the server's order, so array position is not
+  // recency for anyone who has synced a second device.
+  const recentLogs = workoutLogs
+    .filter(l => l.campId === activeCamp.id)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 
   // Weekly summary stats
   const weekLogs = workoutLogs.filter(l => l.campId === activeCamp.id && l.weekNumber === currentWeekNum);
@@ -77,7 +102,6 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
     k => k.startsWith(`${activeCamp.id}-${currentWeekNum}-`) && completedSessions[k]
   ).length;
 
-  const readiness = computeReadiness(state);
   const pro = isPro(state.subscription);
 
   // Post-fight CTA: fight date has passed and no FightResult exists for this camp.

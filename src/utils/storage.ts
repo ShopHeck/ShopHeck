@@ -64,7 +64,35 @@ export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return createDefaultState();
-    return { ...createDefaultState(), ...JSON.parse(raw) };
+    const stored = JSON.parse(raw) as Partial<AppState>;
+    const defaults = createDefaultState();
+
+    // A top-level spread alone is not enough. It replaces each nested slice
+    // wholesale, so a document written before a key was added to `gamification`
+    // / `dashboardPrefs` / `subscription` keeps its OLD shape and the new key
+    // stays undefined after the upgrade — `gam.challenges.filter(...)` in
+    // ProgressWidget then throws on a store that merely predates challenges.
+    // One level deeper is the right depth, and no deeper: `belt` and `streak`
+    // are recomputed from raw logs by the boot-time RECOMPUTE_GAMIFICATION, so
+    // they only need to EXIST here; the slices that do not self-heal
+    // (challenges, achievements, personalRecords, totalXp) are all at this level.
+    //
+    // weightUnit is deliberately absent from the defaults, so it stays
+    // undefined ("never chosen") unless the stored document set it — that is
+    // what lets mergeCloud restore the account's synced choice on a new device.
+    return {
+      ...defaults,
+      ...stored,
+      gamification: stored.gamification
+        ? { ...defaults.gamification, ...stored.gamification }
+        : defaults.gamification,
+      dashboardPrefs: stored.dashboardPrefs
+        ? { ...defaults.dashboardPrefs, ...stored.dashboardPrefs }
+        : defaults.dashboardPrefs,
+      subscription: stored.subscription
+        ? { ...defaults.subscription, ...stored.subscription }
+        : defaults.subscription,
+    };
   } catch {
     return createDefaultState();
   }
@@ -76,6 +104,65 @@ export function saveState(state: AppState): void {
   } catch {
     console.error('Failed to save state');
   }
+}
+
+// ─── Deferred persistence ─────────────────────────────────────────────────
+//
+// saveState serializes the ENTIRE account document — every camp, log, weigh-in,
+// nutrition day, HRV entry, fight result and the gamification slice — and
+// localStorage.setItem is synchronous. Running it on every dispatch meant eight
+// taps on the nutrition +8oz button cost eight full serializations on the main
+// thread, on a phone, mid-camp.
+//
+// Writes are coalesced into one, then handed to an idle slot so they never
+// compete with the tap that caused them. Nothing is lost: every path that can
+// end the session (backgrounding, tab close, native app suspend) flushes first.
+
+const SAVE_DEBOUNCE_MS = 500;
+
+let pendingState: AppState | null = null;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let idleHandle: number | null = null;
+
+/** requestIdleCallback where it exists — Safari/WKWebView still lacks it. */
+function runWhenIdle(fn: () => void): number {
+  const ric = (globalThis as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+    .requestIdleCallback;
+  if (ric) return ric(fn, { timeout: 1000 });
+  return setTimeout(fn, 0) as unknown as number;
+}
+
+function cancelIdle(handle: number): void {
+  const cic = (globalThis as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
+  if (cic) cic(handle);
+  else clearTimeout(handle);
+}
+
+/** Coalesce a write; the newest state wins and lands within ~500ms. */
+export function scheduleSaveState(state: AppState): void {
+  pendingState = state;
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    idleHandle = runWhenIdle(() => {
+      idleHandle = null;
+      flushSaveState();
+    });
+  }, SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * Write any coalesced state immediately. Safe to call when nothing is pending.
+ * MUST be called before the page can go away, or the last edits before a
+ * backgrounding are lost.
+ */
+export function flushSaveState(): void {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+  if (idleHandle !== null) { cancelIdle(idleHandle); idleHandle = null; }
+  if (!pendingState) return;
+  const state = pendingState;
+  pendingState = null;
+  saveState(state);
 }
 
 export function generateId(): string {

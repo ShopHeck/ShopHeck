@@ -89,7 +89,11 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const weightDiff = parseFloat((currentW - targetW).toFixed(1));
 
   // Recent logs
-  const recentLogs = workoutLogs.filter(l => l.campId === activeCamp.id).slice(0, 3);
+  // Sorted, not just sliced — see the matching note in Dashboard.tsx.
+  const recentLogs = workoutLogs
+    .filter(l => l.campId === activeCamp.id)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 
   return (
     <div className="space-y-4 pb-4">

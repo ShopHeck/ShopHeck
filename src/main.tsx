@@ -2,6 +2,17 @@ import * as Sentry from '@sentry/capacitor';
 import * as SentryReact from '@sentry/react';
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// index.css has always named 'Inter' as the first font family, but nothing ever
+// loaded it — @fontsource/inter was a dependency imported nowhere, so the app
+// silently rendered in system-ui on every platform. Latin subset only (the app
+// ships English), and only the five weights Tailwind utilities actually request
+// in src/: 400, 500 (font-medium), 600 (font-semibold), 700 (font-bold) and
+// 900 (font-black). 800 is deliberately absent — nothing uses it.
+import '@fontsource/inter/latin-400.css'
+import '@fontsource/inter/latin-500.css'
+import '@fontsource/inter/latin-600.css'
+import '@fontsource/inter/latin-700.css'
+import '@fontsource/inter/latin-900.css'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
