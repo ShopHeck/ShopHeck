@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "npx --yes vitest@3.2.4 run",
+    "test": "vitest run",
     "test:security": "node scripts/security-regression.mjs",
     "typecheck:functions": "tsc -p tsconfig.functions.json",
     "quality": "npm run lint && npm run test && npm run test:security && npm run typecheck:functions && npm run build",
@@ -60,6 +60,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^3.2.7"
   }
 }

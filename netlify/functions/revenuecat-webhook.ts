@@ -84,9 +84,22 @@ export default async (req: Request): Promise<Response> => {
   if (event.type === 'TRANSFER') {
     const fromIds = (event.transferred_from ?? []).filter(id => UUID_RE.test(id));
     const toId = (event.transferred_to ?? []).find(id => UUID_RE.test(id));
-    if (!toId) return ok('transfer has no Supabase destination id');
 
     try {
+      // The subscription now belongs to the destination subscriber, so the
+      // source accounts always lose their mirrored grant — including when the
+      // destination is anonymous and there is no account to move it onto.
+      if (!toId) {
+        if (fromIds.length > 0) {
+          const { error } = await supabase
+            .from('revenuecat_subscriptions')
+            .delete()
+            .in('user_id', fromIds);
+          if (error) throw new Error(`transfer source revoke failed: ${error.message}`);
+        }
+        return ok('transfer destination is not a Supabase account; source grants revoked');
+      }
+
       let source: {
         tier: string;
         product_id: string | null;

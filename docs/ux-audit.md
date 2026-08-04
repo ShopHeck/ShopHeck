@@ -85,11 +85,11 @@ Users don't subscribe to apps that lose their data. Four verified cases:
 3. **Editing an old fight re-parents it onto the current camp.** The form always receives `state.activeCamp` (`App.tsx:252-255`) and `submit()` overwrites `campId` (`FightResultForm.tsx:85,105`), corrupting camp history and every KPI join.
 4. **Back-dated workouts are stamped with today's week number** (`WorkoutLogger.tsx:104,116`), mis-filing them in the planner and analytics.
 
-Related trust issues: outcome/method desync saves "KO" on a draw (`FightResultForm.tsx:58-63,166`); readiness is snapshotted at data-entry time, not fight time (`FightResultForm.tsx:82`); weigh-ins accept future dates (`WeightTracker.tsx:412`); duplicate same-day weigh-ins chart as two points (`storage.ts:104-107`).
+Related trust issues: outcome/method desync saves "KO" on a draw (`FightResultForm.tsx:58-63,166`); readiness is snapshotted at data-entry time, not fight time (`FightResultForm.tsx:82`); weigh-ins accept future dates (`WeightTracker.tsx:412`); ~~duplicate same-day weigh-ins chart as two points (`storage.ts:104-107`)~~ **resolved (Aug 2026):** `addWeightEntry` now corrects the same-day entry in place.
 
 ### 1.6 Revenue integrity (quick flags)
 
-- Client-side entitlement is trivially forgeable: any URL with `?tier=coach_pro&stripe_session=x` writes a 30-day unlock (`subscription.ts:84-108`; the comment acknowledges it). The server-verified path exists (`fetchServerSubscription`) — tighten the soft unlock's role now that it does.
+- ~~Client-side entitlement is trivially forgeable: any URL with `?tier=coach_pro&stripe_session=x` writes a 30-day unlock (`subscription.ts:84-108`; the comment acknowledges it). The server-verified path exists (`fetchServerSubscription`) — tighten the soft unlock's role now that it does.~~ **Resolved (Aug 2026):** `processStripeReturn` no longer grants anything; entitlements come only from the signature-verified webhook rows.
 - The founder comp email ships in the client bundle (`subscription.ts:37`).
 - Subscribers' Anthropic keys sit in plaintext localStorage and are used with `dangerouslyAllowBrowser: true` from a WebView (`apiKey.ts`, `AIInsights.tsx:169`) — one more reason BYO-key has to go.
 - `?shot` screenshot harness (demo state, `window.__setView`, `__openUpgrade`, forced iOS paywall footer) ships in production (`App.tsx:93-99`, `AppContext.tsx:270`, `UpgradeModal.tsx:63-65`).
