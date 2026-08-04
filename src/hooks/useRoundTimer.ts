@@ -57,6 +57,10 @@ interface TimerSave {
   isRunning: boolean;
   phaseDeadline: number;
   pausedTimeLeft: number;
+  /** Duration of the phase in progress (work/rest/prep). Persisted so a
+   *  paused session restores with its progress ring intact, and so a +30s
+   *  extension survives the pause (timeLeft can exceed the base duration). */
+  pausedPhaseSec: number;
   /** Unique id minted when a session starts, so the completion log fires exactly
    *  once even if the session finishes while the app is closed and is restored on
    *  a later launch (idempotency marker — see RoundTimer's completion effect). */
@@ -89,7 +93,10 @@ function fastForward(s: TimerSave): TimerSave {
   const { rounds, workSec, restSec, prepSec } = s;
   let { phase, currentRound, phaseDeadline } = s;
 
-  while (phase !== 'done' && Date.now() >= phaseDeadline) {
+  // Guard against pathological configs (0 rounds, or a 0-second phase while
+  // the deadline sits exactly on the boundary) producing an unbounded loop.
+  let guard = 0;
+  while (phase !== 'done' && Date.now() >= phaseDeadline && guard++ < 10_000 && rounds > 0) {
     if (phase === 'prep') {
       phase = 'work';
       phaseDeadline += workSec * 1000;
@@ -306,6 +313,13 @@ export function useRoundTimer() {
   const [isRunning,    setIsRunning]    = useState(false);
   // Identifies the current session for once-only completion logging.
   const [sessionId,    setSessionId]    = useState('');
+  /**
+   * Nominal duration of the phase in progress. Distinct from the work/rest
+   * SETTINGS because +30s extensions grow it mid-phase, and the progress ring
+   * divides timeLeft by it — dividing by the base duration instead would make
+   * an extended phase look more than 100% complete.
+   */
+  const [phaseSec,     setPhaseSec]     = useState(PRESETS[0].workSec);
 
   // Refs for stale-closure-safe reads
   const phaseRef      = useRef<Phase>('idle');
@@ -326,6 +340,8 @@ export function useRoundTimer() {
   const lastTickRef   = useRef(-1);     // last remaining value that got a tick
   const voiceRef      = useRef(false);
   const hapticRef     = useRef(true);
+  /** Set by skipPhase; the timing loop consumes it and transitions silently. */
+  const skipRequestedRef = useRef(false);
 
   // Sync refs with state
   useEffect(() => { phaseRef.current     = phase;        }, [phase]);
@@ -458,9 +474,10 @@ export function useRoundTimer() {
       phase, currentRound, isRunning, sessionId,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
+      pausedPhaseSec: phaseSec,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentRound, isRunning, sessionId,
+  }, [phase, currentRound, isRunning, sessionId, phaseSec,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
@@ -488,6 +505,15 @@ export function useRoundTimer() {
     // it wasn't already (e.g. the app was killed before the live log ran). The
     // completion effect dedupes on sessionId, so repeated launches never
     // duplicate the workout or the HealthKit sample.
+    //
+    // pausedPhaseSec survives from saveTimer; a pre-upgrade save omits it, so
+    // fall back to the base duration of the restored phase.
+    const savedPhaseSec = saved.pausedPhaseSec > 0
+      ? saved.pausedPhaseSec
+      : saved.phase === 'rest' ? saved.restSec
+      : saved.phase === 'prep' ? saved.prepSec
+      : saved.workSec;
+
     if (saved.isRunning) {
       const fwd = fastForward(saved);
       phaseRef.current = fwd.phase;
@@ -502,6 +528,14 @@ export function useRoundTimer() {
         deadlineRef.current = fwd.phaseDeadline;
         const tl = Math.max(1, Math.ceil((fwd.phaseDeadline - Date.now()) / 1000));
         setTimeLeft(tl); timeLeftRef.current = tl;
+        // The phase duration after a fast-forwarded transition is the base
+        // duration for whatever phase we landed in — extensions don't survive
+        // a backgrounded transition, which is acceptable (the timer was
+        // unattended anyway).
+        const landedSec = fwd.phase === 'rest' ? saved.restSec
+          : fwd.phase === 'prep' ? saved.prepSec
+          : saved.workSec;
+        setPhaseSec(landedSec);
         setIsRunning(true); isRunningRef.current = true;
       }
     } else {
@@ -510,6 +544,7 @@ export function useRoundTimer() {
       setPhase(saved.phase);
       setCurrentRound(saved.currentRound);
       setTimeLeft(saved.pausedTimeLeft); timeLeftRef.current = saved.pausedTimeLeft;
+      setPhaseSec(savedPhaseSec);
       deadlineRef.current = nextPhaseDeadline(0, saved.pausedTimeLeft);
     }
   }, []);
@@ -567,18 +602,23 @@ export function useRoundTimer() {
   // after the cancel and ring every round twice.
   const alertGenRef = useRef(0);
   useEffect(() => {
+    // Per-instance disposal flag. The cleanup must invalidate any schedule this
+    // listener initiated without reading a ref in the teardown closure: a
+    // schedule spans several awaits, and the flag makes its staleness check
+    // fail the moment this effect instance goes away.
+    let disposed = false;
     const onVisibility = () => {
       const gen = ++alertGenRef.current;
       if (document.visibilityState === 'hidden' && isRunningRef.current) {
-        void scheduleRoundAlerts(upcomingAlerts(), () => alertGenRef.current === gen);
+        void scheduleRoundAlerts(upcomingAlerts(), () => !disposed && alertGenRef.current === gen);
       } else {
         void cancelRoundAlerts();
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
+      disposed = true;
       document.removeEventListener('visibilitychange', onVisibility);
-      alertGenRef.current++;
       void cancelRoundAlerts();
     };
   }, [upcomingAlerts]);
@@ -624,6 +664,10 @@ export function useRoundTimer() {
       roundRef.current    = round;
       setPhase(ph);
       setCurrentRound(round);
+      // The phase we landed in after fast-forwarding runs at its base duration.
+      if (ph === 'rest') setPhaseSec(rSec);
+      else if (ph === 'prep') setPhaseSec(prepSecRef.current);
+      else if (ph === 'work') setPhaseSec(wSec);
       warningFiredRef.current = false;
 
       if (ph === 'done') {
@@ -649,8 +693,16 @@ export function useRoundTimer() {
 
     intervalRef.current = setInterval(() => {
       const remaining = Math.ceil((deadlineRef.current - Date.now()) / 1000);
+      // A skip lands here: same state machine as a natural phase end, but the
+      // anchor is NOW (not the old deadline, which would gift the next phase
+      // the skipped remainder) and no bell/voice/flash fires — the fighter
+      // asked to move on, not to hear the round end. A light haptic on the
+      // tap itself confirms it (skipPhase).
+      const skip = skipRequestedRef.current;
 
-      if (remaining <= 0) {
+      if (skip || remaining <= 0) {
+        skipRequestedRef.current = false;
+        const anchor = skip ? Date.now() : deadlineRef.current;
         const ctx   = getAudioCtx();
         const ph    = phaseRef.current;
         const round = roundRef.current;
@@ -658,13 +710,16 @@ export function useRoundTimer() {
         if (ph === 'prep') {
           // Prep done → start round 1. Anchor to the scheduled prep deadline so
           // a late callback does not stretch every later round.
-          playRoundStartBell(ctx); scheduleCtxSuspend();
-          flash('bg-brand-500');
-          vibrate(HAPTIC.roundStart);
-          if (voiceRef.current) speak('Round 1');
-          const newDeadline = nextPhaseDeadline(deadlineRef.current, workSecRef.current);
+          if (!skip) {
+            playRoundStartBell(ctx); scheduleCtxSuspend();
+            flash('bg-brand-500');
+            vibrate(HAPTIC.roundStart);
+            if (voiceRef.current) speak('Round 1');
+          }
+          const newDeadline = nextPhaseDeadline(anchor, workSecRef.current);
           deadlineRef.current = newDeadline;
           setPhase('work'); phaseRef.current = 'work';
+          setPhaseSec(workSecRef.current);
           setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
           warningFiredRef.current = false;
           lastTickRef.current = -1;
@@ -672,22 +727,27 @@ export function useRoundTimer() {
         } else if (ph === 'work') {
           if (round >= roundsRef.current) {
             // Session complete
-            ringSessionComplete(ctx); scheduleCtxSuspend();
-            flash('bg-green-500');
-            vibrate(HAPTIC.sessionComplete);
-            if (voiceRef.current) speak('Session complete. Great work.');
+            if (!skip) {
+              ringSessionComplete(ctx); scheduleCtxSuspend();
+              flash('bg-green-500');
+              vibrate(HAPTIC.sessionComplete);
+              if (voiceRef.current) speak('Session complete. Great work.');
+            }
             setIsRunning(false); isRunningRef.current = false;
             setPhase('done');    phaseRef.current = 'done';
             setTimeLeft(0);
           } else {
             // End of round → rest
-            ringEndOfRound(ctx); scheduleCtxSuspend();
-            flash('bg-blue-500');
-            vibrate(HAPTIC.roundEnd);
-            if (voiceRef.current) speak('Rest');
-            const newDeadline = nextPhaseDeadline(deadlineRef.current, restSecRef.current);
+            if (!skip) {
+              ringEndOfRound(ctx); scheduleCtxSuspend();
+              flash('bg-blue-500');
+              vibrate(HAPTIC.roundEnd);
+              if (voiceRef.current) speak('Rest');
+            }
+            const newDeadline = nextPhaseDeadline(anchor, restSecRef.current);
             deadlineRef.current = newDeadline;
             setPhase('rest'); phaseRef.current = 'rest';
+            setPhaseSec(restSecRef.current);
             setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
             warningFiredRef.current = false;
           }
@@ -695,15 +755,18 @@ export function useRoundTimer() {
           // End of rest → new round
           const newRound    = round + 1;
           const isLast      = newRound >= roundsRef.current;
-          playRoundStartBell(ctx); scheduleCtxSuspend();
-          flash('bg-brand-500');
-          vibrate(HAPTIC.roundStart);
-          if (voiceRef.current) speak(isLast ? 'Last round' : `Round ${newRound}`);
-          const newDeadline = nextPhaseDeadline(deadlineRef.current, workSecRef.current);
+          if (!skip) {
+            playRoundStartBell(ctx); scheduleCtxSuspend();
+            flash('bg-brand-500');
+            vibrate(HAPTIC.roundStart);
+            if (voiceRef.current) speak(isLast ? 'Last round' : `Round ${newRound}`);
+          }
+          const newDeadline = nextPhaseDeadline(anchor, workSecRef.current);
           deadlineRef.current = newDeadline;
           roundRef.current    = newRound;
           setCurrentRound(newRound);
           setPhase('work');    phaseRef.current = 'work';
+          setPhaseSec(workSecRef.current);
           setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
           warningFiredRef.current = false;
         }
@@ -789,6 +852,7 @@ export function useRoundTimer() {
           // Start with prep countdown. No audio context is needed until a bell
           // actually fires (unless a custom file must be decoded in the effect).
           setPhase('prep'); phaseRef.current = 'prep';
+          setPhaseSec(prepSecRef.current);
           deadlineRef.current = nextPhaseDeadline(0, prepSecRef.current);
           if (voiceRef.current) speak(`Round 1 begins in ${prepSecRef.current}`);
         } else {
@@ -799,6 +863,7 @@ export function useRoundTimer() {
           vibrate(HAPTIC.roundStart);
           if (voiceRef.current) speak('Round 1');
           setPhase('work'); phaseRef.current = 'work';
+          setPhaseSec(workSecRef.current);
           deadlineRef.current = nextPhaseDeadline(0, workSec);
         }
       } else {
@@ -811,6 +876,38 @@ export function useRoundTimer() {
     phase, isRunning, workSec, timeLeft, reset, getAudioCtx,
     playRoundStartBell, scheduleCtxSuspend, flash, vibrate, speak, unlock,
   ]);
+
+  /**
+   * Skip the current phase (rest → next round, work → rest). The interval
+   * loop performs the actual transition with a NOW anchor and no bells.
+   * Only meaningful while running; while paused the controls are hidden.
+   */
+  const skipPhase = useCallback(() => {
+    if (!isRunningRef.current) return;
+    skipRequestedRef.current = true;
+    // Confirm the tap with a light haptic even when phase haptics are disabled —
+    // the button itself gave no other feedback.
+    vibrate(HAPTIC.tick);
+  }, [vibrate]);
+
+  /**
+   * Add 30 seconds to the phase in progress. Works running or paused: the
+   * deadline (running) or remaining time (paused) both simply grow. The
+   * nominal phase duration grows with it so the progress ring stays honest.
+   */
+  const extendPhase = useCallback((sec = 30) => {
+    if (phaseRef.current === 'idle' || phaseRef.current === 'done') return;
+    setPhaseSec(s => s + sec);
+    if (isRunningRef.current) {
+      deadlineRef.current += sec * 1000;
+      setTimeLeft(Math.max(1, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    } else {
+      // Paused: grow the stored remainder. timeLeftRef follows via its sync
+      // effect on the next render.
+      setTimeLeft(t => t + sec);
+    }
+    vibrate(HAPTIC.tick);
+  }, [vibrate]);
 
   // Sync idle display when workSec changes.
   // No set-state-in-effect suppression needed any more: this write used to feed
@@ -845,8 +942,10 @@ export function useRoundTimer() {
     workColor, restColor,
     // Timer state
     phase, currentRound, timeLeft, isRunning, sessionId,
+    /** Nominal duration of the current phase (progress-ring denominator). */
+    phaseSec,
     // Actions
-    handleStartPause, reset, selectPreset,
+    handleStartPause, reset, selectPreset, skipPhase, extendPhase,
     // Setters (for settings rows)
     setRounds:      (v: number) => { setRounds(v); roundsRef.current = v; },
     setWorkSec:     (v: number) => { setWorkSec(v); workSecRef.current = v; },

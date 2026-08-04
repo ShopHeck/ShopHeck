@@ -489,8 +489,46 @@ function makeLocalIdResolver(map: Record<string, string>) {
   };
 }
 
+/**
+ * Page through an entire ordered table query.
+ *
+ * A bare `select('*')` is capped at the server's default page size (1,000
+ * rows), and PostgREST silently drops everything beyond it. A heavy Pro
+ * account — daily weigh-ins, meal logs and session logs across many camps —
+ * passes 1,000 rows in weight_entries and nutrition_logs well before it does
+ * in the log tables, so a cross-device restore would silently lose the OLDEST
+ * rows (the ones furthest down the ORDER BY) exactly for the users who pay
+ * for multi-device sync. Page with `.range()` until a short page returns;
+ * the ordering established at the call site is what makes the pages tile.
+ */
+const PAGE_SIZE = 1000;
+
+type ListResult<T> = { data: T[] | null; error: { message: string } | null };
+
+/**
+ * Returns the same `{ data, error }` shape the plain query builder resolves
+ * to, so a paginated query slots into pullState exactly where the unpaged one
+ * sat.
+ */
+async function selectAll<T>(
+  build: (from: number, to: number) => PromiseLike<ListResult<T>>,
+): Promise<ListResult<T>> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build(from, from + PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    const page = data ?? [];
+    rows.push(...page);
+    // A short page means we have read past the end of the table.
+    if (page.length < PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 export async function pullState(userId: string): Promise<PullResult> {
   if (!supabase) return { ok: false, error: 'Cloud sync is not configured.' };
+  // Non-null local: TypeScript cannot keep the module-level nullable import
+  // narrowed inside the paging closures below (same pattern as AuthContext).
+  const client = supabase;
 
   const map = loadIdMap();
   // Snapshot the mapping BEFORE resolving — makeLocalIdResolver mints (and
@@ -525,14 +563,42 @@ export async function pullState(userId: string): Promise<PullResult> {
       // every one of them pick the OLDEST camp, so a multi-camp account
       // restored onto a new device would open on a finished camp and
       // regenerate the schedule for it.
-      supabase.from('camps').select('*').eq('user_id', userId).order('start_date', { ascending: true }),
-      supabase.from('workout_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('sparring_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('conditioning_tests').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('weight_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('nutrition_logs').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('hrv_entries').select('*').eq('user_id', userId).order('date', { ascending: false }),
-      supabase.from('fight_results').select('*').eq('user_id', userId).order('fight_date', { ascending: false }),
+      //
+      // Every list query is also paginated through selectAll (see its docs):
+      // without .range() each query silently caps at the server page size and
+      // a heavy account loses its oldest rows on restore.
+      selectAll<Row<'camps'>>(
+        (from, to) => client.from('camps').select('*').eq('user_id', userId)
+          .order('start_date', { ascending: true }).range(from, to),
+      ),
+      selectAll<Row<'workout_logs'>>(
+        (from, to) => client.from('workout_logs').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'sparring_logs'>>(
+        (from, to) => client.from('sparring_logs').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'conditioning_tests'>>(
+        (from, to) => client.from('conditioning_tests').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'weight_entries'>>(
+        (from, to) => client.from('weight_entries').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'nutrition_logs'>>(
+        (from, to) => client.from('nutrition_logs').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'hrv_entries'>>(
+        (from, to) => client.from('hrv_entries').select('*').eq('user_id', userId)
+          .order('date', { ascending: false }).range(from, to),
+      ),
+      selectAll<Row<'fight_results'>>(
+        (from, to) => client.from('fight_results').select('*').eq('user_id', userId)
+          .order('fight_date', { ascending: false }).range(from, to),
+      ),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 

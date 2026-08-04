@@ -75,10 +75,11 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
     .filter(e => e.campId === activeCamp.id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
-  const weightToGo = toDisplayWeight(
-    (latestWeight ? latestWeight.weight : activeCamp.currentWeight) - activeCamp.targetWeight,
-    unit,
-  ).toFixed(1);
+  // Clamped at zero: a fighter already under target must not see a negative
+  // "to cut" figure on the dashboard (read as a bug, and demoralising mid-cut).
+  const rawToGo = (latestWeight ? latestWeight.weight : activeCamp.currentWeight) - activeCamp.targetWeight;
+  const weightToGo = toDisplayWeight(Math.max(0, rawToGo), unit).toFixed(1);
+  const madeWeight = rawToGo <= 0;
 
   const today = new Date();
   const todayDayOfWeek = today.getDay();
@@ -320,7 +321,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <button onClick={() => onNavigate('weight')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <TrendingDown size={16} className="text-brand-500" />
           <div className="text-xl font-black text-white">{weightToGo}</div>
-          <div className="text-xs text-gray-400">{unit} to cut</div>
+          <div className="text-xs text-gray-400">{madeWeight ? 'at / below target' : `${unit} to cut`}</div>
         </button>
         <button onClick={() => onNavigate('log')} className="stat-card hover:border-brand-700 transition-colors text-left">
           <Activity size={16} className="text-green-500" />

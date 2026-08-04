@@ -63,7 +63,8 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [sPerf, setSPerf] = useState<1|2|3|4|5>(3);
   const [sNotes, setSNotes] = useState('');
 
-  // Apply prefill from planner shortcut
+  // Apply prefill from planner shortcut. `onPrefillConsumed` is stable
+  // (useCallback in AppShell), so listing it cannot re-fire the effect.
   useEffect(() => {
     if (prefill) {
       setWType(prefill.sessionType);
@@ -72,7 +73,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       setShowModal(true);
       onPrefillConsumed?.();
     }
-  }, [prefill]);
+  }, [prefill, onPrefillConsumed]);
 
   // Conditioning form
   const [cDate, setCDate] = useState(format(new Date(), 'yyyy-MM-dd'));

@@ -145,9 +145,13 @@ export default function FightReadiness() {
 
   // Animate the gauge score from 0 → target on mount
   const [displayScore, setDisplayScore] = useState(0);
+  // The animation's only input is the score itself. Depending on `result` (a
+  // fresh object on every state change) would restart the 900 ms sweep on any
+  // unrelated dispatch, so the primitive is extracted and used as the dep.
+  const overall = result?.overall ?? null;
   useEffect(() => {
-    if (!result) return;
-    const target = result.overall;
+    if (overall === null) return;
+    const target = overall;
     const duration = 900;
     const startTime = Date.now();
 
@@ -160,7 +164,7 @@ export default function FightReadiness() {
     }
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [result?.overall]);
+  }, [overall]);
 
   if (!state.activeCamp) {
     return (

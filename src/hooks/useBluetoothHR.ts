@@ -291,6 +291,10 @@ export function useBluetoothHR(maxHR: number): HRState & {
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {
+    // Copy the handler to a local at setup: it is created once by the useRef
+    // initializer and never reassigned, and reading the ref in the cleanup
+    // would use a value that may have moved by teardown time.
+    const notifyHandler = webNotifyRef.current;
     return () => {
       if (isNative) {
         if (nativeDeviceIdRef.current) {
@@ -299,7 +303,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
         }
       } else {
         if (webCharacteristicRef.current) {
-          webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', webNotifyRef.current);
+          webCharacteristicRef.current.removeEventListener('characteristicvaluechanged', notifyHandler);
           webCharacteristicRef.current.stopNotifications().catch(() => {});
         }
         if (webDeviceRef.current?.gatt?.connected) {
@@ -307,7 +311,7 @@ export function useBluetoothHR(maxHR: number): HRState & {
         }
       }
     };
-    // Unmount only — device refs are stable; the handler is read via webNotifyRef.
+    // Unmount only — device refs are stable; the handler is captured above.
   }, []);
 
   return { ...state, connect, disconnect };
