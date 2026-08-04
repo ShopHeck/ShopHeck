@@ -73,6 +73,30 @@ function purchaseErrorMessage(e: unknown): string {
   return message;
 }
 
+/**
+ * Match a RevenueCat package for a tier+billing choice. Dashboard package
+ * naming is not pinned, so match on substrings of the identifier or product
+ * id — "fighter"/"coach" for the tier and month/year cues for the period.
+ * Returns null when nothing matches; the caller falls back to the full
+ * RevenueCat paywall then, so a renamed dashboard never breaks purchases.
+ */
+function matchPackage(
+  packages: import('../../plugins/RevenueCat').RevenueCatPackage[],
+  tier: 'fighter' | 'coach',
+  billing: 'monthly' | 'annual',
+): import('../../plugins/RevenueCat').RevenueCatPackage | null {
+  const tierCue = tier === 'fighter' ? 'fighter' : 'coach';
+  const periodCues = billing === 'monthly'
+    ? ['month', 'monthly', '_1m', '-1m']
+    : ['year', 'annual', 'annually', '_1y', '-1y', '_12m', '-12m'];
+  const text = (p: import('../../plugins/RevenueCat').RevenueCatPackage) =>
+    `${p.identifier} ${p.productIdentifier} ${p.productTitle}`.toLowerCase();
+  return packages.find(p => {
+    const t = text(p);
+    return t.includes(tierCue) && periodCues.some(c => t.includes(c));
+  }) ?? null;
+}
+
 export default function UpgradeModal({ onClose, onBeforeWebCheckout, defaultTier }: Props) {
   const titleId = useId();
   const panelRef = useDialog({ onClose });
@@ -107,7 +131,16 @@ export default function UpgradeModal({ onClose, onBeforeWebCheckout, defaultTier
     if (Capacitor.isNativePlatform()) {
       setLoading(true);
       try {
-        const result = await RevenueCat.presentPaywall();
+        // Single-screen purchase: this modal already carries the tier cards,
+        // so drive StoreKit directly instead of stacking the RevenueCat
+        // paywall as a second decision screen. Falls back to the full paywall
+        // when packages can't be resolved (no offering, unexpected naming).
+        const { packages } = await RevenueCat.getPackages();
+        const pkg = matchPackage(packages, tier, billing);
+        const result = pkg
+          ? await RevenueCat.purchasePackage({ packageId: pkg.identifier })
+          : await RevenueCat.presentPaywall();
+        if ('cancelled' in result && result.cancelled) return;
         if (applyRevenueCatResult(result.isPro, result.tier)) onClose();
       } catch (e) {
         setNotice(purchaseErrorMessage(e));

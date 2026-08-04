@@ -944,6 +944,10 @@ export function useRoundTimer() {
     phase, currentRound, timeLeft, isRunning, sessionId,
     /** Nominal duration of the current phase (progress-ring denominator). */
     phaseSec,
+    /** Absolute wall-clock end of the phase in progress (0 when idle).
+     *  Stable across ticks — changes only on transitions, skips and +30s,
+     *  which is exactly what the Live Activity needs to know about. */
+    deadlineMs: deadlineRef.current,
     // Actions
     handleStartPause, reset, selectPreset, skipPhase, extendPhase,
     // Setters (for settings rows)

@@ -7,23 +7,54 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		23CF955D613E87F5791E4864 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 505E57AE1A90A9DA998DDE97 /* Foundation.framework */; };
+		2502D417B8163F8FA86FC3F6 /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		45A5E4076B1CF773B5D95511 /* TimerLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6AF4799B99151E05DE8ABFBA /* TimerLiveActivity.appex */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		669BD44CE00BAC756D5230C7 /* TimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F253F8DADDB582C1BAFEFD /* TimerLiveActivityWidget.swift */; };
+		953E1DD27732D4476046557B /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		E23A4817B8B53BB552425619 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5139CF4F8E593DA26E54168 /* LiveActivityPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0E2F /* RevenueCatPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */; };
-		FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */; };
-		FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0E6F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = FC1A2B3C4D5E6A7B8C9D0E4F /* RevenueCat */; };
 		FC1A2B3C4D5E6A7B8C9D0E7F /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = FC1A2B3C4D5E6A7B8C9D0E5F /* RevenueCatUI */; };
+		FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */; };
+		FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CC6FF3F3DADA6083D9DC2186 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6953CF35C936D7E488DAF569;
+			remoteInfo = TimerLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8E8D56DAF78A018B53CF60B7 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				45A5E4076B1CF773B5D95511 /* TimerLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimerActivityAttributes.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -31,9 +62,14 @@
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		505E57AE1A90A9DA998DDE97 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		52F253F8DADDB582C1BAFEFD /* TimerLiveActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimerLiveActivityWidget.swift; sourceTree = "<group>"; };
+		6AF4799B99151E05DE8ABFBA /* TimerLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TimerLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		B5139CF4F8E593DA26E54168 /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
+		C7E94944E999E782E06E876A /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
@@ -53,13 +89,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A027611B8472237BB3F25E37 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23CF955D613E87F5791E4864 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1F31E58294E302147E5F5E83 /* TimerLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */,
+				52F253F8DADDB582C1BAFEFD /* TimerLiveActivityWidget.swift */,
+				C7E94944E999E782E06E876A /* Info.plist */,
+			);
+			name = TimerLiveActivity;
+			path = TimerLiveActivity;
+			sourceTree = "<group>";
+		};
 		27E2DDA53C4D2A4D1A88CE4A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
+				A99F3BABEBEA84FEC2F38E8C /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -71,6 +127,7 @@
 				504EC3051FED79650016851F /* Products */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
+				1F31E58294E302147E5F5E83 /* TimerLiveActivity */,
 			);
 			sourceTree = "<group>";
 		};
@@ -78,6 +135,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				6AF4799B99151E05DE8ABFBA /* TimerLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -98,6 +156,7 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				FCC0DEAD0000000000000001 /* Release.xcconfig */,
 				FCC0DEAD0000000000000002 /* Secrets.xcconfig.example */,
+				B5139CF4F8E593DA26E54168 /* LiveActivityPlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -109,6 +168,14 @@
 				AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */,
 			);
 			name = Pods;
+			sourceTree = "<group>";
+		};
+		A99F3BABEBEA84FEC2F38E8C /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				505E57AE1A90A9DA998DDE97 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -123,10 +190,12 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				9592DBEFFC6D2A0C8D5DEB22 /* [CP] Embed Pods Frameworks */,
+				8E8D56DAF78A018B53CF60B7 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D7F4E5EC982A17773AD2803D /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -136,6 +205,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		6953CF35C936D7E488DAF569 /* TimerLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DB26F52FA6C155416A9DBBC4 /* Build configuration list for PBXNativeTarget "TimerLiveActivity" */;
+			buildPhases = (
+				0620C10E1297790626208AC3 /* Sources */,
+				A027611B8472237BB3F25E37 /* Frameworks */,
+				4A3D6528EB03371804BCE8D0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TimerLiveActivity;
+			productName = TimerLiveActivity;
+			productReference = 6AF4799B99151E05DE8ABFBA /* TimerLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -170,11 +256,19 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				6953CF35C936D7E488DAF569 /* TimerLiveActivity */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		4A3D6528EB03371804BCE8D0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -227,6 +321,15 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		0620C10E1297790626208AC3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				669BD44CE00BAC756D5230C7 /* TimerLiveActivityWidget.swift in Sources */,
+				953E1DD27732D4476046557B /* TimerActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -235,10 +338,21 @@
 				FC1A2B3C4D5E6A7B8C9D0E2F /* RevenueCatPlugin.swift in Sources */,
 				FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */,
 				FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */,
+				E23A4817B8B53BB552425619 /* LiveActivityPlugin.swift in Sources */,
+				2502D417B8163F8FA86FC3F6 /* TimerActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D7F4E5EC982A17773AD2803D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = TimerLiveActivity;
+			target = 6953CF35C936D7E488DAF569 /* TimerLiveActivity */;
+			targetProxy = CC6FF3F3DADA6083D9DC2186 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -260,6 +374,26 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		39D7D73D4D0F6329556DA7CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = WV4L598A44;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TimerLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				MARKETING_VERSION = 1.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = app.fightcamptraining.timerliveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -424,6 +558,27 @@
 			};
 			name = Release;
 		};
+		5C4621AFB30F368A60607AC8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = WV4L598A44;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TimerLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				MARKETING_VERSION = 1.0.3;
+				PRODUCT_BUNDLE_IDENTIFIER = app.fightcamptraining.timerliveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -441,6 +596,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DB26F52FA6C155416A9DBBC4 /* Build configuration list for PBXNativeTarget "TimerLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C4621AFB30F368A60607AC8 /* Release */,
+				39D7D73D4D0F6329556DA7CD /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

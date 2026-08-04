@@ -1,5 +1,13 @@
 import { registerPlugin } from '@capacitor/core';
 
+export interface RevenueCatPackage {
+  identifier: string;
+  productIdentifier: string;
+  packageType: string;
+  localizedPrice: string;
+  productTitle: string;
+}
+
 export interface RevenueCatPlugin {
   getCustomerInfo(): Promise<{ isPro: boolean; tier: string }>;
   /** Resolves with the post-paywall entitlement state once the sheet is dismissed
@@ -7,6 +15,13 @@ export interface RevenueCatPlugin {
   presentPaywall(): Promise<{ isPro: boolean; tier: string }>;
   presentCustomerCenter(): Promise<void>;
   restorePurchases(): Promise<{ isPro: boolean; tier: string }>;
+  /** Lists the current offering's packages so the app's own upgrade screen can
+   *  drive a direct purchase. Empty list when no offering is configured. */
+  getPackages(): Promise<{ packages: RevenueCatPackage[] }>;
+  /** Purchases one package by identifier straight through StoreKit — no
+   *  RevenueCat paywall sheet in between. Resolves with the post-purchase
+   *  entitlement state plus a `cancelled` flag for a backed-out purchase. */
+  purchasePackage(options: { packageId: string }): Promise<{ isPro: boolean; tier: string; cancelled: boolean }>;
   /** Ties the RevenueCat subscriber to the signed-in Supabase account so webhook
    *  events carry an attributable user id (server-verified entitlements).
    *  Resolves with the identified account's entitlements — a subscription bought
@@ -38,6 +53,8 @@ export const RevenueCat = registerPlugin<RevenueCatPlugin>('RevenueCat', {
     presentPaywall: async () => ({ isPro: false, tier: 'free' }),
     presentCustomerCenter: async () => {},
     restorePurchases: async () => ({ isPro: false, tier: 'free' }),
+    getPackages: async () => ({ packages: [] }),
+    purchasePackage: async () => ({ isPro: false, tier: 'free', cancelled: false }),
     logIn: async () => ({ isPro: false, tier: 'free' }),
     logOut: async () => {},
     getDiagnostics: async () => ({

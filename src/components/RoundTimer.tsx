@@ -19,6 +19,7 @@ import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
+import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
 
 // Session id of the last completion we logged — makes the completion effect
 // idempotent across relaunches that restore a finished session.
@@ -122,7 +123,7 @@ export default function RoundTimer() {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
     voiceEnabled, hapticEnabled, reactionMode, bgAlerts, bgAlertsSupported,
     workColor, restColor,
-    phase, currentRound, timeLeft, isRunning, sessionId, phaseSec,
+    phase, currentRound, timeLeft, isRunning, sessionId, phaseSec, deadlineMs,
     handleStartPause, reset, selectPreset, skipPhase, extendPhase,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
     setVoiceEnabled, setHapticEnabled, setReactionMode, setBgAlerts,
@@ -223,6 +224,59 @@ export default function RoundTimer() {
     }
     prevPhaseRef.current = phase;
   }, [phase, resetMEP]);
+
+  // ── Live Activity (iOS 16.1+) ─────────────────────────────────────────────
+  // The web timer freezes when the app backgrounds, so push the session's
+  // REMAINING SCHEDULE as absolute wall-clock segments: the widget renders
+  // the countdown from Date() itself and keeps counting while WKWebView is
+  // suspended.
+  //
+  // Keyed on `deadlineMs`, not `timeLeft` — the deadline only moves on phase
+  // transitions, skips and +30s extensions, so this pushes exactly when the
+  // schedule changes and never once a second.
+  const presetLabel = selectedPreset < PRESETS.length
+    ? PRESETS[selectedPreset].label
+    : customPresets[selectedPreset - PRESETS.length]?.label ?? 'Custom';
+
+  // Latest activity payload, refreshed every render. The push effects below
+  // read it through a ref so they can re-run ONLY on schedule-change signals
+  // (deps) instead of on every second tick.
+  const laSnapshotRef = React.useRef({
+    phase, round: currentRound, rounds, deadlineMs, phaseSec, workSec,
+    restSec, prepSec, isRunning, pausedTimeLeft: timeLeft, presetLabel,
+    workColorHex: workColor, restColorHex: restColor,
+  });
+  laSnapshotRef.current = {
+    phase, round: currentRound, rounds, deadlineMs, phaseSec, workSec,
+    restSec, prepSec, isRunning, pausedTimeLeft: timeLeft, presetLabel,
+    workColorHex: workColor, restColorHex: restColor,
+  };
+
+  useEffect(() => {
+    if (phase === 'idle' || phase === 'done' || !sessionId) {
+      void endLiveActivity();
+      return;
+    }
+    void syncLiveActivity(laSnapshotRef.current, sessionId);
+    // deadlineMs (not timeLeft) is the schedule-change signal: it moves only
+    // on phase transitions, skips and +30s extensions, so this pushes exactly
+    // when the schedule changes and never once a second. pausedTimeLeft is
+    // only consumed by the widget while paused, where timeLeft is constant.
+  }, [phase, currentRound, isRunning, sessionId, deadlineMs, phaseSec,
+      rounds, workSec, restSec, prepSec, presetLabel, workColor, restColor]);
+
+  // The push that matters most: the last foreground moment before WKWebView
+  // suspends. Without it the activity would be one transition stale by the
+  // time the phone is locked.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (phase === 'idle' || phase === 'done' || !sessionId) return;
+      void syncLiveActivity(laSnapshotRef.current, sessionId);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [phase, sessionId]);
 
   const savePreset = useCallback((p: Omit<CustomTimerPreset, 'id' | 'createdAt'>) => {
     const newPreset: CustomTimerPreset = { ...p, id: generateId(), createdAt: new Date().toISOString() };
