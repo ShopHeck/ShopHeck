@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createDefaultState,
   deleteCamp,
@@ -151,6 +151,20 @@ describe('deleteCamp — cascade', () => {
 });
 
 describe('loadState — upgrade path', () => {
+  // createDefaultState() stamps gamification.belt.achievedAt.white with
+  // new Date(), so the two calls in `expect(loadState()).toEqual(
+  // createDefaultState())` disagree by a millisecond whenever they land either
+  // side of a tick — the suite then fails on a one-digit diff in a timestamp
+  // neither case is about. Freeze the clock so these compare the document's
+  // shape, which is what they are checking.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns defaults with no stored document', () => {
     expect(loadState()).toEqual(createDefaultState());
   });

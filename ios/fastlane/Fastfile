@@ -50,6 +50,20 @@ end
 # to this Fastfile's directory so it resolves regardless of fastlane's cwd.
 ASC_KEY_PATH = File.expand_path("AuthKey_asc.p8", __dir__).freeze
 
+# The Xcode project, for code that opens it directly rather than through an
+# action.
+#
+# fastlane runs a lane's own body from the fastlane/ directory, but wraps each
+# *action* it invokes in a further chdir("..") — so the same relative path means
+# two different places depending on who reads it. Actions can be handed
+# "App/App.xcodeproj" and resolve it against ios/; plain Ruby in a lane body
+# resolves it against ios/fastlane/ and fails with
+#
+#   [Xcodeproj] Unable to open `ios/fastlane/App/App.xcodeproj`
+#
+# Anchoring to __dir__ removes the distinction.
+XCODEPROJ_PATH = File.expand_path("../App/App.xcodeproj", __dir__).freeze
+
 # Reject a RevenueCat key that cannot work in a release build.
 #
 # Emptiness was the only thing checked here before, which let the wrong *kind*
@@ -339,11 +353,10 @@ platform :ios do
   private_lane :sync_extension_versions do
     require "xcodeproj"
 
-    project_path = "App/App.xcodeproj"
-    project = Xcodeproj::Project.open(project_path)
+    project = Xcodeproj::Project.open(XCODEPROJ_PATH)
 
     app_target = project.targets.find { |target| target.name == "App" }
-    UI.user_error!("No 'App' target in #{project_path}") if app_target.nil?
+    UI.user_error!("No 'App' target in #{XCODEPROJ_PATH}") if app_target.nil?
 
     app_release = app_target.build_configurations.find { |config| config.name == "Release" }
     build_version = app_release.build_settings["CURRENT_PROJECT_VERSION"]
