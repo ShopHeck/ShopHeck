@@ -104,9 +104,29 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             return
         }
 
-        // One activity per session: end any leftover (e.g. a crashed session
-        // whose 'end' never fired) before starting fresh.
-        endCurrentActivity()
+        // Recover activities that survived a process restart: `currentActivity`
+        // is an in-memory handle, so after a relaunch the system may still hold
+        // an activity this plugin no longer knows about. Requesting a new one
+        // then would stack a second Lock Screen/Dynamic Island timer.
+        //
+        // Same session → adopt the existing activity and update it in place.
+        // A different (stale) session → end it first, then request fresh.
+        for existing in Activity<TimerActivityAttributes>.activities {
+            if existing.attributes.sessionId == sessionId {
+                currentActivity = existing
+                Task {
+                    // update(using:) is the 16.1 API; the ActivityContent-based
+                    // overload needs 16.2.
+                    await existing.update(using: state)
+                }
+                call.resolve(["started": true])
+                return
+            }
+            Task {
+                await existing.end(using: nil)
+            }
+        }
+        currentActivity = nil
 
         let activity = try? Activity<TimerActivityAttributes>.request(
             attributes: TimerActivityAttributes(sessionId: sessionId),

@@ -35,13 +35,17 @@ struct TimerLiveActivityWidget: Widget {
                         .foregroundStyle(phaseColor(context.state))
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("R \(context.state.round)/\(context.state.rounds)")
+                    // Round comes from the ACTIVE SEGMENT, not the snapshot:
+                    // the app can't push while suspended, but the segments
+                    // keep advancing the phase on their own — the label must
+                    // follow them or the island shows R 1/3 during round 3.
+                    Text("R \(displayedRound(context.state))/\(context.state.rounds)")
                         .font(.caption.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
             } compactLeading: {
-                Text("R\(context.state.round)")
+                Text("R\(displayedRound(context.state))")
                     .font(.caption2.weight(.heavy))
                     .foregroundStyle(phaseColor(context.state))
             } compactTrailing: {
@@ -62,11 +66,22 @@ struct TimerLiveActivityWidget: Widget {
 // ─── Shared rendering ──────────────────────────────────────────────────────
 
 /// The segment currently on the clock: the first one whose end is still in
-/// the future. When every segment has elapsed (the app died before it could
-/// end the activity) the last segment renders with a "Done" label.
+/// the future. nil once the WHOLE schedule has elapsed — which happens when
+/// the app was suspended/killed and never got to call `end` (see
+/// phaseLabel's "DONE" branch and countdownText's "✓"). Falling back to the
+/// last segment here would make those completion states unreachable and pin
+/// the activity on a 0:00 segment forever.
 private func currentSegment(_ state: TimerActivityAttributes.ContentState) -> TimerActivityAttributes.ContentState.Segment? {
     let nowMs = Date().timeIntervalSince1970 * 1000
-    return state.segments.first { $0.endMs > nowMs } ?? state.segments.last
+    return state.segments.first { $0.endMs > nowMs }
+}
+
+/// The round to display. The app cannot push updates while suspended, so the
+/// snapshot-level `round` goes stale mid-session; the segments keep advancing
+/// on their own and this label must follow them (R 2/3 during round 2, not
+/// R 1/3). Falls back to the snapshot round when nothing is on the clock.
+private func displayedRound(_ state: TimerActivityAttributes.ContentState) -> Int {
+    currentSegment(state)?.round ?? state.round
 }
 
 private func phaseLabel(_ state: TimerActivityAttributes.ContentState) -> String {
@@ -148,7 +163,7 @@ private struct LockScreenTimerView: View {
 
             Spacer()
 
-            Text("Round\n\(state.round)/\(state.rounds)")
+            Text("Round\n\(displayedRound(state))/\(state.rounds)")
                 .font(.caption.weight(.bold))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
