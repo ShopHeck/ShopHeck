@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope, Watch } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import { useHeartRate } from '../context/HeartRateContext';
@@ -580,6 +580,30 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             {hr.connectError && (
               <div className="px-4 py-2.5 bg-red-950/30 border-t border-red-900/40">
                 <p className="text-xs text-red-400">{hr.connectError}</p>
+              </div>
+            )}
+
+            {/* Apple Watch — read-only status, deliberately. There is no
+                connect button because there is nothing to connect: the watch
+                app streams whenever it is running a session, and a control here
+                would imply a pairing step that does not exist. */}
+            {hr.watchAvailable && (
+              <div className="px-4 py-3.5 flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${hr.source === 'watch' ? 'bg-green-900/30' : 'bg-dark-600'}`}>
+                  <Watch size={15} className={hr.source === 'watch' ? 'text-green-400' : 'text-gray-400'} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Apple Watch</p>
+                  <p className="text-xs text-gray-400">
+                    {hr.source === 'watch'
+                      ? `Streaming · ${hr.hr ?? '—'} bpm`
+                      : hr.connected
+                        // Explains why the watch is idle rather than leaving it
+                        // looking broken next to a working strap.
+                        ? 'Standing by — your chest strap is more accurate, so it wins'
+                        : 'Start a session on your watch to stream heart rate'}
+                  </p>
+                </div>
               </div>
             )}
 

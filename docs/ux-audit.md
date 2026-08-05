@@ -1,5 +1,18 @@
 # Frontend Design & UX Audit — Subscription Conversion
 
+> **Historical record. Do not read the "still open" sections below as current.**
+>
+> This document's open-work lists went stale five times — see the table in
+> [`open-work.md`](./open-work.md), which is now the single tracker. Everything
+> below is preserved as a dated snapshot of what was found and why, because the
+> reasoning is still worth reading; the *status* of any given item is not.
+>
+> Closed since this was last refreshed: coach-notes sync, the team overview, the
+> shared Bluetooth connection, the unified max-HR fallback, the HRV and
+> nutrition delete confirmations, per-category notification toggles, persisted
+> AI analyses, and password reset. The double-paywall item was already fixed
+> when this document claimed it was open.
+
 **Original scope (Aug 2026):** every screen in `src/`, the paywall stack, onboarding, gamification, coach flows, and sync — audited against one question: *what would make more users subscribe because the subscription is worth more to them?*
 
 **This refresh (Aug 2026, later):** the original audit sat behind roughly 25 merged PRs by the time this pass ran. Every claim below was re-verified against current source — not against commit messages, not against the original doc's own text. About three-quarters of the original findings are resolved; this document keeps only what's still true, with fresh `file:line` evidence, and a prioritized plan for what's left.
@@ -83,10 +96,18 @@ Genuinely fixed in this pass:
   `capacitor://localhost`. The reset copy deliberately does not reveal whether
   an address has an account.
 
-**Still open after this pass:** the double iOS paywall (P0 #2 — needs a native
-purchase-surface decision, not a code change), Coach IA (Dashboard and Fighters
-still render the same component), the bare session-complete screen, made-weight
-replacing rather than hiding Cut Coach, and P3 #15 palette tinting.
+**Correction to this section as first written.** It listed the double iOS
+paywall and the bare session-complete screen as still open. Both were already
+fixed — `UpgradeModal` drives StoreKit directly through
+`RevenueCat.purchasePackage` and only falls back to `presentPaywall()` when the
+packages cannot be resolved (`2c95bcd`), and the timer's done state renders a
+rounds/clock/MEP summary card. That made five stale claims across this
+document's life, which is what prompted moving live tracking to
+[`open-work.md`](./open-work.md).
+
+**Genuinely still open after this pass:** Coach IA (Dashboard and Fighters
+render the same component), made-weight hiding rather than replacing Cut Coach,
+and palette tinting. All three are tracked in `open-work.md`.
 
 ---
 
