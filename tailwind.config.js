@@ -73,6 +73,7 @@ export default {
           gold: channel('--accent-gold-rgb'),
           green: channel('--accent-green-rgb'),
           blue: channel('--accent-blue-rgb'),
+          teal: channel('--accent-teal-rgb'),
         },
 
         // Glass + solid surfaces, for the components that opt into the

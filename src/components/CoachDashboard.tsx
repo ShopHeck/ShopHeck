@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, ChevronRight, Activity, Scale, Zap, User, Search, MessageSquarePlus, Trash2, ChevronDown, Lock, Cloud } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { PACE_COLORS, paceTier, tint } from '../utils/designTokens';
 import { useAuth } from '../context/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
@@ -13,6 +14,7 @@ import {
 } from '../lib/coachLinks';
 import { buildTeamOverview, FLAG_LABELS, type TeamOverviewRow } from '../utils/teamOverview';
 import UpgradeModal from './shared/UpgradeModal';
+import GlassMetricTile from './shared/GlassMetricTile';
 import type { CoachNoteCategory } from '../types';
 import {
   LineChart,
@@ -23,6 +25,23 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+
+/**
+ * A coach and their fighter must never read two different colours for the same
+ * camp. Both scales below therefore resolve through the same pace tiers the
+ * fighter-side screens use (§2.6) rather than through a private green/amber/red
+ * — which is what this file previously carried, in four separate places.
+ */
+function paceColor(ratio: number): string {
+  return PACE_COLORS[paceTier(ratio)];
+}
+
+/** Sparring performance is scored 1–5; 4+ is good, 3 is watchable. */
+function performanceStyle(score: number) {
+  const color = paceColor(score / 4);
+  return { backgroundColor: tint(color, 0.18), color };
+}
+
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -44,9 +63,9 @@ function ChartTooltip({ active, payload, label }: CustomTooltipProps) {
 
 const CATEGORY_STYLES: Record<CoachNoteCategory, { label: string; cls: string }> = {
   technique:    { label: 'Technique',    cls: 'bg-brand-900/40 text-brand-400' },
-  conditioning: { label: 'Conditioning', cls: 'bg-yellow-900/40 text-yellow-400' },
-  mental:       { label: 'Mental',       cls: 'bg-purple-900/40 text-purple-400' },
-  nutrition:    { label: 'Nutrition',    cls: 'bg-green-900/40 text-green-400' },
+  conditioning: { label: 'Conditioning', cls: 'bg-accent-gold/20 text-accent-gold' },
+  mental:       { label: 'Mental',       cls: 'bg-accent-violet/20 text-accent-violet' },
+  nutrition:    { label: 'Nutrition',    cls: 'bg-accent-green/20 text-accent-green' },
   general:      { label: 'General',      cls: 'bg-dark-500 text-gray-400' },
 };
 
@@ -240,22 +259,22 @@ export default function CoachDashboard() {
               </div>
             </div>
 
-            <div className="mx-4 grid grid-cols-3 gap-3">
-              <div className="stat-card">
-                <Activity size={14} className="text-brand-500" />
-                <div className="text-lg font-black text-white">{campWorkouts.length}</div>
-                <div className="text-xs text-gray-400">sessions</div>
-              </div>
-              <div className="stat-card">
-                <Zap size={14} className="text-yellow-400" />
-                <div className="text-lg font-black text-white">{campSparring.reduce((s, l) => s + l.rounds, 0)}</div>
-                <div className="text-xs text-gray-400">spar rounds</div>
-              </div>
-              <div className="stat-card">
-                <Scale size={14} className="text-blue-400" />
-                <div className="text-lg font-black text-white">{toDisplayWeight(latestW, unit)}</div>
-                <div className="text-xs text-gray-400">{unit} now</div>
-              </div>
+            <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+              <GlassMetricTile
+                label="Sessions"
+                value={campWorkouts.length}
+                icon={<Activity size={13} style={{ color: 'var(--accent-flame)' }} />}
+              />
+              <GlassMetricTile
+                label="Rounds"
+                value={campSparring.reduce((s, l) => s + l.rounds, 0)}
+                icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
+              />
+              <GlassMetricTile
+                label={`${unit} now`}
+                value={toDisplayWeight(latestW, unit)}
+                icon={<Scale size={13} style={{ color: 'var(--accent-blue)' }} />}
+              />
             </div>
 
             {campSparring.length > 0 && (
@@ -268,10 +287,10 @@ export default function CoachDashboard() {
                         <p className="text-sm font-semibold text-white">{s.rounds} rounds{s.partner_name && s.partner_name !== 'Unknown' ? ` vs ${s.partner_name}` : ''}</p>
                         <p className="text-xs text-gray-400">{format(parseISO(s.date), 'MMM d')} · Week {s.week_number}</p>
                       </div>
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
-                        s.performance >= 4 ? 'bg-green-900/40 text-green-400' :
-                        s.performance >= 3 ? 'bg-yellow-900/40 text-yellow-400' : 'bg-red-900/40 text-red-400'
-                      }`}>{s.performance}</div>
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold tabular-nums"
+                        style={performanceStyle(s.performance)}
+                      >{s.performance}</div>
                     </div>
                   ))}
                 </div>
@@ -325,7 +344,7 @@ export default function CoachDashboard() {
                   onChange={e => setCloudNoteContent(e.target.value)}
                 />
                 {cloudNoteError && (
-                  <p className="text-xs text-red-400">{cloudNoteError}</p>
+                  <p className="text-xs text-accent-crimson">{cloudNoteError}</p>
                 )}
                 <div className="flex justify-end">
                   <button
@@ -372,7 +391,7 @@ export default function CoachDashboard() {
                           <button
                             onClick={() => retractCloudNote(note.id)}
                             aria-label="Delete note"
-                            className="text-gray-450 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                            className="text-gray-450 hover:text-accent-crimson transition-colors flex-shrink-0 mt-0.5"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -470,22 +489,22 @@ export default function CoachDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="mx-4 grid grid-cols-3 gap-3">
-          <div className="stat-card">
-            <Activity size={14} className="text-brand-500" />
-            <div className="text-lg font-black text-white">{campWorkouts.length}</div>
-            <div className="text-xs text-gray-400">sessions</div>
-          </div>
-          <div className="stat-card">
-            <Zap size={14} className="text-yellow-400" />
-            <div className="text-lg font-black text-white">{campSparring.reduce((s, l) => s + l.rounds, 0)}</div>
-            <div className="text-xs text-gray-400">spar rounds</div>
-          </div>
-          <div className="stat-card">
-            <Scale size={14} className="text-blue-400" />
-            <div className="text-lg font-black text-white">{toDisplayWeight(currentW, unit)}</div>
-            <div className="text-xs text-gray-400">{unit} now</div>
-          </div>
+        <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+          <GlassMetricTile
+            label="Sessions"
+            value={campWorkouts.length}
+            icon={<Activity size={13} style={{ color: 'var(--accent-flame)' }} />}
+          />
+          <GlassMetricTile
+            label="Rounds"
+            value={campSparring.reduce((s, l) => s + l.rounds, 0)}
+            icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
+          />
+          <GlassMetricTile
+            label={`${unit} now`}
+            value={toDisplayWeight(currentW, unit)}
+            icon={<Scale size={13} style={{ color: 'var(--accent-blue)' }} />}
+          />
         </div>
 
         {/* Coach Notes Section */}
@@ -569,7 +588,7 @@ export default function CoachDashboard() {
                     </div>
                     <button
                       onClick={() => dispatch({ type: 'DELETE_COACH_NOTE', payload: note.id })}
-                      className="text-gray-450 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                      className="text-gray-450 hover:text-accent-crimson transition-colors flex-shrink-0 mt-0.5"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -644,11 +663,10 @@ export default function CoachDashboard() {
                     <p className="text-xs text-gray-400">{format(parseISO(s.date), 'MMM d')} · Week {s.weekNumber}</p>
                     {s.focus && <p className="text-xs text-gray-450 mt-0.5">Focus: {s.focus}</p>}
                   </div>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
-                    s.performance >= 4 ? 'bg-green-900/40 text-green-400' :
-                    s.performance >= 3 ? 'bg-yellow-900/40 text-yellow-400' :
-                    'bg-red-900/40 text-red-400'
-                  }`}>
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold tabular-nums"
+                    style={performanceStyle(s.performance)}
+                  >
                     {s.performance}
                   </div>
                 </div>
@@ -690,14 +708,14 @@ export default function CoachDashboard() {
             onClick={() => setShowUpgrade(true)}
             className="w-full mb-4 flex items-center gap-3 p-3.5 rounded-xl border border-purple-700/40 bg-gradient-to-br from-purple-900/30 to-dark-700 text-left hover:border-purple-600 transition-colors"
           >
-            <div className="w-9 h-9 rounded-lg bg-purple-900/40 flex items-center justify-center flex-shrink-0">
-              <Lock size={16} className="text-purple-400" />
+            <div className="w-9 h-9 rounded-lg bg-accent-violet/20 flex items-center justify-center flex-shrink-0">
+              <Lock size={16} className="text-accent-violet" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Unlock Coach Pro</p>
               <p className="text-xs text-gray-400 mt-0.5">View fighter analytics, add notes &amp; manage unlimited fighters</p>
             </div>
-            <ChevronRight size={16} className="text-purple-400 flex-shrink-0" />
+            <ChevronRight size={16} className="text-accent-violet flex-shrink-0" />
           </button>
         )}
 
@@ -740,11 +758,15 @@ export default function CoachDashboard() {
                               {row.flags.map(flag => (
                                 <span
                                   key={flag}
-                                  className={`badge text-[10px] ${
+                                  className="badge text-[10px]"
+                                  style={
+                                    /* Fight week is a state, not a problem — it
+                                       takes the flame of the countdown rather
+                                       than the crimson of a red flag. */
                                     flag === 'fight-week'
-                                      ? 'bg-brand-900/40 text-brand-400'
-                                      : 'bg-red-900/40 text-red-400'
-                                  }`}
+                                      ? { backgroundColor: tint('var(--accent-flame)', 0.18), color: 'var(--accent-flame)' }
+                                      : { backgroundColor: tint('var(--pace-critical)', 0.18), color: 'var(--pace-critical)' }
+                                  }
                                 >
                                   {FLAG_LABELS[flag]}
                                 </span>
@@ -763,11 +785,10 @@ export default function CoachDashboard() {
                           {row.adherencePct === null ? (
                             <span className="text-gray-450">—</span>
                           ) : (
-                            <span className={
-                              row.adherencePct >= 80 ? 'text-green-400'
-                                : row.adherencePct >= 60 ? 'text-yellow-400'
-                                : 'text-red-400'
-                            }>
+                            <span
+                              className="tabular-nums"
+                              style={{ color: paceColor(row.adherencePct / 80) }}
+                            >
                               {row.adherencePct}%
                             </span>
                           )}

@@ -13,6 +13,7 @@ import AdaptationCard from './AdaptationCard';
 import { activeCornerSession } from '../utils/cornerMode';
 import { fightCta } from '../utils/fightDayCta';
 import GlassSurface from './shared/GlassSurface';
+import ToolTile from './shared/ToolTile';
 import GlassMetricTile from './shared/GlassMetricTile';
 import DurationBadge from './shared/DurationBadge';
 import FightCountdownCard from './shared/FightCountdownCard';
@@ -36,15 +37,6 @@ const PHASE_COLORS: Record<string, string> = {
 const INTENSITY_DOTS: Record<string, number> = {
   Low: 1, Medium: 2, High: 3, 'Very High': 4,
 };
-
-/** Small tier chip on gated tool tiles, so a paywall is never a surprise tap. */
-function ProChip() {
-  return (
-    <span className="ml-auto flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-900/50 border border-brand-800/60 text-brand-400">
-      PRO
-    </span>
-  );
-}
 
 import type { LogPrefill } from '../App';
 
@@ -539,95 +531,15 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
 
       {/* Quick Tools */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tools</p>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => onNavigate('aiinsights')}
-            className="card flex items-center gap-3 hover:border-purple-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-              <Brain size={18} className="text-purple-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">AI Insights</p>
-              <p className="text-xs text-gray-400">Coach analysis</p>
-            </div>
-            {!pro && <ProChip />}
-          </button>
-          <button
-            onClick={() => onNavigate('gameplan')}
-            className="card flex items-center gap-3 hover:border-red-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-red-900/30 flex items-center justify-center flex-shrink-0">
-              <Shield size={18} className="text-red-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Game Plan</p>
-              <p className="text-xs text-gray-400">Fight strategy</p>
-            </div>
-            {!pro && <ProChip />}
-          </button>
-          <button
-            onClick={() => onNavigate('nutrition')}
-            className="card flex items-center gap-3 hover:border-blue-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-              <Droplets size={18} className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Nutrition</p>
-              <p className="text-xs text-gray-400">Water & meals</p>
-            </div>
-            {!pro && <ProChip />}
-          </button>
-          <button
-            onClick={() => onNavigate('trackers')}
-            className="card flex items-center gap-3 hover:border-teal-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
-              <Bluetooth size={18} className="text-teal-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Trackers</p>
-              <p className="text-xs text-gray-400">HR · HRV · Recovery</p>
-            </div>
-          </button>
-          <button
-            onClick={() => onNavigate('workout-library')}
-            className="card flex items-center gap-3 hover:border-yellow-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
-              <Dumbbell size={18} className="text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Exercise Library</p>
-              <p className="text-xs text-gray-400">Drills & workouts</p>
-            </div>
-          </button>
-          <button
-            onClick={() => onNavigate('meal-library')}
-            className="card flex items-center gap-3 hover:border-green-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-green-900/30 flex items-center justify-center flex-shrink-0">
-              <UtensilsCrossed size={18} className="text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Meal Library</p>
-              <p className="text-xs text-gray-400">Plans & generator</p>
-            </div>
-          </button>
-          <button
-            onClick={() => onNavigate('camp-history')}
-            className="card flex items-center gap-3 hover:border-brand-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-brand-900/30 flex items-center justify-center flex-shrink-0">
-              <History size={18} className="text-brand-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Camp History</p>
-              <p className="text-xs text-gray-400">Past camps & fights</p>
-            </div>
-          </button>
+        <p className="type-caption text-gray-450 mb-2">Tools</p>
+        <div className="grid grid-cols-2" style={{ gap: 'var(--space-3)' }}>
+          <ToolTile icon={<Brain size={18} />} accent="var(--accent-violet)" title="AI Insights" subtitle="Coach analysis" onClick={() => onNavigate('aiinsights')} gated={!pro} />
+          <ToolTile icon={<Shield size={18} />} accent="var(--accent-crimson)" title="Game Plan" subtitle="Fight strategy" onClick={() => onNavigate('gameplan')} gated={!pro} />
+          <ToolTile icon={<Droplets size={18} />} accent="var(--accent-blue)" title="Nutrition" subtitle="Water & meals" onClick={() => onNavigate('nutrition')} gated={!pro} />
+          <ToolTile icon={<Bluetooth size={18} />} accent="var(--accent-cyan)" title="Trackers" subtitle="HR · HRV · Recovery" onClick={() => onNavigate('trackers')} />
+          <ToolTile icon={<Dumbbell size={18} />} accent="var(--accent-gold)" title="Exercise Library" subtitle="Drills & workouts" onClick={() => onNavigate('workout-library')} />
+          <ToolTile icon={<UtensilsCrossed size={18} />} accent="var(--accent-green)" title="Meal Library" subtitle="Plans & generator" onClick={() => onNavigate('meal-library')} />
+          <ToolTile icon={<History size={18} />} accent="var(--accent-flame)" title="Camp History" subtitle="Past camps & fights" onClick={() => onNavigate('camp-history')} />
         </div>
       </div>
     </div>

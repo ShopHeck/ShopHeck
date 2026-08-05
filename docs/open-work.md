@@ -62,17 +62,6 @@ app and signs in with it. That works, but it is a seam.
 Closing it means a universal link (associated domains + an `apple-app-site-association`
 file) so the reset link opens the app directly.
 
-### Palette is untinted stock Tailwind
-
-Every `dark-*` token has equal R/G/B and `brand-*` is stock Tailwind orange.
-
-```sh
-sed -n '31,42p' tailwind.config.js
-```
-
-Deliberately low priority — a full redesign was proposed and declined (PR #82),
-so this is token-level tinting only, not a new visual language.
-
 ### Adaptations and corner sessions are local-only
 
 `campAdaptations`, `cornerSessions` and `aiAnalyses` never reach the cloud —

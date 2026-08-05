@@ -167,6 +167,7 @@ export const TOKENS = {
   gold: 'var(--accent-gold)',
   green: 'var(--accent-green)',
   blue: 'var(--accent-blue)',
+  teal: 'var(--accent-teal)',
   textPrimary: 'var(--text-primary)',
   textSecondary: 'var(--text-secondary)',
   textTertiary: 'var(--text-tertiary)',
