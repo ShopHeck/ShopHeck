@@ -5,6 +5,7 @@ import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { scheduleAdherence } from '../utils/adherence';
 import { streamAiCoach, AiCoachError, type AiCoachErrorCode } from '../lib/aiCoach';
+import { aiAnalysisKey } from '../utils/storage';
 import AuthScreen from './AuthScreen';
 import UpgradeModal from './shared/UpgradeModal';
 import { format, parseISO, subDays } from 'date-fns';
@@ -147,10 +148,33 @@ function renderInsights(text: string) {
 }
 
 export default function AIInsights() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const { activeCamp } = state;
 
-  const [insights, setInsights] = useState('');
+  // The saved analysis for this camp, if one has been generated before.
+  const saved = activeCamp
+    ? state.aiAnalyses?.[aiAnalysisKey('insights', activeCamp.id)]
+    : undefined;
+
+  // In-flight streaming text, tagged with the camp it belongs to. Tagging (as
+  // opposed to seeding a plain string from `saved`) is what keeps the display
+  // honest if the active camp changes while this screen is mounted: a draft for
+  // another camp is simply not shown, so no effect has to chase the switch.
+  //
+  // The completed text is committed to app state once, not per token —
+  // dispatching per chunk would run the reducer and re-render every consumer
+  // hundreds of times for a single generation.
+  const [draft, setDraft] = useState<{ subjectId: string; content: string } | null>(null);
+  const insights = draft && draft.subjectId === activeCamp?.id
+    ? draft.content
+    : saved?.content ?? '';
+  const setInsights = (update: (prev: string) => string) => {
+    if (!activeCamp) return;
+    setDraft(d => ({
+      subjectId: activeCamp.id,
+      content: update(d?.subjectId === activeCamp.id ? d.content : ''),
+    }));
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState<AiCoachErrorCode | null>(null);
@@ -163,12 +187,23 @@ export default function AIInsights() {
     setLoading(true);
     setError('');
     setErrorCode(null);
-    setInsights('');
+    setDraft({ subjectId: activeCamp.id, content: '' });
 
+    let streamed = '';
     try {
       await streamAiCoach('insights', buildPrompt(state), text => {
+        streamed += text;
         setInsights(prev => prev + text);
       });
+      // Only a completed stream is worth keeping. A run that threw partway
+      // leaves the partial text on screen (the user can see what arrived) but
+      // does not persist a truncated analysis as if it were the finished one.
+      if (streamed.trim()) {
+        dispatch({
+          type: 'SAVE_AI_ANALYSIS',
+          payload: { kind: 'insights', subjectId: activeCamp.id, content: streamed },
+        });
+      }
     } catch (err) {
       if (err instanceof AiCoachError) {
         setError(err.message);
@@ -266,6 +301,14 @@ export default function AIInsights() {
               <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse rounded-sm" />
             )}
           </div>
+          {/* Dates a restored analysis, so a week-old read isn't mistaken for a
+              fresh one. Only shown when the text on screen IS the saved text —
+              during a regenerate the old timestamp would be a lie. */}
+          {!loading && saved && insights === saved.content && (
+            <p className="text-xs text-gray-450 mt-3 pt-3 border-t border-dark-600">
+              Generated {format(parseISO(saved.generatedAt), 'MMM d, h:mm a')}
+            </p>
+          )}
         </div>
       )}
 

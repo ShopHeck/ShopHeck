@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { format, parseISO, subDays } from 'date-fns';
 import { useApp } from '../context/AppContext';
-import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { useHeartRate } from '../context/HeartRateContext';
 import {
   initiateFitbitConnect, handleFitbitCallback, getFitbitCallbackCode,
   getFitbitCallbackState,
@@ -14,6 +15,7 @@ import {
 } from '../utils/fitbitAuth';
 import type { HRVSource } from '../types';
 import { parseRmssdMs } from '../utils/validation';
+import ConfirmDialog from './shared/ConfirmDialog';
 
 // ─── Recovery score ───────────────────────────────────────────────────────
 
@@ -77,10 +79,14 @@ interface Props { onNavigate: (view: string) => void; }
 
 export default function FitnessTrackerHub({ onNavigate }: Props) {
   const { state, dispatch } = useApp();
-  const { activeCamp, currentUser, fitbitConfig, hrvEntries = [] } = state;
+  const { activeCamp, fitbitConfig, hrvEntries = [] } = state;
 
-  const maxHR = currentUser?.maxHR ?? (currentUser ? 220 - currentUser.age : 185);
-  const hr    = useBluetoothHR(maxHR);
+  // The app's single connection (see context/HeartRateContext). Zones are
+  // computed against the provider's max HR, so they now match the timer's
+  // exactly; this screen used to apply a bare `220 - age` with no floor and a
+  // different no-user default, and the profile it read for that is why
+  // `currentUser` is no longer destructured here.
+  const hr = useHeartRate();
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // ── Manual / BLE HRV log form ──────────────────────────────────────────
@@ -90,6 +96,10 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
   const [manualDate, setManualDate]       = useState(format(new Date(), 'yyyy-MM-dd'));
   const [manualSource, setManualSource]   = useState<HRVSource>('manual');
   const [manualNotes, setManualNotes]     = useState('');
+  // An HRV reading is a once-a-morning measurement that cannot be re-taken, and
+  // the delete sits inside a scrolling list — a mis-tap used to destroy it with
+  // no confirmation and no undo.
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // ── Fitbit state ──────────────────────────────────────────────────────
   const [fitbitClientId, setFitbitClientId] = useState(fitbitConfig?.clientId ?? '');
@@ -565,7 +575,8 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
                   </p>
                 </div>
                 <button
-                  onClick={() => dispatch({ type: 'DELETE_HRV', payload: entry.id })}
+                  onClick={() => setDeleteConfirmId(entry.id)}
+                  aria-label={`Delete HRV entry from ${format(parseISO(entry.date), 'MMM d')}`}
                   className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0"
                 >
                   <Trash2 size={14} />
@@ -576,6 +587,16 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
         </div>
       )}
 
+      {deleteConfirmId && (
+        <ConfirmDialog
+          danger
+          title="Delete HRV Entry?"
+          message="This reading will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { dispatch({ type: 'DELETE_HRV', payload: deleteConfirmId }); setDeleteConfirmId(null); }}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
+      )}
     </div>
   );
 }

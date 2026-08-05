@@ -9,6 +9,9 @@ import type { FightAnalysis } from '../utils/fightAnalysis';
 import type { WeightProposal } from '../utils/factorTuner';
 import { useWeightUnit } from '../hooks/useWeightUnit';
 import { formatWeightDelta, type WeightUnit } from '../utils/units';
+import { useApp } from '../context/AppContext';
+import { aiAnalysisKey } from '../utils/storage';
+import { format, parseISO } from 'date-fns';
 
 interface Props {
   camp: FightCamp;
@@ -108,7 +111,20 @@ function renderInsights(text: string) {
 
 export default function PostFightInsights(props: Props) {
   const unit = useWeightUnit();
-  const [insights, setInsights] = useState('');
+  const { state, dispatch } = useApp();
+  const fightId = props.fight.id;
+
+  // The saved breakdown for this fight, if one has been generated before. A
+  // post-fight breakdown is a one-off read of a fight that already happened —
+  // losing it to a back tap meant paying for the same analysis twice.
+  const saved = state.aiAnalyses?.[aiAnalysisKey('post-fight', fightId)];
+
+  // Draft is tagged with its fight so a breakdown streamed for one result is
+  // never shown against another (this component is rendered per fight).
+  const [draft, setDraft] = useState<{ subjectId: string; content: string } | null>(null);
+  const insights = draft && draft.subjectId === fightId
+    ? draft.content
+    : saved?.content ?? '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState<AiCoachErrorCode | null>(null);
@@ -119,12 +135,25 @@ export default function PostFightInsights(props: Props) {
     setLoading(true);
     setError('');
     setErrorCode(null);
-    setInsights('');
+    setDraft({ subjectId: fightId, content: '' });
 
+    let streamed = '';
     try {
       await streamAiCoach('postfight', buildPrompt(props, unit), text => {
-        setInsights(prev => prev + text);
+        streamed += text;
+        setDraft(d => ({
+          subjectId: fightId,
+          content: (d?.subjectId === fightId ? d.content : '') + text,
+        }));
       });
+      // Only a completed stream is persisted; a run that threw partway leaves
+      // its partial text visible but does not save a truncated breakdown.
+      if (streamed.trim()) {
+        dispatch({
+          type: 'SAVE_AI_ANALYSIS',
+          payload: { kind: 'post-fight', subjectId: fightId, content: streamed },
+        });
+      }
     } catch (err) {
       if (err instanceof AiCoachError) {
         setError(err.message);
@@ -207,6 +236,11 @@ export default function PostFightInsights(props: Props) {
               <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse rounded-sm" />
             )}
           </div>
+          {!loading && saved && insights === saved.content && (
+            <p className="text-xs text-gray-450 mt-3 pt-3 border-t border-dark-600">
+              Generated {format(parseISO(saved.generatedAt), 'MMM d, h:mm a')}
+            </p>
+          )}
         </div>
       )}
 

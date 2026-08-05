@@ -26,6 +26,7 @@
 		FC1A2B3C4D5E6A7B8C9D0E7F /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = FC1A2B3C4D5E6A7B8C9D0E5F /* RevenueCatUI */; };
 		FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */; };
+		FC1A2B3C4D5E6A7B8C9D0F3B /* WatchBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F3A /* WatchBridgePlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +74,7 @@
 		FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
+		FC1A2B3C4D5E6A7B8C9D0F3A /* WatchBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridgePlugin.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		FCC0DEAD0000000000000001 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		FCC0DEAD0000000000000002 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 				FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */,
 				FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */,
 				FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */,
+				FC1A2B3C4D5E6A7B8C9D0F3A /* WatchBridgePlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -338,6 +341,7 @@
 				FC1A2B3C4D5E6A7B8C9D0E2F /* RevenueCatPlugin.swift in Sources */,
 				FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */,
 				FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */,
+				FC1A2B3C4D5E6A7B8C9D0F3B /* WatchBridgePlugin.swift in Sources */,
 				E23A4817B8B53BB552425619 /* LiveActivityPlugin.swift in Sources */,
 				2502D417B8163F8FA86FC3F6 /* TimerActivityAttributes.swift in Sources */,
 			);

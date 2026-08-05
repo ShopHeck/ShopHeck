@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
@@ -35,8 +35,17 @@ import {
   deleteFightResult,
   applyFactorWeights,
   setDashboardPrefs,
+  saveAiAnalysis,
+  acceptAdaptation,
+  revertAdaptation,
+  dismissAdaptation,
+  startCornerSession,
+  scoreCornerRound,
+  completeCornerSession,
+  consumeCornerSession,
+  discardCornerSession,
 } from '../utils/storage';
-import { generateTrainingCamp } from '../utils/campGenerator';
+import { buildSchedule } from '../utils/adaptiveCamp';
 import { applyGamificationUpdates, dismissCelebration } from '../utils/gamification';
 import { useAuth } from './AuthContext';
 import { fetchServerSubscription, clearIdMap } from '../lib/sync';
@@ -85,6 +94,15 @@ export type Action =
   | { type: 'RECOMPUTE_GAMIFICATION' }
   | { type: 'DISMISS_CELEBRATION'; payload: string }
   | { type: 'SET_DASHBOARD_PREF'; payload: Partial<DashboardPrefs> }
+  | { type: 'SAVE_AI_ANALYSIS'; payload: { kind: AiAnalysisKind; subjectId: string; content: string } }
+  | { type: 'ACCEPT_ADAPTATION'; payload: Omit<CampAdaptation, 'id' | 'createdAt'> }
+  | { type: 'REVERT_ADAPTATION'; payload: string }
+  | { type: 'DISMISS_ADAPTATION'; payload: string }
+  | { type: 'START_CORNER_SESSION'; payload: Omit<CornerSession, 'id' | 'startedAt' | 'rounds'> }
+  | { type: 'SCORE_CORNER_ROUND'; payload: { sessionId: string; round: CornerRound } }
+  | { type: 'COMPLETE_CORNER_SESSION'; payload: string }
+  | { type: 'CONSUME_CORNER_SESSION'; payload: string }
+  | { type: 'DISCARD_CORNER_SESSION'; payload: string }
   | { type: 'RESET' };
 
 /** Actions whose payloads can shift streaks/belts/achievements/PRs/challenges. */
@@ -123,15 +141,16 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'CREATE_CAMP': {
       const camp = createCamp(action.payload);
-      const schedule = generateTrainingCamp(camp, state.currentUser?.factorWeights);
-      return setSchedule({ ...state, camps: [...state.camps, camp], activeCamp: camp }, schedule);
+      const next = { ...state, camps: [...state.camps, camp], activeCamp: camp };
+      return setSchedule(next, buildSchedule(next, camp));
     }
 
     case 'UPDATE_CAMP': {
       const camps = state.camps.map(c => c.id === action.payload.id ? action.payload : c);
       const activeCamp = state.activeCamp?.id === action.payload.id ? action.payload : state.activeCamp;
-      const schedule = activeCamp ? generateTrainingCamp(activeCamp, state.currentUser?.factorWeights) : state.trainingSchedule;
-      return setSchedule({ ...state, camps, activeCamp }, schedule);
+      const next = { ...state, camps, activeCamp };
+      const schedule = activeCamp ? buildSchedule(next, activeCamp) : state.trainingSchedule;
+      return setSchedule(next, schedule);
     }
 
     case 'DELETE_CAMP': {
@@ -139,17 +158,15 @@ function baseReducer(state: AppState, action: Action): AppState {
       // be rebuilt for it — otherwise the planner kept rendering the deleted
       // camp's weeks until the next app launch.
       const next = deleteCamp(state, action.payload);
-      const schedule = next.activeCamp
-        ? generateTrainingCamp(next.activeCamp, next.currentUser?.factorWeights)
-        : [];
+      const schedule = buildSchedule(next, next.activeCamp);
       return setSchedule(next, schedule);
     }
 
     case 'SET_ACTIVE_CAMP': {
       const camp = state.camps.find(c => c.id === action.payload) || null;
       if (!camp) return state;
-      const schedule = generateTrainingCamp(camp, state.currentUser?.factorWeights);
-      return setSchedule({ ...state, activeCamp: camp }, schedule);
+      const next = { ...state, activeCamp: camp };
+      return setSchedule(next, buildSchedule(next, camp));
     }
 
     case 'LOG_WORKOUT':
@@ -239,6 +256,41 @@ function baseReducer(state: AppState, action: Action): AppState {
     case 'SET_DASHBOARD_PREF':
       return setDashboardPrefs(state, action.payload);
 
+    case 'SAVE_AI_ANALYSIS':
+      return saveAiAnalysis(state, action.payload);
+
+    // Accepting or reverting an adaptation changes the plan, so the schedule is
+    // rebuilt here rather than left to the next unrelated regeneration —
+    // otherwise the planner keeps rendering the pre-adaptation week until some
+    // other action happens to refresh it.
+    case 'ACCEPT_ADAPTATION': {
+      const next = acceptAdaptation(state, action.payload);
+      return setSchedule(next, buildSchedule(next, next.activeCamp));
+    }
+
+    case 'REVERT_ADAPTATION': {
+      const next = revertAdaptation(state, action.payload);
+      return setSchedule(next, buildSchedule(next, next.activeCamp));
+    }
+
+    case 'DISMISS_ADAPTATION':
+      return dismissAdaptation(state, action.payload);
+
+    case 'START_CORNER_SESSION':
+      return startCornerSession(state, action.payload);
+
+    case 'SCORE_CORNER_ROUND':
+      return scoreCornerRound(state, action.payload.sessionId, action.payload.round);
+
+    case 'COMPLETE_CORNER_SESSION':
+      return completeCornerSession(state, action.payload);
+
+    case 'CONSUME_CORNER_SESSION':
+      return consumeCornerSession(state, action.payload);
+
+    case 'DISCARD_CORNER_SESSION':
+      return discardCornerSession(state, action.payload);
+
     case 'RESET':
       // The wipe itself runs in `dispatch` below, not here — see runCommands.
       return createDefaultState();
@@ -281,7 +333,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ? seedDemoState()
       : loadState();
     if (loaded.activeCamp) {
-      return setSchedule(loaded, generateTrainingCamp(loaded.activeCamp, loaded.currentUser?.factorWeights));
+      return setSchedule(loaded, buildSchedule(loaded, loaded.activeCamp));
     }
     return loaded;
   });

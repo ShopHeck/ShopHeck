@@ -5,6 +5,7 @@ import { todayISO } from '../utils/dates';
 import { format, parseISO, subDays, differenceInDays } from 'date-fns';
 import type { NutritionLog, MacroEntry } from '../types';
 import Modal from './shared/Modal';
+import ConfirmDialog from './shared/ConfirmDialog';
 
 type MealRating = 'good' | 'ok' | 'poor';
 type Meal = 'breakfast' | 'lunch' | 'dinner';
@@ -66,6 +67,10 @@ export default function NutritionTracker() {
   const [showTargetEditor, setShowTargetEditor] = useState(false);
   const [macroInput, setMacroInput] = useState<MacroEntry>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [targetInput, setTargetInput] = useState<MacroEntry>({ calories: 2000, protein: 150, carbs: 200, fat: 65 });
+  // A nutrition log is a whole day — water, macros, three meal ratings and
+  // notes. The delete is a small target nested inside the day row, which is
+  // itself a button, so a mis-tap on the row used to wipe the day outright.
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   if (!activeCamp) {
     return (
@@ -120,6 +125,7 @@ export default function NutritionTracker() {
 
   function deleteLog(id: string) {
     dispatch({ type: 'DELETE_NUTRITION', payload: id });
+    setDeleteConfirmId(null);
   }
 
   function saveMacros() {
@@ -413,7 +419,8 @@ export default function NutritionTracker() {
                 </div>
                 {log && (
                   <button
-                    onClick={e => { e.stopPropagation(); deleteLog(log.id); }}
+                    onClick={e => { e.stopPropagation(); setDeleteConfirmId(log.id); }}
+                    aria-label={`Delete nutrition log for ${format(parseISO(log.date), 'MMM d')}`}
                     className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2"
                   >
                     <Trash2 size={13} />
@@ -498,6 +505,17 @@ export default function NutritionTracker() {
             ))}
           </div>
         </Modal>
+      )}
+
+      {deleteConfirmId && (
+        <ConfirmDialog
+          danger
+          title="Delete This Day?"
+          message="Water, macros, meal ratings and notes for this day will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => deleteLog(deleteConfirmId)}
+          onCancel={() => setDeleteConfirmId(null)}
+        />
       )}
     </div>
   );

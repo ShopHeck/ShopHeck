@@ -1,6 +1,7 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 import { defaultGamificationState } from './gamification';
+import { upsertCornerRound } from './cornerMode';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -27,7 +28,157 @@ export function createDefaultState(): AppState {
     fightResults: [],
     gamification: defaultGamificationState(),
     dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false },
+    aiAnalyses: {},
+    campAdaptations: [],
+    dismissedAdaptations: [],
+    cornerSessions: [],
   };
+}
+
+/**
+ * Record an accepted schedule adaptation.
+ *
+ * Replaces any previous adaptation for the same camp week rather than stacking:
+ * two deloads applied to one week would compound into a week with almost no
+ * training in it, and `applyAdaptations` deliberately only reads the newest per
+ * week anyway. Dropping the old row here keeps the store honest about that.
+ */
+export function acceptAdaptation(
+  state: AppState,
+  adaptation: Omit<CampAdaptation, 'id' | 'createdAt'>,
+): AppState {
+  const row: CampAdaptation = {
+    ...adaptation,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
+  const others = (state.campAdaptations ?? []).filter(
+    a => !(a.campId === row.campId && a.weekNumber === row.weekNumber),
+  );
+  return { ...state, campAdaptations: [...others, row] };
+}
+
+/** Undo an accepted adaptation, returning the week to its generated form. */
+export function revertAdaptation(state: AppState, id: string): AppState {
+  return { ...state, campAdaptations: (state.campAdaptations ?? []).filter(a => a.id !== id) };
+}
+
+/** Remember that a proposal was declined, so it is not offered again. */
+export function dismissAdaptation(state: AppState, key: string): AppState {
+  const seen = state.dismissedAdaptations ?? [];
+  if (seen.includes(key)) return state;
+  return { ...state, dismissedAdaptations: [...seen, key] };
+}
+
+// ─── Corner Mode ─────────────────────────────────────────────────────────────
+
+/**
+ * Open a corner session, replacing any unconsumed one for the same camp.
+ *
+ * Replacing rather than appending is deliberate: a fighter who backs out of
+ * Corner Mode and re-enters means "start again", and leaving the abandoned
+ * session behind would make `activeCornerSession` a coin flip between them.
+ */
+export function startCornerSession(
+  state: AppState,
+  session: Omit<CornerSession, 'id' | 'startedAt' | 'rounds'>,
+): AppState {
+  const row: CornerSession = {
+    ...session,
+    id: generateId(),
+    startedAt: new Date().toISOString(),
+    rounds: [],
+  };
+  const others = (state.cornerSessions ?? []).filter(
+    s => !(s.campId === row.campId && !s.consumed),
+  );
+  return { ...state, cornerSessions: [...others, row] };
+}
+
+/** Score (or re-score) a round in an open session. */
+export function scoreCornerRound(
+  state: AppState,
+  sessionId: string,
+  round: CornerRound,
+): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? upsertCornerRound(s, round) : s,
+    ),
+  };
+}
+
+/** Stamp a session finished — final bell, or a stoppage the corner called. */
+export function completeCornerSession(state: AppState, sessionId: string): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? { ...s, completedAt: s.completedAt ?? new Date().toISOString() } : s,
+    ),
+  };
+}
+
+/**
+ * Mark a session's data as carried into a saved fight result.
+ *
+ * Kept rather than deleted: the session is the record of what the corner
+ * actually saw live, and the fight result is what the fighter later decided it
+ * meant. Those are different things, and the first is the more reliable one.
+ */
+export function consumeCornerSession(state: AppState, sessionId: string): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? { ...s, consumed: true } : s,
+    ),
+  };
+}
+
+/** Discard a session outright — the corner opened it by mistake. */
+export function discardCornerSession(state: AppState, sessionId: string): AppState {
+  return { ...state, cornerSessions: (state.cornerSessions ?? []).filter(s => s.id !== sessionId) };
+}
+
+/** Key for a saved AI analysis. One analysis per generator per subject. */
+export function aiAnalysisKey(kind: AiAnalysisKind, subjectId: string): string {
+  return `${kind}:${subjectId}`;
+}
+
+/**
+ * Store a completed analysis, replacing any previous one for the same subject.
+ *
+ * Called once when a stream finishes, never per token — a dispatch per chunk
+ * would run the whole reducer and re-render every consumer hundreds of times
+ * for a single generation. The streaming text lives in component state until
+ * then.
+ */
+export function saveAiAnalysis(
+  state: AppState,
+  analysis: Omit<AiAnalysis, 'generatedAt'> & { generatedAt?: string },
+): AppState {
+  const { kind, subjectId, content } = analysis;
+  return {
+    ...state,
+    aiAnalyses: {
+      ...state.aiAnalyses,
+      [aiAnalysisKey(kind, subjectId)]: {
+        kind,
+        subjectId,
+        content,
+        generatedAt: analysis.generatedAt ?? new Date().toISOString(),
+      },
+    },
+  };
+}
+
+/** Drop a saved analysis — used when its subject is deleted. */
+export function clearAiAnalysis(state: AppState, kind: AiAnalysisKind, subjectId: string): AppState {
+  const key = aiAnalysisKey(kind, subjectId);
+  if (!state.aiAnalyses?.[key]) return state;
+  const next = { ...state.aiAnalyses };
+  delete next[key];
+  return { ...state, aiAnalyses: next };
 }
 
 export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs>): AppState {
@@ -272,6 +423,19 @@ export function deleteCamp(state: AppState, campId: string): AppState {
   const { [campId]: _removedPlan, ...gamePlans } = state.gamePlans;
   void _removedPlan;
 
+  // Saved AI analyses are camp-scoped too: the camp's own insights, plus the
+  // post-fight analysis of every fight result being removed above. Left behind,
+  // they would resurface against a camp the fighter deleted.
+  const droppedFightIds = new Set(
+    (state.fightResults ?? []).filter(r => r.campId === campId).map(r => r.id),
+  );
+  const aiAnalyses = Object.fromEntries(
+    Object.entries(state.aiAnalyses ?? {}).filter(([, a]) =>
+      !(a.kind === 'insights' && a.subjectId === campId) &&
+      !(a.kind === 'post-fight' && droppedFightIds.has(a.subjectId)),
+    ),
+  );
+
   return {
     ...state,
     camps,
@@ -286,6 +450,12 @@ export function deleteCamp(state: AppState, campId: string): AppState {
     gamePlans,
     completedSessions: withoutCampKeys(state.completedSessions),
     dayOverrides: withoutCampKeys(state.dayOverrides),
+    aiAnalyses,
+    // Adaptations are camp-scoped; the dismissal keys are prefixed with the
+    // camp id (see adaptationKey) so they cascade on the same rule.
+    campAdaptations: (state.campAdaptations ?? []).filter(a => a.campId !== campId),
+    dismissedAdaptations: (state.dismissedAdaptations ?? []).filter(k => !k.startsWith(`${campId}:`)),
+    cornerSessions: (state.cornerSessions ?? []).filter(s => s.campId !== campId),
   };
 }
 
@@ -363,7 +533,14 @@ export function updateFightResult(state: AppState, result: FightResult): AppStat
 }
 
 export function deleteFightResult(state: AppState, id: string): AppState {
-  return { ...state, fightResults: (state.fightResults ?? []).filter(r => r.id !== id) };
+  // The saved post-fight breakdown goes with it — a fight result is the only
+  // thing that analysis describes, and ids are not reused, so keeping it would
+  // just leave an orphan in the store forever.
+  return clearAiAnalysis(
+    { ...state, fightResults: (state.fightResults ?? []).filter(r => r.id !== id) },
+    'post-fight',
+    id,
+  );
 }
 
 export function applyFactorWeights(state: AppState, fighterId: string, weights: CampFactorWeights): AppState {

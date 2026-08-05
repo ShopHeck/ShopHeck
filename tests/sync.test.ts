@@ -128,6 +128,7 @@ function snapshot(partial: Partial<CloudSnapshot> = {}): CloudSnapshot {
     nutritionLogs: [],
     hrvEntries: [],
     fightResults: [],
+    coachNotes: [],
     gamePlans: {},
     completedSessions: {},
     dayOverrides: {},
@@ -155,7 +156,7 @@ describe('pullState — ordering', () => {
     return pullState('user-1').then(() => {
       const tables = mock.orders.map(o => o.table).sort();
       expect(tables).toEqual([
-        'camps', 'conditioning_tests', 'fight_results', 'hrv_entries',
+        'camps', 'coach_notes', 'conditioning_tests', 'fight_results', 'hrv_entries',
         'nutrition_logs', 'sparring_logs', 'weight_entries', 'workout_logs',
       ]);
     });
@@ -174,6 +175,9 @@ describe('pullState — ordering', () => {
       for (const table of [
         'workout_logs', 'sparring_logs', 'conditioning_tests',
         'weight_entries', 'nutrition_logs', 'hrv_entries', 'fight_results',
+        // Coach notes are keyed by fighter_id rather than user_id, but they
+        // are still a prepend-convention list and must come back newest-first.
+        'coach_notes',
       ]) {
         expect(byTable[table].ascending, `${table} must be newest-first`).toBe(false);
       }
@@ -193,7 +197,7 @@ describe('pullState — pagination', () => {
     return pullState('user-1').then(() => {
       const tables = mock.ranges.map(r => r.table).sort();
       expect(tables).toEqual([
-        'camps', 'conditioning_tests', 'fight_results', 'hrv_entries',
+        'camps', 'coach_notes', 'conditioning_tests', 'fight_results', 'hrv_entries',
         'nutrition_logs', 'sparring_logs', 'weight_entries', 'workout_logs',
       ]);
       for (const r of mock.ranges) {
@@ -488,5 +492,77 @@ describe('mergeCloud — dashboardPrefs', () => {
     );
 
     expect(merged.dashboardPrefs?.weightUnit).toBe('lbs');
+  });
+});
+
+describe('mergeCloud — coach notes', () => {
+  function note(id: string, fighterId: string, campId = 'camp-1') {
+    return {
+      id,
+      coachId: 'coach-uuid',
+      coachName: 'Coach Vega',
+      fighterId,
+      campId,
+      category: 'technique' as const,
+      content: 'Keep the jab working.',
+      createdAt: '2026-08-01T12:00:00.000Z',
+    };
+  }
+
+  it('restores a note the coach wrote on their own device', () => {
+    const merged = mergeCloud(
+      localState({ currentUser: profile('local-1') }),
+      snapshot({ coachNotes: [note('n1', 'auth-uuid')] }),
+    );
+    expect(merged.coachNotes.map(n => n.id)).toEqual(['n1']);
+  });
+
+  it('re-points fighterId at the LOCAL profile id', () => {
+    // pullState can only stamp the auth uuid. A fighter who onboarded offline
+    // keeps their generated local id, and Dashboard selects the note to show
+    // with `n.fighterId === currentUser.id` — leaving the uuid on the row syncs
+    // the note down correctly and then renders it nowhere.
+    const merged = mergeCloud(
+      localState({ currentUser: profile('local-1') }),
+      snapshot({ coachNotes: [note('n1', 'auth-uuid')] }),
+    );
+    expect(merged.coachNotes[0].fighterId).toBe('local-1');
+  });
+
+  it('leaves fighterId alone when there is no local profile to adopt', () => {
+    const merged = mergeCloud(
+      localState({ currentUser: null }),
+      snapshot({ coachNotes: [note('n1', 'auth-uuid')] }),
+    );
+    expect(merged.coachNotes[0].fighterId).toBe('auth-uuid');
+  });
+
+  it('removes a note the coach retracted', () => {
+    const merged = mergeCloud(
+      localState({ currentUser: profile('local-1'), coachNotes: [note('n1', 'local-1')] }),
+      snapshot({ tombstoned: new Set(['n1']) }),
+    );
+    expect(merged.coachNotes).toHaveLength(0);
+  });
+
+  it('does not resurrect a note this device already dismissed', () => {
+    const merged = mergeCloud(
+      localState({ currentUser: profile('local-1') }),
+      snapshot({
+        coachNotes: [note('n1', 'auth-uuid')],
+        previouslySynced: new Set(['n1']),
+      }),
+    );
+    expect(merged.coachNotes).toHaveLength(0);
+  });
+
+  it('keeps the local copy when a note exists on both sides', () => {
+    const local = { ...note('n1', 'local-1'), content: 'local edit' };
+    const merged = mergeCloud(
+      localState({ currentUser: profile('local-1'), coachNotes: [local] }),
+      snapshot({ coachNotes: [note('n1', 'auth-uuid')] }),
+    );
+    expect(merged.coachNotes).toHaveLength(1);
+    expect(merged.coachNotes[0].content).toBe('local edit');
   });
 });

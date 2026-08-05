@@ -17,9 +17,11 @@ import ProGate from './shared/ProGate';
 import { useDialog } from '../hooks/useDialog';
 import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
-import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { useHeartRate } from '../context/HeartRateContext';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
+import { WatchBridge } from '../plugins/WatchBridge';
 
 // Session id of the last completion we logged — makes the completion effect
 // idempotent across relaunches that restore a finished session.
@@ -130,9 +132,8 @@ export default function RoundTimer() {
     setWorkColor, setRestColor,
   } = timer;
 
-  // Bluetooth HR
-  const maxHR = state.currentUser?.maxHR ?? Math.max(160, 220 - (state.currentUser?.age ?? 25));
-  const hr = useBluetoothHR(maxHR);
+  // Bluetooth HR — the app's single connection (see context/HeartRateContext).
+  const hr = useHeartRate();
   const { mep, resetMEP } = useMyZoneMEP(hr.zone, isRunning);
   const mepTarget = state.currentUser?.mepTarget ?? 65;
 
@@ -264,6 +265,29 @@ export default function RoundTimer() {
     // only consumed by the widget while paused, where timeLeft is constant.
   }, [phase, currentRound, isRunning, sessionId, deadlineMs, phaseSec,
       rounds, workSec, restSec, prepSec, presetLabel, workColor, restColor]);
+
+  // Mirror the session onto the wrist.
+  //
+  // Only the CONFIGURATION is sent, once per session — not the running clock.
+  // The watch derives every phase boundary itself from these durations plus its
+  // own start instant (see RoundEngine.swift), because WatchConnectivity is
+  // best-effort: a per-transition push would drop bells whenever the link was
+  // busy, and a bell that never rings is the one failure that makes a round
+  // timer useless. Keyed on sessionId so a preset change mid-session cannot
+  // re-push and restart the wrist clock.
+  useEffect(() => {
+    if (!sessionId) {
+      void WatchBridge.endSession().catch(() => {});
+      return;
+    }
+    void WatchBridge.startSession({
+      rounds, workSec, restSec, prepSec, label: presetLabel,
+    }).catch(() => {
+      // No watch paired, or the watch app is not installed. The phone timer is
+      // unaffected, and nagging about a device the fighter may not own would be
+      // noise — Settings surfaces availability instead.
+    });
+  }, [sessionId, rounds, workSec, restSec, prepSec, presetLabel]);
 
   // The push that matters most: the last foreground moment before WKWebView
   // suspends. Without it the activity would be one transition stale by the

@@ -6,7 +6,7 @@ import type {
   WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
   DashboardPrefs, FitbitConfig, MacroEntry, CampFactorWeights, FightRound,
   Sport, WeightClass, ExperienceLevel, UserRole, SessionType, OffSeasonGoal, HRVSource,
-  SubscriptionState,
+  SubscriptionState, CoachNote,
 } from '../types';
 
 type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
@@ -449,6 +449,15 @@ export interface CloudSnapshot {
   nutritionLogs: NutritionLog[];
   hrvEntries: HRVEntry[];
   fightResults: FightResult[];
+  /**
+   * Notes a linked coach wrote about this fighter.
+   *
+   * Pull-only, unlike every other collection here. The rows are written by the
+   * coach's account (`coach_notes_write` is `coach_id = auth.uid()`), so a
+   * fighter pushing them would be rejected by RLS — `pushState` deliberately
+   * never sends this table. See lib/coachLinks.ts for the write path.
+   */
+  coachNotes: CoachNote[];
   gamePlans: Record<string, GamePlan>;
   completedSessions: Record<string, boolean>;
   dayOverrides: Record<string, boolean>;
@@ -538,7 +547,7 @@ export async function pullState(userId: string): Promise<PullResult> {
   const lid = makeLocalIdResolver(map);
 
   try {
-    const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ] = await Promise.all([
+    const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       // Tombstoned rows are fetched too, not filtered out. Filtering makes a
       // deleted row indistinguishable from one that never existed, and
@@ -599,10 +608,17 @@ export async function pullState(userId: string): Promise<PullResult> {
         (from, to) => client.from('fight_results').select('*').eq('user_id', userId)
           .order('fight_date', { ascending: false }).range(from, to),
       ),
+      // Coach notes are keyed by `fighter_id`, not `user_id` — they are written
+      // by the coach's account about this fighter. Newest first, matching the
+      // `add*`-prepends convention of every other list above.
+      selectAll<Row<'coach_notes'>>(
+        (from, to) => client.from('coach_notes').select('*').eq('fighter_id', userId)
+          .order('created_at', { ascending: false }).range(from, to),
+      ),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
-    const firstErr = [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, stateQ]
+    const firstErr = [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ]
       .map(q => q.error?.message).find(Boolean);
     if (firstErr) return { ok: false, error: firstErr };
 
@@ -627,7 +643,11 @@ export async function pullState(userId: string): Promise<PullResult> {
       return out;
     };
 
+    /** Cloud ids of the camps this pull actually returned, for FK checks below. */
+    const knownCampUuids = new Set<string>();
+
     const camps: FightCamp[] = live(campsQ.data as Row<'camps'>[] | null).map((c: Row<'camps'>) => {
+      knownCampUuids.add(c.id);
       const campLocalId = lid(c.id);
       const cs = c.completed_sessions as Record<string, boolean> | null;
       if (cs) for (const [rel, v] of Object.entries(cs)) completedSessions[`${campLocalId}-${rel}`] = v;
@@ -719,6 +739,24 @@ export async function pullState(userId: string): Promise<PullResult> {
         overallNotes: r.overall_notes ?? '', lessons: r.lessons ?? '',
         readinessAtFight: r.readiness_at_fight ?? undefined, createdAt: r.created_at,
       })),
+      // `coachId` stays the coach's cloud uuid — there is no local profile to
+      // resolve it against, and `coach_name` is denormalized onto the row for
+      // exactly this reason (the fighter cannot read the coach's profile row).
+      // Notes whose camp this device doesn't know are dropped rather than
+      // shown against a mint-new local camp id: `lid()` would happily invent
+      // one, and the note would render under a camp that isn't there.
+      coachNotes: live(notesQ.data as Row<'coach_notes'>[] | null)
+        .filter((n: Row<'coach_notes'>) => knownCampUuids.has(n.camp_id))
+        .map((n: Row<'coach_notes'>) => ({
+          id: lid(n.id),
+          coachId: n.coach_id,
+          coachName: n.coach_name,
+          fighterId: userId,
+          campId: lid(n.camp_id),
+          category: n.category as CoachNote['category'],
+          content: n.content,
+          createdAt: n.created_at,
+        })),
       gamePlans,
       completedSessions,
       dayOverrides,
@@ -735,6 +773,20 @@ export async function pullState(userId: string): Promise<PullResult> {
     saveIdMap(map);
     return { ok: false, error: e instanceof Error ? e.message : 'Pull failed.' };
   }
+}
+
+/**
+ * Re-point pulled coach notes at the local profile id.
+ *
+ * `pullState` stamps `fighterId` with the auth uuid because that is the only id
+ * it has. Locally the same fighter may still be identified by the id
+ * `createProfile` generated during offline onboarding, and that local id is the
+ * one every consumer filters on. Without a local id to adopt, the uuid is left
+ * in place — it is still the correct identifier, just one nothing will match.
+ */
+function localizeNotes(notes: CoachNote[], localFighterId?: string): CoachNote[] {
+  if (!localFighterId) return notes;
+  return notes.map(n => (n.fighterId === localFighterId ? n : { ...n, fighterId: localFighterId }));
 }
 
 /**
@@ -783,9 +835,11 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
   const activeStillExists =
     state.activeCamp !== null && liveCampIds.has(state.activeCamp.id);
 
+  const currentUser = state.currentUser ?? c.profile;
+
   return {
     ...state,
-    currentUser: state.currentUser ?? c.profile,
+    currentUser,
     fighters: c.profile && !state.fighters.some(f => f.id === c.profile!.id)
       ? [...state.fighters, c.profile]
       : state.fighters,
@@ -798,6 +852,21 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults: union(state.fightResults ?? [], c.fightResults),
+    // Coach notes merge like every other collection, but only the cloud side is
+    // ever written by anyone but this device: a fighter's local `coachNotes`
+    // are their own local-fighter notes, and the coach's arrive here. `union`
+    // already handles both directions — a note the coach retracted comes down
+    // tombstoned and is dropped, and one the fighter dismissed locally is not
+    // resurrected.
+    //
+    // `fighterId` is re-pointed at the LOCAL profile id, and this is load-bearing
+    // rather than cosmetic. `pullState` can only stamp the auth uuid (it has no
+    // local state to consult), but a fighter who onboarded before signing in
+    // keeps their locally-generated `currentUser.id` — the line above this one
+    // resolves `currentUser` local-first. Dashboard selects the note to surface
+    // with `n.fighterId === currentUser.id`, so leaving the uuid on the row
+    // means the note syncs down correctly and then renders nowhere.
+    coachNotes: union(state.coachNotes ?? [], localizeNotes(c.coachNotes, currentUser?.id)),
     // Cloud first so local keys win on conflict. Both sides are filtered to the
     // surviving camps — the local maps too, or metadata for a camp deleted on
     // another device would outlive the camp itself.

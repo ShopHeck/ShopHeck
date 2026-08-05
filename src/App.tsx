@@ -5,6 +5,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
 import { SyncProvider } from './context/SyncContext';
 import { TimerProvider, useTimerSignal } from './context/TimerContext';
+import { HeartRateProvider } from './context/HeartRateContext';
 import ViewSkeleton from './components/shared/ViewSkeleton';
 import type { SessionType } from './types';
 
@@ -22,6 +23,8 @@ import ProGate from './components/shared/ProGate';
 import UpgradeModal from './components/shared/UpgradeModal';
 import { isPro } from './utils/subscription';
 import { remindersEnabled, syncReminders } from './utils/notifications';
+import { useAuth } from './context/AuthContext';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 // ── Lazy imports — loaded on first navigation to that view ────────────────
 const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
@@ -39,6 +42,7 @@ const FitnessTrackerHub = lazy(() => import('./components/FitnessTrackerHub'));
 const WorkoutLibrary   = lazy(() => import('./components/WorkoutLibrary'));
 const MealLibrary      = lazy(() => import('./components/MealLibrary'));
 const FightResultForm  = lazy(() => import('./components/FightResultForm'));
+const CornerMode       = lazy(() => import('./components/CornerMode'));
 const FightBreakdown   = lazy(() => import('./components/FightBreakdown'));
 const CampComparison   = lazy(() => import('./components/CampComparison'));
 const ProgressScreen   = lazy(() => import('./components/gamification/ProgressScreen'));
@@ -63,7 +67,7 @@ function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => voi
   );
 }
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements' | 'corner';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -92,6 +96,11 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   'fight-breakdown': { title: 'Fight Breakdown',    subtitle: 'KPIs & Analysis' },
   'camp-history':   { title: 'Camp History',        subtitle: 'Compare Past Camps' },
   achievements:     { title: 'Achievements',        subtitle: 'Belt · Streaks · PRs' },
+  // Corner Mode renders its own full-screen surface over the shell, so this
+  // title is never actually visible. It exists because VIEW_TITLES is a
+  // Record<View, …> — which is exactly what caught this view being added
+  // without one.
+  corner:           { title: 'Corner Mode',         subtitle: 'Fight Night' },
 };
 
 function FlashOverlay() {
@@ -319,6 +328,15 @@ function AppShell() {
                 onEdit={(id) => { setEditingFightId(id); navigate('fight-log'); }}
               />
             )}
+            {view === 'corner' && (
+              <CornerMode
+                onClose={goBack}
+                // Replace, not push: the fight is over, and backing out of the
+                // result form must not drop the user into a finished corner
+                // session that would offer to start round 1 again.
+                onFinish={() => navigate('fight-log', { replace: true })}
+              />
+            )}
             {view === 'fighters'        && <CoachDashboard />}
             {view === 'achievements'    && <ProgressScreen />}
             {view === 'settings'        && (
@@ -352,12 +370,33 @@ function AppShell() {
   );
 }
 
+/**
+ * Renders the set-a-new-password screen when the app was opened from a recovery
+ * link.
+ *
+ * Mounted here rather than inside `AppShell` because `AppShell` returns
+ * `<Onboarding />` early when there is no profile — and someone resetting a
+ * password on a fresh install is exactly the person who would hit that and
+ * never see the screen.
+ */
+function RecoveryGate() {
+  const { recovery } = useAuth();
+  if (!recovery.active && !recovery.error) return null;
+  return <ResetPasswordScreen />;
+}
+
 export default function App() {
   return (
     <TimerProvider>
       <AppProvider>
         <SyncProvider>
-          <AppShell />
+          {/* Inside AppProvider: the provider derives max HR from the signed-in
+              profile. Mounted for the app's lifetime so a paired strap survives
+              navigation between the timer, Settings and the tracker hub. */}
+          <HeartRateProvider>
+            <AppShell />
+            <RecoveryGate />
+          </HeartRateProvider>
         </SyncProvider>
       </AppProvider>
     </TimerProvider>

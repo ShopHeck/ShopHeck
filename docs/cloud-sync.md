@@ -35,16 +35,37 @@ Set them in **three** places:
 
 ## What's implemented
 
-- **Auth** — optional email/password + Sign in with Apple (`src/context/AuthContext.tsx`).
+- **Auth** — optional email/password, password reset, and Sign in with Apple.
+  Native iOS uses the real Apple sheet with a nonce (hashed for Apple, raw for
+  Supabase); web uses the OAuth redirect (`src/context/AuthContext.tsx`).
 - **Push sync** — device → cloud, debounced + on sign-in (`src/lib/sync.ts`,
-  `src/context/SyncContext.tsx`). Never mutates local state.
+  `src/context/SyncContext.tsx`). Never mutates local state. Per-row FNV-1a
+  hashes mean only changed rows are sent, with a forced full resync every 24h so
+  a drifted hash store heals itself.
+- **Pull / merge** — `pullState` + `mergeCloud`. A conservative union: local wins
+  on conflict, a row this device deleted is not resurrected
+  (`previouslySynced`), and a row tombstoned elsewhere *is* removed. Every list
+  query is explicitly ordered and paginated. This is the highest-risk pure
+  function in the app; `tests/sync.test.ts` pins its documented edge cases.
 - **Coach linking** — invite codes in both directions (`redeem_coach_invite` for
   coach-minted codes, `redeem_fighter_invite` for fighter-minted ones shared out
   via the invite-your-coach loop) + `is_coach_of()` RLS so a linked coach can
   read a fighter's data.
+- **Coach roster + notes** — a team overview triage table and a linked-fighter
+  detail view (`src/lib/coachLinks.ts`). Coach notes are written directly by the
+  coach and pulled by the fighter, deliberately outside `pushState`: a note is
+  owned by the coach but keyed to another account's `fighter_id` and `camp_id`,
+  so there is no `user_id` to push it under. That matches the `coach_notes` RLS
+  exactly — coach writes, either party reads.
 
-## Roadmap
+## Not synced, on purpose
 
-- **Pull / merge** (cross-device restore with last-write-wins) — needs id/key remap.
-- **Coach-linking UX** — generate/enter invite codes, coach roster view.
-- **Sign in with Apple (native)** — deep-link round-trip + Supabase Apple provider config.
+`pushState` enumerates the `user_state` columns it sends, so these stay on the
+device:
+
+| Slice | Why |
+|---|---|
+| `subscription` | Entitlement is server-authoritative — read from the Stripe/RevenueCat tables, never from client-synced state |
+| Fitbit OAuth tokens | Long-lived third-party credentials; the connect flow is per-device PKCE, so syncing them buys nothing and puts a reusable credential in our database |
+| `aiAnalyses` | Large text blobs, cheap to regenerate |
+| `campAdaptations`, `cornerSessions` | See [`open-work.md`](./open-work.md) — worth syncing eventually, needs a migration |

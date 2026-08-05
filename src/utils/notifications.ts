@@ -40,6 +40,72 @@ export function setRemindersEnabled(on: boolean): void {
   localStorage.setItem(PREF_KEY, on ? 'on' : 'off');
 }
 
+// ─── Per-category preferences ───────────────────────────────────────────────
+//
+// "Training reminders" started as one switch over one 7pm daily. Three more
+// notification types have been added since — the weigh-in, the streak-at-risk
+// alert and the Sunday recap — and all four still rode that single switch, so a
+// fighter who wanted the weigh-in but not the Sunday recap had exactly one
+// option: turn everything off. That is the shape of an uninstall, not a
+// preference.
+//
+// The master switch stays as the permission-bearing gate (it is what triggers
+// the OS prompt, and it is what `disableReminders` clears); these sit under it.
+
+const CATEGORY_KEY = 'fightcamp_reminder_categories';
+
+export type ReminderCategory = 'checkIn' | 'weighIn' | 'streakRisk' | 'weeklyRecap';
+
+export const REMINDER_CATEGORIES: ReadonlyArray<{
+  key: ReminderCategory;
+  label: string;
+  description: string;
+}> = [
+  { key: 'checkIn',     label: 'Daily check-in',   description: '7pm — log today’s training' },
+  { key: 'weighIn',     label: 'Morning weigh-in', description: '8am during a fight camp cut' },
+  { key: 'streakRisk',  label: 'Streak at risk',   description: 'When a streak is down to its last day' },
+  { key: 'weeklyRecap', label: 'Weekly recap',     description: 'Sunday evening summary of your week' },
+];
+
+/**
+ * Categories default to **on**.
+ *
+ * This is what makes the split backward-compatible: an existing install has the
+ * master switch on and no category record, and must keep receiving exactly what
+ * it received before rather than going silent until the user visits Settings.
+ * Only an explicit opt-out is ever stored.
+ */
+function readCategories(): Record<ReminderCategory, boolean> {
+  const all: Record<ReminderCategory, boolean> = {
+    checkIn: true, weighIn: true, streakRisk: true, weeklyRecap: true,
+  };
+  try {
+    const raw = localStorage.getItem(CATEGORY_KEY);
+    if (!raw) return all;
+    const parsed = JSON.parse(raw) as Partial<Record<ReminderCategory, boolean>>;
+    for (const { key } of REMINDER_CATEGORIES) {
+      if (typeof parsed[key] === 'boolean') all[key] = parsed[key];
+    }
+  } catch {
+    /* unreadable record — fall back to all-on rather than silencing the app */
+  }
+  return all;
+}
+
+export function getReminderCategories(): Record<ReminderCategory, boolean> {
+  return readCategories();
+}
+
+/** True when the master switch is on *and* this category is not opted out. */
+export function reminderCategoryEnabled(category: ReminderCategory): boolean {
+  return remindersEnabled() && readCategories()[category];
+}
+
+export function setReminderCategoryEnabled(category: ReminderCategory, on: boolean): void {
+  const next = { ...readCategories(), [category]: on };
+  localStorage.setItem(CATEGORY_KEY, JSON.stringify(next));
+}
+
 /** Asks the OS for permission. Returns true when granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!notificationsSupported()) return false;
@@ -73,15 +139,19 @@ export async function syncReminders({ weighIn }: SyncOpts): Promise<void> {
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== 'granted') return;
 
-    const notifications: LocalNotificationSchema[] = [
-      {
+    // Both dailies are cancelled above, so a category switched off simply is
+    // not rescheduled here — no separate cancel path is needed.
+    const categories = readCategories();
+    const notifications: LocalNotificationSchema[] = [];
+    if (categories.checkIn) {
+      notifications.push({
         id: ID_CHECKIN,
         title: 'Keep your streak alive 🔥',
         body: "Log today's training before the day is done.",
         schedule: { on: { hour: 19, minute: 0 }, allowWhileIdle: true },
-      },
-    ];
-    if (weighIn) {
+      });
+    }
+    if (weighIn && categories.weighIn) {
       notifications.push({
         id: ID_WEIGHIN,
         title: 'Morning weigh-in ⚖️',
@@ -89,6 +159,7 @@ export async function syncReminders({ weighIn }: SyncOpts): Promise<void> {
         schedule: { on: { hour: 8, minute: 0 }, allowWhileIdle: true },
       });
     }
+    if (notifications.length === 0) return;
     await LocalNotifications.schedule({ notifications });
   } catch {
     /* notifications are best-effort; never block the app */
@@ -115,13 +186,14 @@ export interface StreakSnapshot {
 /**
  * Reconcile the scheduled streak alert with the live streak. Idempotent —
  * cancels first, then reschedules when there is a streak worth defending.
- * Shares the "Training reminders" preference and permission with the dailies.
+ * Shares the master switch and OS permission with the dailies, and carries its
+ * own "Streak at risk" category on top.
  */
 export async function syncStreakRiskAlert(streak: StreakSnapshot): Promise<void> {
   if (!notificationsSupported()) return;
   try {
     await LocalNotifications.cancel({ notifications: STREAK_IDS });
-    if (!remindersEnabled()) return;
+    if (!reminderCategoryEnabled('streakRisk')) return;
     // A 1-day "streak" is just one workout — the generic daily reminder covers
     // that; the targeted alert is reserved for a streak that took real work.
     if (streak.expired || streak.current < 2 || !streak.lastWorkoutAt) return;
@@ -190,7 +262,7 @@ export async function syncWeeklyReport(stats: WeekReportStats): Promise<void> {
   if (!notificationsSupported()) return;
   try {
     await LocalNotifications.cancel({ notifications: REPORT_IDS });
-    if (!remindersEnabled()) return;
+    if (!reminderCategoryEnabled('weeklyRecap')) return;
     if (stats.sessions === 0) return;
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== 'granted') return;

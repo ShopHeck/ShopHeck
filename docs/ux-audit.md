@@ -1,5 +1,18 @@
 # Frontend Design & UX Audit — Subscription Conversion
 
+> **Historical record. Do not read the "still open" sections below as current.**
+>
+> This document's open-work lists went stale five times — see the table in
+> [`open-work.md`](./open-work.md), which is now the single tracker. Everything
+> below is preserved as a dated snapshot of what was found and why, because the
+> reasoning is still worth reading; the *status* of any given item is not.
+>
+> Closed since this was last refreshed: coach-notes sync, the team overview, the
+> shared Bluetooth connection, the unified max-HR fallback, the HRV and
+> nutrition delete confirmations, per-category notification toggles, persisted
+> AI analyses, and password reset. The double-paywall item was already fixed
+> when this document claimed it was open.
+
 **Original scope (Aug 2026):** every screen in `src/`, the paywall stack, onboarding, gamification, coach flows, and sync — audited against one question: *what would make more users subscribe because the subscription is worth more to them?*
 
 **This refresh (Aug 2026, later):** the original audit sat behind roughly 25 merged PRs by the time this pass ran. Every claim below was re-verified against current source — not against commit messages, not against the original doc's own text. About three-quarters of the original findings are resolved; this document keeps only what's still true, with fresh `file:line` evidence, and a prioritized plan for what's left.
@@ -27,6 +40,74 @@ Grouped by the original section. Each line was independently re-verified, not as
 **Copy (was part of §3):** "Clapper" is now an internal function name only, never rendered (`useRoundTimer.ts:209` vs zero hits in any component). The raw `no-data` enum is mapped to an em dash in the KPI grid (`FightBreakdown.tsx:55`). "vs Unknown (Similar)" is gone — an unnamed partner now renders as "Similar-level partner" everywhere it's shown, including AI prompts (`WorkoutLogger.tsx:271`, `CoachDashboard.tsx:197,481`, `AIInsights.tsx:93`). "N to go" on off-season rows is now gated behind `hasCutTarget` (`WeightTracker.tsx:402`). The "Powered by Claude Opus · Adaptive thinking" line is gone along with the client-side AI calls it was describing. Sign-in and sign-up errors now go through `friendlyAuthError()` instead of surfacing raw Supabase text (`AuthContext.tsx:116,126,158`).
 
 **Navigation and accessibility (was most of §3):** resolved by two follow-on PRs after this audit — a view-history stack with a working back button on every off-tab-bar view, `gray-450` replacing the AA-failing `gray-500` across 121 sites, dialog semantics (focus trap, Escape, stacking) on every overlay including the paywall, accessible names on the readiness gauge and all charts, `aria-pressed` on every toggle group, and 44pt targets with labels. No-camp empty states (`WeightTracker`, `WorkoutLogger`, `WeeklyPlanner`, `OffSeasonDashboard`) already routed through a shared `NoCampState` component before this audit's navigation fix landed, which is a case worth flagging on its own: the original doc's specific claim ("four screens `return null`") was already stale when it was written down, not just stale by the time of this refresh.
+
+---
+
+## Closed in the optimization pass (Aug 2026, later still)
+
+A follow-up pass worked the Phase 2 list below. Every item here was re-verified
+against source before being touched — three of the "still open" entries were
+already **stale** when that pass started, which is worth recording because this
+document has now been wrong in that direction twice:
+
+- **Weekly adherence (P2 #8, adherence half)** was already unified. `campKpis`,
+  `ProgressCharts` and `OffSeasonDashboard` all import `utils/adherence.ts`; the
+  engineering audit closed this and this document was never updated.
+- **Preset UI (P2 #10)** was already fixed — the delete is always-visible (not
+  `group-hover`) and every preset button carries `disabled={isRunning}`.
+- **Inter (P3 #14)** was already loaded from `main.tsx`.
+
+Genuinely fixed in this pass:
+
+- **P1 #5 — `coach_notes` now reaches a remote fighter.** Deliberately *not*
+  routed through `sync.ts`: a note is owned by the coach but keyed to another
+  account's `fighter_id` and `camp_id`, so there is no `user_id` to push it
+  under, and the coach's local notes hang off local-fighter records with no
+  cloud identity. The coach writes directly (`lib/coachLinks.ts`) from the
+  linked-fighter view, and the fighter reads their own notes through
+  `pullState`. That matches the existing RLS exactly. `mergeCloud` re-points
+  `fighterId` at the local profile id — without that the note syncs down
+  correctly and then renders nowhere, because `Dashboard` selects it with
+  `n.fighterId === currentUser.id` and an offline-onboarded fighter keeps their
+  locally-generated id. Pinned by six tests; the re-point test was confirmed to
+  fail with the fix removed.
+- **P1 #6 — Team Overview.** A triage table (days out, adherence, sessions this
+  week, weight, red flags) sorted by who needs the coach first, not
+  alphabetically. Built on `scheduleAdherence` and `computeCutProjection` rather
+  than new local maths, so a coach and their fighter cannot read two different
+  numbers for the same camp. Four batched queries regardless of roster size —
+  the obvious shape is one `getFighterDetail` per fighter, which is an N+1.
+- **P2 #7 — one Bluetooth connection.** `useBluetoothHR` now lives in a provider
+  mounted for the app's lifetime. This fixed more than the "not connected"
+  mismatch: the hook disconnects its device on unmount, so navigating away from
+  whichever screen owned the connection was dropping the strap mid-session.
+- **P2 #8 — max-HR fallback**, now `utils/maxHR.ts`. `FitnessTrackerHub`'s
+  unfloored `220 - age` put a 55-year-old at 165 and pushed every reading a zone
+  high, inflating MEP.
+- **P2 #9 — delete confirmations** on HRV entries and nutrition days.
+- **P2 #11 — per-category notification toggles.** The master switch stays as the
+  permission-bearing gate; categories default to **on** so an existing install
+  keeps receiving exactly what it did before rather than going silent.
+- **P2 #12 — AI analyses persist.** Saved to app state on stream completion (not
+  per token) and local-only — `pushState` enumerates its `user_state` columns, so
+  these never inflate a sync. Camp and fight deletes cascade to them.
+- **P2 #13 — password reset**, plus `emailRedirectTo` on signup. Both use the
+  web origin even on native, because a mail client cannot resolve
+  `capacitor://localhost`. The reset copy deliberately does not reveal whether
+  an address has an account.
+
+**Correction to this section as first written.** It listed the double iOS
+paywall and the bare session-complete screen as still open. Both were already
+fixed — `UpgradeModal` drives StoreKit directly through
+`RevenueCat.purchasePackage` and only falls back to `presentPaywall()` when the
+packages cannot be resolved (`2c95bcd`), and the timer's done state renders a
+rounds/clock/MEP summary card. That made five stale claims across this
+document's life, which is what prompted moving live tracking to
+[`open-work.md`](./open-work.md).
+
+**Genuinely still open after this pass:** Coach IA (Dashboard and Fighters
+render the same component), made-weight hiding rather than replacing Cut Coach,
+and palette tinting. All three are tracked in `open-work.md`.
 
 ---
 

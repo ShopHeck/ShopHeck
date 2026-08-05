@@ -1,13 +1,15 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope } from 'lucide-react';
+import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope, Watch } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { useHeartRate } from '../context/HeartRateContext';
+import { estimateMaxHR } from '../utils/maxHR';
 import UpgradeModal from './shared/UpgradeModal';
 import { isPro, isCoachPro } from '../utils/subscription';
 import { RevenueCat } from '../plugins/RevenueCat';
 import { useApp } from '../context/AppContext';
 import { hasCustomBell, setCustomBell, clearCustomBell, fileToDataUrl } from '../utils/customBell';
-import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders, syncStreakRiskAlert, syncWeeklyReport } from '../utils/notifications';
+import { notificationsSupported, remindersEnabled, setRemindersEnabled, requestNotificationPermission, syncReminders, disableReminders, syncStreakRiskAlert, syncWeeklyReport, REMINDER_CATEGORIES, getReminderCategories, setReminderCategoryEnabled, type ReminderCategory } from '../utils/notifications';
 import { computeWeekReportStats } from '../utils/weeklyReport';
 import { isHealthWriteEnabled, setHealthWriteEnabled } from '../utils/healthSync';
 import { parseWeightInput, weightRangeHint } from '../utils/validation';
@@ -45,9 +47,12 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
   const userIsPro = isPro(sub);
   const userIsCoachPro = isCoachPro(sub);
 
-  // Bluetooth HR
-  const maxHRDefault = Math.max(160, 220 - (currentUser?.age ?? 25));
-  const hr = useBluetoothHR(currentUser?.maxHR ?? maxHRDefault);
+  // Bluetooth HR — the app's single connection (see context/HeartRateContext).
+  // `maxHRDefault` is the age *estimate* alone, not `deriveMaxHR`: it backs the
+  // "reset to estimate" behaviour of the editor below, which must not read back
+  // the saved override it is replacing.
+  const maxHRDefault = estimateMaxHR(currentUser?.age);
+  const hr = useHeartRate();
   const [editingMaxHR, setEditingMaxHR] = useState(false);
   const [maxHRDraft, setMaxHRDraft] = useState(String(currentUser?.maxHR ?? maxHRDefault));
   const [editingMEP, setEditingMEP] = useState(false);
@@ -104,6 +109,39 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
     if (state.gamification?.streak) await syncStreakRiskAlert(state.gamification.streak);
     await syncWeeklyReport(computeWeekReportStats(state));
   }
+
+  // Per-category reminder switches. Each flip has to re-run the reconcilers,
+  // not just write the preference: every sync function cancels its own
+  // notifications before rescheduling, so re-running them is what actually
+  // clears an alert the user just switched off (or arms one they switched on)
+  // instead of leaving it queued in the OS until the next unrelated state
+  // change.
+  const [reminderCategories, setReminderCategories] = useState(getReminderCategories());
+  async function toggleReminderCategory(key: ReminderCategory) {
+    const next = !reminderCategories[key];
+    setReminderCategoryEnabled(key, next);
+    setReminderCategories(getReminderCategories());
+
+    if (key === 'checkIn' || key === 'weighIn') {
+      const weighIn = !!(activeCamp && !activeCamp.isOffSeason && activeCamp.fightDate);
+      await syncReminders({ weighIn });
+    } else if (key === 'streakRisk') {
+      // An empty snapshot still reaches the cancel at the top of the reconciler,
+      // which is the whole point of the call when switching the category off.
+      await syncStreakRiskAlert(
+        state.gamification?.streak ?? { current: 0, lastWorkoutAt: null, expired: true },
+      );
+    } else {
+      await syncWeeklyReport(computeWeekReportStats(state));
+    }
+  }
+
+  const activeReminderCount = REMINDER_CATEGORIES.filter(c => reminderCategories[c.key]).length;
+  const remindersSummary = activeReminderCount === REMINDER_CATEGORIES.length
+    ? 'On — all four reminder types'
+    : activeReminderCount === 0
+      ? 'On — but every type is switched off below'
+      : `On — ${activeReminderCount} of ${REMINDER_CATEGORIES.length} types`;
 
   // Apple Health write-back (native iOS only)
   const [healthSync, setHealthSync] = useState(isHealthWriteEnabled());
@@ -545,6 +583,30 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
             )}
 
+            {/* Apple Watch — read-only status, deliberately. There is no
+                connect button because there is nothing to connect: the watch
+                app streams whenever it is running a session, and a control here
+                would imply a pairing step that does not exist. */}
+            {hr.watchAvailable && (
+              <div className="px-4 py-3.5 flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${hr.source === 'watch' ? 'bg-green-900/30' : 'bg-dark-600'}`}>
+                  <Watch size={15} className={hr.source === 'watch' ? 'text-green-400' : 'text-gray-400'} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Apple Watch</p>
+                  <p className="text-xs text-gray-400">
+                    {hr.source === 'watch'
+                      ? `Streaming · ${hr.hr ?? '—'} bpm`
+                      : hr.connected
+                        // Explains why the watch is idle rather than leaving it
+                        // looking broken next to a working strap.
+                        ? 'Standing by — your chest strap is more accurate, so it wins'
+                        : 'Start a session on your watch to stream heart rate'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Max HR */}
             <div className="px-4 py-3.5">
               <div className="flex items-center justify-between">
@@ -821,13 +883,41 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Training reminders</p>
                 <p className="text-xs text-gray-450">
-                  {reminders ? 'On — daily check-in & weigh-in nudges' : 'Off — tap to enable'}
+                  {reminders ? remindersSummary : 'Off — tap to enable'}
                 </p>
               </div>
               <div className={`w-10 h-6 rounded-full p-0.5 transition-colors flex-shrink-0 ${reminders ? 'bg-brand-600' : 'bg-dark-500'}`}>
                 <div className={`w-5 h-5 rounded-full bg-white transition-transform ${reminders ? 'translate-x-4' : ''}`} />
               </div>
             </button>
+          )}
+          {/* Per-category switches, revealed only once reminders are on: they
+              are meaningless while the master switch (which owns the OS
+              permission prompt) is off, and four dead rows would just be noise
+              for a user who has opted out of notifications entirely. */}
+          {notificationsSupported() && reminders && (
+            <div className="pl-[3.25rem] pr-4 pb-3 space-y-3">
+              {REMINDER_CATEGORIES.map(cat => {
+                const on = reminderCategories[cat.key];
+                return (
+                  <button
+                    key={cat.key}
+                    onClick={() => toggleReminderCategory(cat.key)}
+                    role="switch"
+                    aria-checked={on}
+                    className="w-full flex items-center gap-3 text-left"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm text-white">{cat.label}</p>
+                      <p className="text-xs text-gray-450">{cat.description}</p>
+                    </div>
+                    <div className={`w-9 h-5 rounded-full p-0.5 transition-colors flex-shrink-0 ${on ? 'bg-brand-600' : 'bg-dark-500'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${on ? 'translate-x-4' : ''}`} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           )}
           {Capacitor.isNativePlatform() && (
             <button
