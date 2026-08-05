@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
@@ -35,6 +35,7 @@ import {
   deleteFightResult,
   applyFactorWeights,
   setDashboardPrefs,
+  saveAiAnalysis,
 } from '../utils/storage';
 import { generateTrainingCamp } from '../utils/campGenerator';
 import { applyGamificationUpdates, dismissCelebration } from '../utils/gamification';
@@ -85,6 +86,7 @@ export type Action =
   | { type: 'RECOMPUTE_GAMIFICATION' }
   | { type: 'DISMISS_CELEBRATION'; payload: string }
   | { type: 'SET_DASHBOARD_PREF'; payload: Partial<DashboardPrefs> }
+  | { type: 'SAVE_AI_ANALYSIS'; payload: { kind: AiAnalysisKind; subjectId: string; content: string } }
   | { type: 'RESET' };
 
 /** Actions whose payloads can shift streaks/belts/achievements/PRs/challenges. */
@@ -238,6 +240,9 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'SET_DASHBOARD_PREF':
       return setDashboardPrefs(state, action.payload);
+
+    case 'SAVE_AI_ANALYSIS':
+      return saveAiAnalysis(state, action.payload);
 
     case 'RESET':
       // The wipe itself runs in `dispatch` below, not here — see runCommands.

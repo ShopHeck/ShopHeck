@@ -6,7 +6,12 @@ import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { isCoachPro } from '../utils/subscription';
 import { toDisplayWeight, formatWeight } from '../utils/units';
-import { listLinkedFighters, getFighterDetail, type LinkedFighter, type FighterDetail } from '../lib/coachLinks';
+import {
+  listLinkedFighters, getFighterDetail, listCoachNotes, postCoachNote, removeCoachNote,
+  getTeamSnapshots,
+  type LinkedFighter, type FighterDetail, type CloudCoachNote,
+} from '../lib/coachLinks';
+import { buildTeamOverview, FLAG_LABELS, type TeamOverviewRow } from '../utils/teamOverview';
 import UpgradeModal from './shared/UpgradeModal';
 import type { CoachNoteCategory } from '../types';
 import {
@@ -64,23 +69,89 @@ export default function CoachDashboard() {
   const [cloudDetail, setCloudDetail] = useState<FighterDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // The coach side is a paid tier. Free coaches see the roster shell, but
+  // opening a fighter's data / notes requires Coach Pro.
+  const coachPro = isCoachPro(state.subscription);
+
+  // Team overview (Coach Pro). Loaded alongside the roster rather than on
+  // demand — it is the first thing on the screen, and a spinner where the
+  // triage table should be defeats the point of it.
+  const [team, setTeam] = useState<TeamOverviewRow[]>([]);
+
   useEffect(() => {
-    if (authConfigured && authUser && currentUser?.role === 'coach') {
-      listLinkedFighters(authUser.id).then(setLinked);
-    }
+    if (!authConfigured || !authUser || currentUser?.role !== 'coach') return;
+    listLinkedFighters(authUser.id).then(setLinked);
   }, [authConfigured, authUser, currentUser?.role]);
+
+  useEffect(() => {
+    // Gated on the entitlement too: without it the table never renders, and
+    // fetching every linked fighter's logs to throw them away is pure cost.
+    // Nothing is cleared on the way out — the table's own render is gated on
+    // `coachPro`, so a stale roster can never be displayed, and clearing here
+    // would be a state write on every render this effect re-runs.
+    if (!authConfigured || !authUser || currentUser?.role !== 'coach' || !coachPro) return;
+    let active = true;
+    getTeamSnapshots(authUser.id)
+      .then(snaps => { if (active) setTeam(buildTeamOverview(snaps)); })
+      .catch(() => { /* roster stays empty; the section renders its own notice */ });
+    return () => { active = false; };
+  }, [authConfigured, authUser, currentUser?.role, coachPro]);
+
+  // ── Cloud coach notes (the ones that actually reach a remote fighter) ──
+  //
+  // Kept in component state, not app state: these rows belong to the *fighter's*
+  // account and are written straight to Supabase (see lib/coachLinks.ts). The
+  // local `coachNotes` slice is a different thing — notes on locally-added
+  // fighters, which have no cloud identity.
+  const [cloudNotes, setCloudNotes] = useState<CloudCoachNote[]>([]);
+  const [cloudNoteContent, setCloudNoteContent] = useState('');
+  const [cloudNoteCategory, setCloudNoteCategory] = useState<CoachNoteCategory>('general');
+  const [cloudNoteBusy, setCloudNoteBusy] = useState(false);
+  const [cloudNoteError, setCloudNoteError] = useState('');
 
   async function openCloudFighter(f: LinkedFighter) {
     if (!coachPro) { setShowUpgrade(true); return; }
     setCloudFighter(f);
     setLoadingDetail(true);
-    setCloudDetail(await getFighterDetail(f.id));
+    setCloudNoteError('');
+    const [detail, notes] = await Promise.all([getFighterDetail(f.id), listCoachNotes(f.id)]);
+    setCloudDetail(detail);
+    setCloudNotes(notes);
     setLoadingDetail(false);
   }
 
-  // The coach side is a paid tier. Free coaches see the roster shell, but
-  // opening a fighter's data / notes requires Coach Pro.
-  const coachPro = isCoachPro(state.subscription);
+  async function submitCloudNote(campId: string) {
+    if (!cloudFighter || !authUser || !cloudNoteContent.trim()) return;
+    setCloudNoteBusy(true);
+    setCloudNoteError('');
+    const res = await postCoachNote({
+      coachId: authUser.id,
+      coachName: currentUser?.name ?? 'Coach',
+      fighterId: cloudFighter.id,
+      campId,
+      category: cloudNoteCategory,
+      content: cloudNoteContent.trim(),
+    });
+    if (res.error) {
+      setCloudNoteError(res.error);
+      setCloudNoteBusy(false);
+      return;
+    }
+    // Re-read rather than optimistically appending: the row's id and
+    // created_at are assigned by the server, and the note list is keyed on both.
+    setCloudNotes(await listCoachNotes(cloudFighter.id));
+    setCloudNoteContent('');
+    setCloudNoteCategory('general');
+    setCloudNoteBusy(false);
+  }
+
+  async function retractCloudNote(noteId: string) {
+    if (!cloudFighter) return;
+    const res = await removeCoachNote(noteId);
+    if (res.error) { setCloudNoteError(res.error); return; }
+    setCloudNotes(await listCoachNotes(cloudFighter.id));
+  }
+
   function openFighter(id: string) {
     if (coachPro) setSelectedFighter(id);
     else setShowUpgrade(true);
@@ -223,6 +294,95 @@ export default function CoachDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Coach notes — the write path that actually reaches this fighter's
+                phone. Scoped to the camp on screen, which is what makes the
+                camp_id foreign key resolvable on the fighter's side. */}
+            <div className="mx-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Coach Notes</p>
+
+              <div className="card mb-3 space-y-3">
+                <div className="flex gap-1.5 flex-wrap">
+                  {(Object.keys(CATEGORY_STYLES) as CoachNoteCategory[]).map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCloudNoteCategory(cat)}
+                      aria-pressed={cloudNoteCategory === cat}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                        cloudNoteCategory === cat
+                          ? `${CATEGORY_STYLES[cat].cls} border-current`
+                          : 'bg-dark-600 text-gray-400 border-dark-500 hover:border-dark-300'
+                      }`}
+                    >
+                      {CATEGORY_STYLES[cat].label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  className="input w-full min-h-[90px] text-sm resize-none"
+                  placeholder={`Write a note ${cloudFighter.name.split(' ')[0]} will see in their app…`}
+                  value={cloudNoteContent}
+                  onChange={e => setCloudNoteContent(e.target.value)}
+                />
+                {cloudNoteError && (
+                  <p className="text-xs text-red-400">{cloudNoteError}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => submitCloudNote(camp.id)}
+                    disabled={!cloudNoteContent.trim() || cloudNoteBusy}
+                    className="btn-primary px-4 py-2 text-sm disabled:opacity-40"
+                  >
+                    {cloudNoteBusy ? 'Sending…' : 'Send Note'}
+                  </button>
+                </div>
+              </div>
+
+              {cloudNotes.length === 0 ? (
+                <div className="card text-center py-6">
+                  <MessageSquarePlus size={24} className="text-gray-450 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">No notes yet</p>
+                  <p className="text-xs text-gray-450 mt-1">Notes you send appear on {cloudFighter.name.split(' ')[0]}&apos;s phone on their next sync</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {cloudNotes.map(note => (
+                    <div key={note.id} className="card">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className={`badge text-xs font-semibold ${
+                              CATEGORY_STYLES[note.category as CoachNoteCategory]?.cls ?? 'bg-dark-500 text-gray-400'
+                            }`}>
+                              {CATEGORY_STYLES[note.category as CoachNoteCategory]?.label ?? note.category}
+                            </span>
+                            <span className="text-xs text-gray-450">
+                              {format(parseISO(note.createdAt), 'MMM d, h:mm a')}
+                            </span>
+                            {note.coachId !== authUser?.id && (
+                              <span className="text-xs text-gray-450">· {note.coachName}</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-300 leading-relaxed">{note.content}</p>
+                        </div>
+                        {/* Only the author can retract a note — RLS enforces the
+                            same rule, so showing the control to anyone else would
+                            offer an action the server rejects. */}
+                        {note.coachId === authUser?.id && (
+                          <button
+                            onClick={() => retractCloudNote(note.id)}
+                            aria-label="Delete note"
+                            className="text-gray-450 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -539,6 +699,107 @@ export default function CoachDashboard() {
             </div>
             <ChevronRight size={16} className="text-purple-400 flex-shrink-0" />
           </button>
+        )}
+
+        {/* Team Overview — the triage table. Coach Pro only: it is the roster
+            analytics the tier is sold on, and every field it reads is behind
+            the same gate as the fighter detail view. */}
+        {authConfigured && authUser && coachPro && linked.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Users size={14} className="text-brand-400" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Team Overview</p>
+            </div>
+            {team.length === 0 ? (
+              <div className="card text-center py-6 text-sm text-gray-400">Loading team overview…</div>
+            ) : (
+            <div className="card overflow-x-auto p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-dark-500">
+                    <th scope="col" className="text-left font-semibold text-gray-400 text-xs uppercase tracking-wider px-3 py-2">Fighter</th>
+                    <th scope="col" className="text-right font-semibold text-gray-400 text-xs uppercase tracking-wider px-2 py-2 whitespace-nowrap">Days out</th>
+                    <th scope="col" className="text-right font-semibold text-gray-400 text-xs uppercase tracking-wider px-2 py-2">Adherence</th>
+                    <th scope="col" className="text-right font-semibold text-gray-400 text-xs uppercase tracking-wider px-2 py-2 whitespace-nowrap">7d</th>
+                    <th scope="col" className="text-right font-semibold text-gray-400 text-xs uppercase tracking-wider px-3 py-2 whitespace-nowrap">Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.map(row => {
+                    const fighterLink = linked.find(f => f.id === row.fighterId);
+                    return (
+                      <tr
+                        key={row.fighterId}
+                        onClick={() => fighterLink && openCloudFighter(fighterLink)}
+                        className="border-b border-dark-600 last:border-0 hover:bg-dark-600/50 transition-colors cursor-pointer"
+                      >
+                        <td className="px-3 py-2.5">
+                          <p className="font-semibold text-white leading-tight">{row.name}</p>
+                          {row.flags.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {row.flags.map(flag => (
+                                <span
+                                  key={flag}
+                                  className={`badge text-[10px] ${
+                                    flag === 'fight-week'
+                                      ? 'bg-brand-900/40 text-brand-400'
+                                      : 'bg-red-900/40 text-red-400'
+                                  }`}
+                                >
+                                  {FLAG_LABELS[flag]}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-450 mt-0.5">
+                              {row.hasCamp ? 'On track' : 'No camp'}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-white whitespace-nowrap">
+                          {row.daysOut !== null ? `${row.daysOut}d` : <span className="text-gray-450">—</span>}
+                        </td>
+                        <td className="px-2 py-2.5 text-right whitespace-nowrap">
+                          {row.adherencePct === null ? (
+                            <span className="text-gray-450">—</span>
+                          ) : (
+                            <span className={
+                              row.adherencePct >= 80 ? 'text-green-400'
+                                : row.adherencePct >= 60 ? 'text-yellow-400'
+                                : 'text-red-400'
+                            }>
+                              {row.adherencePct}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-gray-300 whitespace-nowrap">
+                          {row.sessionsLast7}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-gray-300 whitespace-nowrap">
+                          {row.latestWeight === null ? (
+                            <span className="text-gray-450">—</span>
+                          ) : (
+                            <>
+                              {toDisplayWeight(row.latestWeight, unit)}
+                              {row.targetWeight !== null && !row.isOffSeason && (
+                                <span className="text-gray-450"> / {toDisplayWeight(row.targetWeight, unit)}</span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            )}
+            {/* The column headings alone don't say what "adherence" counts, and
+                a coach reads this table at a glance. */}
+            <p className="text-xs text-gray-450 mt-2">
+              Sorted by who needs you first. Adherence is ticked sessions ÷ scheduled sessions; 7d is sessions logged this week.
+            </p>
+          </div>
         )}
 
         {/* Connected Fighters (cloud) */}

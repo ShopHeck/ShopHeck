@@ -422,6 +422,31 @@ export interface GamificationState {
   lastEvaluatedAt: string | null;
 }
 
+// ─── Saved AI analyses ────────────────────────────────────────────────────
+
+/** Which generator produced an analysis. */
+export type AiAnalysisKind = 'insights' | 'post-fight';
+
+/**
+ * A completed AI analysis, kept so leaving the screen doesn't destroy output
+ * the subscription just paid to generate.
+ *
+ * Deliberately **local-only**: `pushState` enumerates the `user_state` columns
+ * it sends, so this slice never reaches the cloud. These are long text blobs
+ * that are cheap to regenerate and would otherwise inflate every sync for a
+ * value the fighter can rebuild in one tap.
+ */
+export interface AiAnalysis {
+  kind: AiAnalysisKind;
+  /** Camp id for `insights`, fight-result id for `post-fight`. */
+  subjectId: string;
+  content: string;
+  generatedAt: string;
+}
+
+/** Key: `${kind}:${subjectId}` — see `aiAnalysisKey()` in utils/storage. */
+export type AiAnalyses = Record<string, AiAnalysis>;
+
 // ─── App State ────────────────────────────────────────────────────────────
 
 export interface AppState {
@@ -449,4 +474,6 @@ export interface AppState {
   fightResults: FightResult[];
   gamification?: GamificationState;
   dashboardPrefs?: DashboardPrefs;
+  /** Saved AI analyses, keyed by `${kind}:${subjectId}`. Local-only. */
+  aiAnalyses?: AiAnalyses;
 }

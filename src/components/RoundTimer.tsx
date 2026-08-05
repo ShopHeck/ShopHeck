@@ -17,7 +17,8 @@ import ProGate from './shared/ProGate';
 import { useDialog } from '../hooks/useDialog';
 import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
-import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { useHeartRate } from '../context/HeartRateContext';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
 
@@ -130,9 +131,8 @@ export default function RoundTimer() {
     setWorkColor, setRestColor,
   } = timer;
 
-  // Bluetooth HR
-  const maxHR = state.currentUser?.maxHR ?? Math.max(160, 220 - (state.currentUser?.age ?? 25));
-  const hr = useBluetoothHR(maxHR);
+  // Bluetooth HR — the app's single connection (see context/HeartRateContext).
+  const hr = useHeartRate();
   const { mep, resetMEP } = useMyZoneMEP(hr.zone, isRunning);
   const mepTarget = state.currentUser?.mepTarget ?? 65;
 

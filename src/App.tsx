@@ -5,6 +5,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { AppProvider, useApp } from './context/AppContext';
 import { SyncProvider } from './context/SyncContext';
 import { TimerProvider, useTimerSignal } from './context/TimerContext';
+import { HeartRateProvider } from './context/HeartRateContext';
 import ViewSkeleton from './components/shared/ViewSkeleton';
 import type { SessionType } from './types';
 
@@ -357,7 +358,12 @@ export default function App() {
     <TimerProvider>
       <AppProvider>
         <SyncProvider>
-          <AppShell />
+          {/* Inside AppProvider: the provider derives max HR from the signed-in
+              profile. Mounted for the app's lifetime so a paired strap survives
+              navigation between the timer, Settings and the tracker hub. */}
+          <HeartRateProvider>
+            <AppShell />
+          </HeartRateProvider>
         </SyncProvider>
       </AppProvider>
     </TimerProvider>

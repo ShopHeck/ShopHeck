@@ -10,6 +10,28 @@ import {
 const APPLE_BUNDLE_ID = 'app.fightcamptraining';
 const REQUEST_SIGN_OUT_EVENT = 'fightcamp:request-sign-out';
 
+/**
+ * Where Supabase should send a user after they click a link in an email.
+ *
+ * Confirmation and password-reset links are opened from a mail client, which
+ * has no idea the native app exists — `window.location.origin` there is
+ * `capacitor://localhost`, a scheme only the installed app can resolve, so a
+ * link built from it dead-ends in the browser. The deployed site handles both
+ * link types (Netlify's SPA catch-all rewrites any path to index.html, and the
+ * Supabase client parses the token out of the URL on load), so the web origin
+ * is the destination in both builds.
+ *
+ * Same env-with-production-fallback pattern as `VITE_FUNCTIONS_BASE` in
+ * lib/aiCoach.ts, deliberately sharing that variable rather than adding a
+ * second URL to keep in step with it.
+ */
+const PROD_SITE = 'https://fightcamp.netlify.app';
+function emailRedirectUrl(): string {
+  const configured = import.meta.env.VITE_FUNCTIONS_BASE as string | undefined;
+  if (configured) return configured;
+  return Capacitor.isNativePlatform() ? PROD_SITE : window.location.origin;
+}
+
 function randomNonce(length = 32): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._';
   const bytes = crypto.getRandomValues(new Uint8Array(length));
@@ -30,6 +52,8 @@ interface AuthValue {
   user: User | null;
   signInEmail: (email: string, password: string) => Promise<{ error?: string }>;
   signUpEmail: (email: string, password: string, name?: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
+  /** Sends a password-reset email. Never reveals whether the address exists. */
+  resetPassword: (email: string) => Promise<{ error?: string }>;
   signInApple: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   /** Permanently deletes the signed-in user's account and all their data, then signs out. */
@@ -121,11 +145,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: name ? { name } : undefined },
+      options: {
+        data: name ? { name } : undefined,
+        // Without this the confirmation link uses the project's default Site
+        // URL, which dead-ends outside the app.
+        emailRedirectTo: emailRedirectUrl(),
+      },
     });
     if (error) return { error: friendlyAuthError(error.message) };
     // When email confirmation is on, there's no session until the link is clicked.
     return { needsConfirmation: !data.session };
+  }
+
+  /**
+   * Send a password-reset email. Deliberately reports success even when the
+   * address has no account: telling an anonymous caller which emails are
+   * registered is an account-enumeration oracle, and Supabase's own response
+   * does not distinguish the two either.
+   */
+  async function resetPassword(email: string) {
+    if (!supabase) return { error: unavailableReason() };
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: emailRedirectUrl(),
+    });
+    return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
   async function signInApple() {
@@ -195,6 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: session?.user ?? null,
     signInEmail,
     signUpEmail,
+    resetPassword,
     signInApple,
     signOut,
     deleteAccount,
