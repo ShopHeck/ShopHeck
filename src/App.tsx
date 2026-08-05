@@ -23,6 +23,8 @@ import ProGate from './components/shared/ProGate';
 import UpgradeModal from './components/shared/UpgradeModal';
 import { isPro } from './utils/subscription';
 import { remindersEnabled, syncReminders } from './utils/notifications';
+import { useAuth } from './context/AuthContext';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 // ── Lazy imports — loaded on first navigation to that view ────────────────
 const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
@@ -368,6 +370,21 @@ function AppShell() {
   );
 }
 
+/**
+ * Renders the set-a-new-password screen when the app was opened from a recovery
+ * link.
+ *
+ * Mounted here rather than inside `AppShell` because `AppShell` returns
+ * `<Onboarding />` early when there is no profile — and someone resetting a
+ * password on a fresh install is exactly the person who would hit that and
+ * never see the screen.
+ */
+function RecoveryGate() {
+  const { recovery } = useAuth();
+  if (!recovery.active && !recovery.error) return null;
+  return <ResetPasswordScreen />;
+}
+
 export default function App() {
   return (
     <TimerProvider>
@@ -378,6 +395,7 @@ export default function App() {
               navigation between the timer, Settings and the tracker hub. */}
           <HeartRateProvider>
             <AppShell />
+            <RecoveryGate />
           </HeartRateProvider>
         </SyncProvider>
       </AppProvider>

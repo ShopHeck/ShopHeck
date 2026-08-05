@@ -6,6 +6,11 @@ import {
   notifyLocalDataCleared,
   reconcileLocalAccount,
 } from '../utils/localData';
+import {
+  readRecoveryParams,
+  urlWithoutAuthParams,
+  friendlyRecoveryError,
+} from '../utils/authRecovery';
 
 const APPLE_BUNDLE_ID = 'app.fightcamptraining';
 const REQUEST_SIGN_OUT_EVENT = 'fightcamp:request-sign-out';
@@ -54,6 +59,16 @@ interface AuthValue {
   signUpEmail: (email: string, password: string, name?: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   /** Sends a password-reset email. Never reveals whether the address exists. */
   resetPassword: (email: string) => Promise<{ error?: string }>;
+  /**
+   * Set when the app was opened from a password-reset link, so the shell can
+   * show the set-a-new-password screen. Carries a message instead when the link
+   * was expired or already used.
+   */
+  recovery: { active: boolean; error?: string };
+  /** Finish a recovery: set the new password and clear recovery mode. */
+  completePasswordReset: (password: string) => Promise<{ error?: string }>;
+  /** Leave recovery mode without changing anything. */
+  dismissRecovery: () => void;
   signInApple: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   /** Permanently deletes the signed-in user's account and all their data, then signs out. */
@@ -65,6 +80,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [recovery, setRecovery] = useState<{ active: boolean; error?: string }>({ active: false });
 
   useEffect(() => {
     /**
@@ -171,6 +187,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
+  /**
+   * Consume a password-reset redirect on first load.
+   *
+   * Runs once, before anything else can navigate: the tokens live in the URL and
+   * are stripped as soon as they are read, so a later effect that happened to
+   * rewrite the location would destroy them. `detectSessionInUrl` is off (see
+   * lib/supabase.ts), which is exactly why this has to be explicit.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = readRecoveryParams(window.location.href);
+    if (!params) return;
+
+    // Strip immediately — these are credentials in the address bar, and they
+    // would otherwise survive into history or a screenshot.
+    window.history.replaceState({}, '', urlWithoutAuthParams(window.location.href));
+
+    if (params.kind === 'error') {
+      setRecovery({ active: false, error: params.message });
+      return;
+    }
+    if (!supabase) return;
+
+    const client = supabase;
+    let cancelled = false;
+    (async () => {
+      const { error } = params.kind === 'tokens'
+        ? await client.auth.setSession({
+            access_token: params.accessToken,
+            refresh_token: params.refreshToken,
+          })
+        : await client.auth.exchangeCodeForSession(params.code);
+
+      if (cancelled) return;
+      setRecovery(error
+        ? { active: false, error: friendlyRecoveryError(error.message) }
+        : { active: true });
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  async function completePasswordReset(password: string) {
+    if (!supabase) return { error: unavailableReason() };
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { error: friendlyAuthError(error.message) };
+    // Recovery is over; the user is now signed in with the new password. The
+    // session established above is a real one, so there is nothing to sign out
+    // of — dropping the flag returns the app to its normal shell.
+    setRecovery({ active: false });
+    return {};
+  }
+
+  function dismissRecovery() {
+    setRecovery({ active: false });
+  }
+
   async function signInApple() {
     if (!supabase) return { error: unavailableReason() };
 
@@ -239,6 +312,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInEmail,
     signUpEmail,
     resetPassword,
+    recovery,
+    completePasswordReset,
+    dismissRecovery,
     signInApple,
     signOut,
     deleteAccount,

@@ -10,6 +10,8 @@ import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
 import AdaptationCard from './AdaptationCard';
+import { activeCornerSession } from '../utils/cornerMode';
+import { fightCta } from '../utils/fightDayCta';
 
 const PHASE_COLORS: Record<string, string> = {
   'Base Building': 'bg-blue-900/40 text-blue-400 border-blue-800',
@@ -110,21 +112,19 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
 
   const pro = isPro(state.subscription);
 
-  // Post-fight CTA: fight date has passed and no FightResult exists for this camp.
   const campFightResult = fightResults.find(r => r.campId === activeCamp.id);
-  const showPostFightCta = !!activeCamp.fightDate
-    && parseISO(activeCamp.fightDate) < new Date()
-    && !campFightResult;
   const hasLoggedFight = !!campFightResult;
 
-  // Corner Mode CTA: fight week, fight not yet logged. `daysUntil` is already
-  // clamped at 0 by getDaysUntilFight, so a fight date that has passed reads as
-  // 0 here — the post-fight CTA below takes over on the following day, and the
-  // two are mutually exclusive because both require no logged result.
-  const showCornerCta = !!activeCamp.fightDate
-    && !campFightResult
-    && !showPostFightCta
-    && daysUntil <= 7;
+  // The fight-day handover between these two CTAs got it wrong once and is now
+  // a tested pure function — see utils/fightDayCta.ts for what broke.
+  const cta = fightCta({
+    fightDate: activeCamp.fightDate,
+    daysUntil,
+    hasResult: hasLoggedFight,
+    cornerSession: activeCornerSession(state, activeCamp.id),
+  });
+  const showPostFightCta = cta === 'post-fight';
+  const showCornerCta = cta === 'corner';
 
   const latestCoachNote = coachNotes
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)

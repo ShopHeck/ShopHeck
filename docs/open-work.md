@@ -51,6 +51,17 @@ refuelling advice would be most useful.
 grep -n "proj.status !== 'made'" src/components/WeightTracker.tsx
 ```
 
+### Password reset does not work on native
+
+The recovery redirect is handled (`utils/authRecovery.ts`), but the link itself
+always points at the **web** origin — `emailRedirectUrl()` cannot use
+`capacitor://localhost` because a mail client can't resolve it. So a fighter who
+resets from the iOS app sets their new password in Safari, then returns to the
+app and signs in with it. That works, but it is a seam.
+
+Closing it means a universal link (associated domains + an `apple-app-site-association`
+file) so the reset link opens the app directly.
+
 ### Palette is untinted stock Tailwind
 
 Every `dark-*` token has equal R/G/B and `brand-*` is stock Tailwind orange.
