@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History, Swords } from 'lucide-react';
+import { TrendingDown, Activity, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History, Swords } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
@@ -12,13 +12,25 @@ import ProgressWidget from './gamification/ProgressWidget';
 import AdaptationCard from './AdaptationCard';
 import { activeCornerSession } from '../utils/cornerMode';
 import { fightCta } from '../utils/fightDayCta';
+import GlassSurface from './shared/GlassSurface';
+import GlassMetricTile from './shared/GlassMetricTile';
+import DurationBadge from './shared/DurationBadge';
+import FightCountdownCard from './shared/FightCountdownCard';
+import FightReadinessGauge from './shared/FightReadinessGauge';
+import { SESSION_COLORS, SESSION_ICONS } from '../utils/sessionVisuals';
+import { readinessColor, tint } from '../utils/designTokens';
 
+/**
+ * Camp phases run cool→hot as the fight approaches, which is why they use the
+ * accent ramp rather than the status palette — a phase is a stage, not a
+ * judgement, and Peak being crimson here does not mean anything is wrong.
+ */
 const PHASE_COLORS: Record<string, string> = {
-  'Base Building': 'bg-blue-900/40 text-blue-400 border-blue-800',
-  'Strength & Conditioning': 'bg-yellow-900/40 text-yellow-400 border-yellow-800',
-  'Fight Specific': 'bg-orange-900/40 text-orange-400 border-orange-800',
-  'Peak': 'bg-red-900/40 text-red-400 border-red-800',
-  'Taper': 'bg-green-900/40 text-green-400 border-green-800',
+  'Base Building': 'var(--accent-blue)',
+  'Strength & Conditioning': 'var(--accent-gold)',
+  'Fight Specific': 'var(--accent-flame)',
+  'Peak': 'var(--accent-crimson)',
+  'Taper': 'var(--accent-green)',
 };
 
 const INTENSITY_DOTS: Record<string, number> = {
@@ -132,43 +144,22 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Fight Countdown Card */}
-      <div className="mx-4 mt-4 relative overflow-hidden bg-gradient-to-br from-brand-900/60 to-dark-700 rounded-2xl border border-brand-800/50 p-5">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-600/10 rounded-full -translate-y-8 translate-x-8" />
-        <div className="relative">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-brand-400 text-xs font-semibold uppercase tracking-widest">Fight Night</p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-5xl font-black text-white">{daysUntil}</span>
-                <span className="text-gray-400 font-medium">days out</span>
-              </div>
-              <p className="text-gray-400 text-sm mt-1">
-                {activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMMM d, yyyy') : 'Fight date TBD'}
-                {activeCamp.opponent && <span className="text-gray-400"> · vs {activeCamp.opponent}</span>}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-black text-white">{activeCamp.rounds}R</div>
-              <div className="text-xs text-gray-400">{activeCamp.roundDuration}min rounds</div>
-              <div className="text-xs text-brand-400 mt-1">{activeCamp.weightClass}</div>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-4">
-            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-              <span>Week {currentWeekNum} of {activeCamp.campWeeks}</span>
-              <span>{progress}% complete</span>
-            </div>
-            <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-brand-700 to-brand-500 rounded-full transition-all duration-700"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Locked contract — §3.4. Content order, dimensions and the fight-week
+          crimson state all live in the component, so this card cannot drift
+          from the one the readiness screen and the spec describe. */}
+      <div className="mt-4">
+        <FightCountdownCard
+          daysOut={daysUntil}
+          dateLine={activeCamp.fightDate ? format(parseISO(activeCamp.fightDate), 'MMMM d, yyyy') : 'Fight date TBD'}
+          opponent={activeCamp.opponent}
+          rounds={activeCamp.rounds}
+          roundMinutes={activeCamp.roundDuration}
+          weightClass={activeCamp.weightClass}
+          currentWeek={currentWeekNum}
+          totalWeeks={activeCamp.campWeeks}
+          progressPct={progress}
+          state={activeCamp.fightDate ? 'populated' : 'empty'}
+        />
       </div>
 
       <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
@@ -236,50 +227,44 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Readiness Card */}
+      {/* Compact readiness variant (§3.6): the same gauge component the detail
+          screen renders, at a smaller scale, with one line of truncated
+          recommendation and a chevron. It links to the full screen rather than
+          duplicating it — which is also why the breakdown does not appear here.
+          This previously drew a rotated full circle while the detail screen drew
+          the correct 270° arc, so the same score had two different shapes. */}
       {readiness && (
         <div className="mx-4">
-          <button
+          <GlassSurface
+            as="button"
+            cornerRadius="lg"
             onClick={() => onNavigate('readiness')}
-            className="card w-full text-left hover:border-dark-300 transition-colors group"
+            className="w-full text-left p-4"
+            aria-label={`Fight readiness ${readiness.overall} out of 100, ${readiness.status}. Open the full readiness breakdown.`}
           >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fight Readiness</p>
-              <ChevronRight size={15} className="text-gray-450 group-hover:text-gray-400 transition-colors" />
-            </div>
             <div className="flex items-center gap-4">
-              {/* Score ring */}
-              <div className="relative flex-shrink-0 w-16 h-16">
-                <svg viewBox="0 0 40 40" className="w-full h-full -rotate-[126deg]">
-                  <circle cx="20" cy="20" r="16" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 16 * 0.75} ${2 * Math.PI * 16}`} />
-                  <circle cx="20" cy="20" r="16" fill="none" strokeWidth="4" strokeLinecap="round"
-                    stroke={readiness.statusColor}
-                    strokeDasharray={`${2 * Math.PI * 16 * 0.75 * (readiness.overall / 100)} ${2 * Math.PI * 16}`} />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-black text-white">{readiness.overall}</span>
-                </div>
-              </div>
-              {/* Info */}
+              <FightReadinessGauge
+                score={readiness.overall}
+                statusLabel={readiness.status}
+                compact
+              />
               <div className="flex-1 min-w-0">
-                <p className="text-base font-black text-white leading-tight" style={{ color: readiness.statusColor }}>
+                <p className="type-caption text-gray-450">Fight Readiness</p>
+                <p
+                  className="type-card-title mt-0.5 leading-tight"
+                  style={{ color: readinessColor(readiness.overall) }}
+                >
                   {readiness.status}
                 </p>
-                <div className="mt-1.5 h-1.5 bg-dark-500 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${readiness.overall}%`, backgroundColor: readiness.statusColor }}
-                  />
-                </div>
                 {readiness.insights[0] && (
                   <p className="text-xs text-gray-400 mt-1.5 leading-snug line-clamp-2">
                     {readiness.insights[0]}
                   </p>
                 )}
               </div>
+              <ChevronRight size={16} className="text-gray-450 flex-shrink-0" />
             </div>
-          </button>
+          </GlassSurface>
         </div>
       )}
 
@@ -313,7 +298,14 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Current Phase</p>
             {currentWeek.phase && (
-              <span className={`badge border ${PHASE_COLORS[currentWeek.phase] || 'bg-dark-600 text-gray-400 border-dark-400'}`}>
+              <span
+                className="badge border"
+                style={{
+                  color: PHASE_COLORS[currentWeek.phase] ?? 'var(--text-secondary)',
+                  backgroundColor: tint(PHASE_COLORS[currentWeek.phase] ?? 'var(--text-tertiary)', 0.14),
+                  borderColor: tint(PHASE_COLORS[currentWeek.phase] ?? 'var(--text-tertiary)', 0.35),
+                }}
+              >
                 {currentWeek.phase}
               </span>
             )}
@@ -357,23 +349,28 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Stats Row */}
-      <div className="mx-4 grid grid-cols-3 gap-3">
-        <button onClick={() => onNavigate('weight')} className="stat-card hover:border-brand-700 transition-colors text-left">
-          <TrendingDown size={16} className="text-brand-500" />
-          <div className="text-xl font-black text-white">{weightToGo}</div>
-          <div className="text-xs text-gray-400">{madeWeight ? 'at / below target' : `${unit} to cut`}</div>
-        </button>
-        <button onClick={() => onNavigate('log')} className="stat-card hover:border-brand-700 transition-colors text-left">
-          <Activity size={16} className="text-green-500" />
-          <div className="text-xl font-black text-white">{totalWorkouts}</div>
-          <div className="text-xs text-gray-400">sessions logged</div>
-        </button>
-        <button onClick={() => onNavigate('progress')} className="stat-card hover:border-brand-700 transition-colors text-left">
-          <Zap size={16} className="text-yellow-500" />
-          <div className="text-xl font-black text-white">{totalSparingRounds}</div>
-          <div className="text-xs text-gray-400">sparring rounds</div>
-        </button>
+      {/* Metric tiles — locked dimensions (§3.4), solid fill rather than live
+          blur (§3.2 names this grid specifically). Labels are single-line by
+          contract, so the unit moves into the label and the value stays bare. */}
+      <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+        <GlassMetricTile
+          label={madeWeight ? 'On target' : 'To cut'}
+          value={madeWeight ? '✓' : weightToGo}
+          icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
+          onClick={() => onNavigate('weight')}
+        />
+        <GlassMetricTile
+          label="Sessions"
+          value={totalWorkouts}
+          icon={<Activity size={13} style={{ color: 'var(--accent-green)' }} />}
+          onClick={() => onNavigate('log')}
+        />
+        <GlassMetricTile
+          label="Rounds"
+          value={totalSparingRounds}
+          icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
+          onClick={() => onNavigate('progress')}
+        />
       </div>
 
       {/* This Week Summary */}
@@ -433,37 +430,43 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
             </div>
           ) : (
             <div className="space-y-2">
-              {todaySessions.sessions.map((session, i) => (
-                <div key={i} className="card flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    session.type === 'conditioning' ? 'bg-orange-900/40' :
-                    session.type === 'sparring' ? 'bg-red-900/40' :
-                    session.type === 'skill' ? 'bg-blue-900/40' :
-                    session.type === 'strength' ? 'bg-yellow-900/40' :
-                    'bg-green-900/40'
-                  }`}>
-                    {session.type === 'conditioning' ? <Flame size={18} className="text-orange-400" /> :
-                     session.type === 'sparring' ? <Zap size={18} className="text-red-400" /> :
-                     session.type === 'skill' ? <Target size={18} className="text-blue-400" /> :
-                     session.type === 'strength' ? <Activity size={18} className="text-yellow-400" /> :
-                     <Clock size={18} className="text-green-400" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{session.title}</p>
-                    <p className="text-xs text-gray-400">{session.duration} min</p>
-                  </div>
-                  <button
-                    onClick={() => onNavigate('log', {
-                      sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                      title: session.title,
-                      duration: session.duration,
-                    })}
-                    className="text-xs text-brand-500 font-semibold hover:text-brand-400 transition-colors flex-shrink-0"
-                  >
-                    Log
-                  </button>
-                </div>
-              ))}
+              {todaySessions.sessions.map((session, i) => {
+                // The five-way ternary chain this replaces carried its own copy
+                // of the session→color mapping, one of three that had already
+                // drifted from each other. SESSION_COLORS is now the only one.
+                const accent = SESSION_COLORS[session.type];
+                const Icon = SESSION_ICONS[session.type];
+                return (
+                  <GlassSurface key={i} cornerRadius="md" className="flex items-center gap-3 p-4">
+                    <div
+                      className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+                      style={{
+                        backgroundColor: tint(accent, 0.16),
+                        borderRadius: 'var(--radius-sm)',
+                        color: accent,
+                      }}
+                    >
+                      <Icon size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{session.title}</p>
+                    </div>
+                    <DurationBadge minutes={session.duration} sessionType={session.type} />
+                    <button
+                      onClick={() => onNavigate('log', {
+                        sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                        title: session.title,
+                        duration: session.duration,
+                      })}
+                      aria-label={`Log ${session.title}`}
+                      className="text-xs font-semibold flex-shrink-0 -m-2 p-2"
+                      style={{ color: 'var(--accent-flame)' }}
+                    >
+                      Log
+                    </button>
+                  </GlassSurface>
+                );
+              })}
             </div>
           )}
         </div>

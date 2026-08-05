@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope, Watch } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import IconChipRow from './shared/IconChipRow';
 import { useHeartRate } from '../context/HeartRateContext';
 import { estimateMaxHR } from '../utils/maxHR';
 import UpgradeModal from './shared/UpgradeModal';
@@ -317,7 +318,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               )}
             </div>
           </div>
-          <div className={`badge ${currentUser?.role === 'coach' ? 'bg-purple-900/40 text-purple-400' : 'bg-brand-900/40 text-brand-400'}`}>
+          <div className={`badge ${currentUser?.role === 'coach' ? 'bg-accent-violet/20 text-accent-violet' : 'bg-accent-flame/20 text-accent-flame'}`}>
             {currentUser?.role}
           </div>
         </div>
@@ -461,10 +462,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                   <button
                     key={coach.id}
                     onClick={() => dispatch({ type: 'LINK_COACH', payload: isLinked ? null : coach.id })}
-                    className={`w-full card flex items-center gap-3 transition-all text-left ${isLinked ? 'border-purple-700' : 'hover:border-dark-300'}`}
+                    className={`w-full card flex items-center gap-3 transition-all text-left ${isLinked ? 'border-accent-violet/60' : 'hover:border-surface-3'}`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isLinked ? 'bg-purple-900/50' : 'bg-dark-600'}`}>
-                      <span className={`font-black text-base ${isLinked ? 'text-purple-400' : 'text-gray-400'}`}>{coach.name.charAt(0)}</span>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isLinked ? 'bg-accent-violet/25' : 'bg-surface-2'}`}>
+                      <span className={`font-black text-base ${isLinked ? 'text-accent-violet' : 'text-gray-400'}`}>{coach.name.charAt(0)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`font-semibold text-sm ${isLinked ? 'text-white' : 'text-gray-300'}`}>{coach.name}</p>
@@ -474,7 +475,7 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
                       </div>
                     </div>
                     {isLinked ? (
-                      <div className="flex items-center gap-1 text-purple-400">
+                      <div className="flex items-center gap-1 text-accent-violet">
                         <UserCheck size={16} />
                         <span className="text-xs font-semibold">Linked</span>
                       </div>
@@ -495,8 +496,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
         {userIsPro ? (
           <div className="card">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${userIsCoachPro ? 'bg-purple-900/40' : 'bg-brand-900/40'}`}>
-                {userIsCoachPro ? <Trophy size={18} className="text-purple-400" /> : <Zap size={18} className="text-brand-400" />}
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${userIsCoachPro ? 'bg-accent-violet/20' : 'bg-accent-flame/20'}`}>
+                {userIsCoachPro ? <Trophy size={18} className="text-accent-violet" /> : <Zap size={18} className="text-accent-flame" />}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold text-white">
@@ -705,8 +706,8 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             onClick={() => onNavigate?.('aiinsights')}
             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
           >
-            <div className="w-8 h-8 bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Brain size={15} className="text-purple-400" />
+            <div className="w-8 h-8 bg-accent-violet/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Brain size={15} className="text-accent-violet" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">AI Coach Insights</p>
@@ -764,19 +765,13 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
           </div>
 
           {/* Apple Health */}
-          <button
+          <IconChipRow
+            icon={<Heart size={15} />}
+            accent="var(--accent-crimson)"
+            title="Apple Health"
+            subtitle="Import workouts & weight · Export data"
             onClick={() => onNavigate?.('health')}
-            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
-          >
-            <div className="w-8 h-8 bg-red-950/40 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Heart size={15} className="text-red-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">Apple Health</p>
-              <p className="text-xs text-gray-450">Import workouts & weight · Export data</p>
-            </div>
-            <ChevronRight size={15} className="text-gray-450" />
-          </button>
+          />
         </div>
       </div>
 
@@ -824,17 +819,20 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
               </div>
             )}
             {authUser && (
-              <button
-                onClick={() => { setDeleteError(''); setConfirmDelete(true); }}
-                className="mt-3 pt-3 border-t border-dark-600 w-full flex items-center gap-2 text-left"
-              >
-                <Trash2 size={14} className="text-red-400 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-400">Delete account</p>
-                  <p className="text-xs text-gray-450">Permanently remove your account and all synced data</p>
-                </div>
-                <ChevronRight size={15} className="text-gray-450" />
-              </button>
+              <div className="mt-3 pt-3 border-t border-surface-2 -mx-4">
+                {/* Destructive rows are crimson text and icon on the default
+                    background, never a filled crimson button (§9) — a filled
+                    button reads as the primary action on the screen, which
+                    "Delete account" must never be. */}
+                <IconChipRow
+                  icon={<Trash2 size={14} />}
+                  accent="var(--accent-crimson)"
+                  destructive
+                  title="Delete account"
+                  subtitle="Permanently remove your account and all synced data"
+                  onClick={() => { setDeleteError(''); setConfirmDelete(true); }}
+                />
+              </div>
             )}
             {!authUser && authConfigured && (
               <button onClick={() => setShowAuth(true)} className="w-full flex items-center gap-3 text-left">

@@ -3,27 +3,43 @@ import { format } from 'date-fns';
 import { ChevronDown, ChevronUp, UtensilsCrossed, Sparkles, BookOpen } from 'lucide-react';
 import { MEAL_PLANS, FOOD_ITEMS, type MealPlan, type MealGoal, type Macros, type FoodItem } from '../data/mealLibrary';
 import { useApp } from '../context/AppContext';
+import { MACRO_COLORS, tint, type Macro } from '../utils/designTokens';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function MacroPill({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+/**
+ * Takes the macro itself rather than a color, so a pill cannot be built with
+ * the wrong one. Every call site previously passed its own Tailwind class pair,
+ * which is how the same four macros ended up with two different purples.
+ */
+function MacroPill({ label, value, unit, macro }: { label: string; value: number; unit: string; macro: Macro }) {
+  const color = MACRO_COLORS[macro];
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${color}`}>
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums"
+      style={{ backgroundColor: tint(color, 0.16), color }}
+    >
       {label} {Math.round(value)}{unit}
     </span>
   );
 }
 
-function MacroBar({ label, value, max, color, unit = 'g' }: { label: string; value: number; max: number; color: string; unit?: string }) {
+function MacroBar({ label, value, max, macro, unit = 'g' }: { label: string; value: number; max: number; macro: Macro; unit?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs mb-0.5">
         <span className="text-gray-400">{label}</span>
-        <span className="text-white font-semibold">{Math.round(value)}{unit}</span>
+        <span className="text-white font-semibold tabular-nums">{Math.round(value)}{unit}</span>
       </div>
-      <div className="h-1.5 bg-dark-600 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      <div
+        className="h-1.5 overflow-hidden"
+        style={{ background: 'var(--surface-3)', borderRadius: 'var(--radius-full)' }}
+      >
+        <div
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, background: MACRO_COLORS[macro], borderRadius: 'var(--radius-full)' }}
+        />
       </div>
     </div>
   );
@@ -58,10 +74,10 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
           <p className="text-sm font-semibold text-white">{plan.name}</p>
           <p className="text-xs text-gray-400 mt-0.5">{plan.description}</p>
           <div className="flex flex-wrap gap-1 mt-2">
-            <MacroPill label="Cal" value={t.calories} unit="" color="bg-orange-900/40 text-orange-300" />
-            <MacroPill label="P" value={t.protein} unit="g" color="bg-green-900/40 text-green-300" />
-            <MacroPill label="C" value={t.carbs} unit="g" color="bg-blue-900/40 text-blue-300" />
-            <MacroPill label="F" value={t.fat} unit="g" color="bg-purple-900/40 text-purple-300" />
+            <MacroPill label="Cal" value={t.calories} unit="" macro="calories" />
+            <MacroPill label="P" value={t.protein} unit="g" macro="protein" />
+            <MacroPill label="C" value={t.carbs} unit="g" macro="carbs" />
+            <MacroPill label="F" value={t.fat} unit="g" macro="fat" />
           </div>
         </div>
         <div className="text-gray-400 flex-shrink-0 mt-1">
@@ -101,10 +117,10 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
                     </ul>
                   </div>
                   <div className="flex flex-wrap gap-1 pt-1">
-                    <MacroPill label="Cal" value={meal.macros.calories} unit="" color="bg-orange-900/40 text-orange-300" />
-                    <MacroPill label="P" value={meal.macros.protein} unit="g" color="bg-green-900/40 text-green-300" />
-                    <MacroPill label="C" value={meal.macros.carbs} unit="g" color="bg-blue-900/40 text-blue-300" />
-                    <MacroPill label="F" value={meal.macros.fat} unit="g" color="bg-purple-900/40 text-purple-300" />
+                    <MacroPill label="Cal" value={meal.macros.calories} unit="" macro="calories" />
+                    <MacroPill label="P" value={meal.macros.protein} unit="g" macro="protein" />
+                    <MacroPill label="C" value={meal.macros.carbs} unit="g" macro="carbs" />
+                    <MacroPill label="F" value={meal.macros.fat} unit="g" macro="fat" />
                   </div>
                 </div>
               )}
@@ -296,10 +312,10 @@ function MacroGenerator() {
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Target Macros</p>
 
         {[
-          { label: 'Calories',   value: calories,  set: setCalories, unit: 'kcal', color: 'text-orange-400' },
-          { label: 'Protein',    value: protein,   set: setProtein,  unit: 'g',    color: 'text-green-400'  },
-          { label: 'Carbs',      value: carbs,     set: setCarbs,    unit: 'g',    color: 'text-blue-400'   },
-          { label: 'Fat',        value: fat,        set: setFat,      unit: 'g',    color: 'text-purple-400' },
+          { label: 'Calories',   value: calories,  set: setCalories, unit: 'kcal', color: MACRO_COLORS.calories },
+          { label: 'Protein',    value: protein,   set: setProtein,  unit: 'g',    color: MACRO_COLORS.protein },
+          { label: 'Carbs',      value: carbs,     set: setCarbs,    unit: 'g',    color: MACRO_COLORS.carbs },
+          { label: 'Fat',        value: fat,        set: setFat,      unit: 'g',    color: MACRO_COLORS.fat },
         ].map(row => (
           <div key={row.label} className="flex items-center justify-between gap-3">
             <label className="text-sm font-medium text-white w-20" htmlFor={`macro-${row.label}`}>{row.label}</label>
@@ -366,10 +382,10 @@ function MacroGenerator() {
           {t && (
             <div className="space-y-2 pt-1 border-t border-dark-600">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Estimated Macros</p>
-              <MacroBar label="Calories" value={t.calories} max={Number(calories) || 2000} color="bg-orange-500" unit="kcal" />
-              <MacroBar label="Protein"  value={t.protein}  max={Number(protein)  || 200} color="bg-green-500" />
-              <MacroBar label="Carbs"    value={t.carbs}    max={Number(carbs)    || 300} color="bg-blue-500"  />
-              <MacroBar label="Fat"      value={t.fat}      max={Number(fat)      || 100} color="bg-purple-500" />
+              <MacroBar label="Calories" value={t.calories} max={Number(calories) || 2000} macro="calories" unit="kcal" />
+              <MacroBar label="Protein"  value={t.protein}  max={Number(protein)  || 200} macro="protein" />
+              <MacroBar label="Carbs"    value={t.carbs}    max={Number(carbs)    || 300} macro="carbs" />
+              <MacroBar label="Fat"      value={t.fat}      max={Number(fat)      || 100} macro="fat" />
               <div className="flex justify-between text-xs mt-1 pt-1 border-t border-dark-700">
                 <span className="text-gray-400">Total Calories</span>
                 <span className={`font-bold ${Math.round(t.calories) > inputCal * 1.15 ? 'text-red-400' : 'text-orange-400'}`}>

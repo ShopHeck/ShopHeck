@@ -16,8 +16,11 @@ import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import { useDialog } from '../hooks/useDialog';
 import GymDisplay from './GymDisplay';
+import PressableButton from './shared/PressableButton';
+import TimerOrb from './shared/TimerOrb';
 import ReactionPrompt from './ReactionPrompt';
 import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { tint } from '../utils/designTokens';
 import { useHeartRate } from '../context/HeartRateContext';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
@@ -362,21 +365,15 @@ export default function RoundTimer() {
   // needs mid-round. Denominator is phaseSec (the CURRENT phase's nominal
   // duration, grown by +30s extensions), not the work/rest setting, so an
   // extended phase never shows past 100%.
-  const RING_R = 98;
-  const RING_C = 2 * Math.PI * RING_R;
+  // Ring geometry now lives in <TimerOrb>, which locks the two permitted sizes
+  // and their stroke widths; this screen only supplies the fraction.
   const progress = phase === 'idle' || phase === 'done'
     ? 1
     : Math.max(0, Math.min(1, timeLeft / Math.max(1, phaseSec)));
-  const ringDash = `${RING_C * progress} ${RING_C}`;
 
   // ── Derived UI ────────────────────────────────────────────────────────────
-  // Active color: work=user's workColor, rest=user's restColor, prep=yellow, done=green, idle=gray
-  const activeColor =
-    phase === 'work' ? workColor :
-    phase === 'rest' ? restColor :
-    phase === 'prep' ? '#eab308' :
-    phase === 'done' ? '#22c55e' : '#4b5563';
-
+  // The phase→color mapping now lives entirely in <TimerOrb>; the surfaces
+  // around it key off the fighter's workColor directly.
   const phaseLabel =
     phase === 'idle' ? 'Ready'     :
     phase === 'prep' ? 'GET READY' :
@@ -384,16 +381,10 @@ export default function RoundTimer() {
     phase === 'rest' ? 'REST'      : 'DONE';
 
   const phaseBg =
-    phase === 'rest' ? 'bg-blue-900/40 text-blue-300'     :
-    phase === 'done' ? 'bg-green-900/40 text-green-300'   :
-    phase === 'prep' ? 'bg-yellow-900/40 text-yellow-300' :
-    'bg-dark-600 text-gray-400';
-
-  // For work/rest phases, derive a tinted badge from the user's chosen color
-  const phaseBadgeStyle: React.CSSProperties | undefined =
-    (phase === 'work' || phase === 'rest')
-      ? { backgroundColor: `${activeColor}25`, color: activeColor }
-      : undefined;
+    phase === 'rest' ? 'bg-accent-blue/20 text-accent-blue'   :
+    phase === 'done' ? 'bg-accent-green/20 text-accent-green' :
+    phase === 'prep' ? 'bg-accent-gold/20 text-accent-gold'   :
+    'bg-surface-2 text-gray-400';
 
   return (
     <div className="pb-4">
@@ -491,39 +482,18 @@ export default function RoundTimer() {
           </div>
         )}
 
-        {/* Timer ring — SVG arc depletes with the phase so elapsed time is
-            visible at a glance, not just the counting number. */}
-        <div className="relative w-52 h-52 flex items-center justify-center">
-          <svg viewBox="0 0 208 208" className="absolute inset-0 w-full h-full -rotate-90">
-            {/* Track */}
-            <circle cx="104" cy="104" r={RING_R} fill="none" stroke="#222222" strokeWidth="8" />
-            {/* Progress arc */}
-            <circle
-              cx="104" cy="104" r={RING_R} fill="none"
-              stroke={activeColor} strokeWidth="8" strokeLinecap="round"
-              strokeDasharray={ringDash}
-              style={{ transition: 'stroke-dasharray 250ms linear, stroke 300ms ease' }}
-            />
-          </svg>
-          <div className="rounded-full bg-dark-800 flex items-center justify-center" style={{ width: '11.5rem', height: '11.5rem' }}>
-            <span
-              className="text-6xl font-black tabular-nums tracking-tight transition-colors duration-300"
-              style={{ color: activeColor }}
-              role="timer"
-              aria-label={`${phaseLabel} — ${fmt(timeLeft)} remaining`}
-            >
-              {phase === 'done' ? '✓' : fmt(timeLeft)}
-            </span>
-          </div>
-        </div>
-
-        {/* Phase badge when running */}
-        {(phase === 'work' || phase === 'rest') && (
-          <span className="badge text-sm font-bold px-3 py-1 mt-3" style={phaseBadgeStyle}>{phaseLabel}</span>
-        )}
-        {phase === 'prep' && (
-          <span className="badge text-sm font-bold px-3 py-1 mt-3 bg-yellow-900/40 text-yellow-300">{phaseLabel}</span>
-        )}
+        {/* The orb carries its own state label in the center (§3.4), which is
+            why the separate phase badge that used to sit under it is gone —
+            it was the same word twice, 60px apart. */}
+        <TimerOrb
+          time={phase === 'done' ? '✓' : fmt(timeLeft)}
+          phase={phase === 'idle' || phase === 'prep' || phase === 'work' || phase === 'rest' ? phase : 'done'}
+          progress={progress}
+          workColor={workColor}
+          restColor={restColor}
+          running={isRunning}
+          label={phaseLabel}
+        />
 
         {/* Reaction prompt — below badge during rest */}
         {reactionMode && phase === 'rest' && (
@@ -536,7 +506,10 @@ export default function RoundTimer() {
         {hr.connected && hr.hr !== null && phase !== 'idle' && (
           <div
             className="mt-3 flex items-center gap-3 px-4 py-2 rounded-2xl"
-            style={{ backgroundColor: `${ZONE_COLORS[hr.zone]}18`, border: `1px solid ${ZONE_COLORS[hr.zone]}40` }}
+            style={{
+              backgroundColor: tint(ZONE_COLORS[hr.zone], 0.09),
+              border: `1px solid ${tint(ZONE_COLORS[hr.zone], 0.25)}`,
+            }}
           >
             <span className="text-sm font-bold tabular-nums" style={{ color: ZONE_COLORS[hr.zone] }}>
               {hr.hr} bpm
@@ -558,7 +531,7 @@ export default function RoundTimer() {
             <button
               onClick={() => extendPhase(30)}
               aria-label="Add 30 seconds to the current phase"
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-dark-700 border border-dark-500 text-sm font-semibold text-gray-300 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-surface-1 border border-surface-2 text-sm font-semibold text-gray-300 hover:text-white hover:border-surface-3 pressable"
             >
               <Plus size={15} />
               30s
@@ -566,7 +539,7 @@ export default function RoundTimer() {
             <button
               onClick={skipPhase}
               aria-label={phase === 'rest' ? 'Skip rest — go to the next round' : phase === 'prep' ? 'Skip the countdown' : 'Skip to the rest period'}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-dark-700 border border-dark-500 text-sm font-semibold text-gray-300 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-surface-1 border border-surface-2 text-sm font-semibold text-gray-300 hover:text-white hover:border-surface-3 pressable"
             >
               <SkipForward size={15} />
               {phase === 'rest' ? 'Skip rest' : phase === 'prep' ? 'Skip' : 'End round'}
@@ -585,7 +558,7 @@ export default function RoundTimer() {
                   backgroundColor:
                     i < currentRound - 1  ? `${workColor}99` :
                     i === currentRound - 1 ? workColor :
-                    '#2a2a2a',
+                    'var(--surface-3)',
                 }}
               />
             ))}
@@ -614,7 +587,7 @@ export default function RoundTimer() {
               </div>
             </div>
             {hr.connected && mep > 0 && (
-              <p className="text-sm mt-2 text-center" style={{ color: mep >= mepTarget ? '#22c55e' : '#9ca3af' }}>
+              <p className="text-sm mt-2 text-center" style={{ color: mep >= mepTarget ? 'var(--pace-ahead)' : 'var(--text-secondary)' }}>
                 {mep} MEP {mep >= mepTarget ? `✓ target hit (${mepTarget})` : `/ ${mepTarget} target`}
               </p>
             )}
@@ -622,40 +595,51 @@ export default function RoundTimer() {
         )}
       </div>
 
-      {/* Controls */}
+      {/* Controls. These use <PressableButton> rather than `active:scale-95`
+          because WKWebView drops `:active` on a fast tap — and a fast tap with
+          gloves on, mid-round, is precisely how this row gets used. Everywhere
+          else in the app the CSS pseudo-class is good enough; here it is the
+          difference between a control that confirms it fired and one that
+          appears not to have. */}
       <div className="mx-4 mt-6 flex gap-3 justify-center items-center">
-        <button
+        <PressableButton
           onClick={reset}
           aria-label="Reset timer"
-          className="w-14 h-14 rounded-full bg-dark-700 border border-dark-500 flex items-center justify-center text-gray-400 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+          className="w-14 h-14 rounded-full bg-surface-1 border border-surface-2 flex items-center justify-center text-gray-400 hover:text-white hover:border-surface-3"
         >
           <RotateCcw size={20} />
-        </button>
-        <button
+        </PressableButton>
+        <PressableButton
           onClick={onStartPause}
           aria-label={phase === 'done' ? 'Start a new session' : isRunning ? 'Pause timer' : 'Start timer'}
-          className={`w-20 h-20 rounded-full flex items-center justify-center text-white transition-all active:scale-95 shadow-lg ${
+          className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-2"
+          style={
             phase === 'done'
-              ? 'bg-green-600 hover:bg-green-500'
+              ? { backgroundColor: 'var(--pace-ahead)', color: 'var(--bg-obsidian)' }
               : isRunning
-              ? 'bg-dark-600 border-2 border-brand-600 hover:bg-dark-500'
-              : 'bg-brand-600 hover:bg-brand-500'
-          }`}
+              ? { backgroundColor: 'var(--surface-2)', border: '2px solid var(--accent-flame)' }
+              : { backgroundColor: 'var(--accent-flame)', boxShadow: 'var(--glow-active)' }
+          }
         >
           {isRunning ? <Pause size={30} /> : <Play size={30} className="translate-x-0.5" />}
-        </button>
+        </PressableButton>
         {/* Bluetooth HR button */}
         {hr.supported && (
-          <button
+          <PressableButton
             onClick={hr.connected ? hr.disconnect : hr.connect}
             disabled={hr.connecting}
             aria-label={hr.connected ? `Disconnect heart rate monitor (${hr.deviceName})` : 'Connect heart rate monitor'}
             title={hr.connected ? `Connected: ${hr.deviceName}` : 'Connect HR device'}
-            className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+            className="w-14 h-14 rounded-full border flex items-center justify-center disabled:opacity-50"
+            style={
               hr.connected
-                ? 'bg-green-900/30 border-green-700 text-green-400 hover:border-green-500'
-                : 'bg-dark-700 border-dark-500 text-gray-400 hover:text-white hover:border-dark-300'
-            }`}
+                ? {
+                    backgroundColor: tint('var(--pace-ahead)', 0.14),
+                    borderColor: tint('var(--pace-ahead)', 0.5),
+                    color: 'var(--pace-ahead)',
+                  }
+                : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--surface-2)', color: 'var(--text-secondary)' }
+            }
           >
             {hr.connecting
               ? <span className="text-[9px] font-bold text-gray-400">…</span>
@@ -663,17 +647,17 @@ export default function RoundTimer() {
               ? <Bluetooth size={20} />
               : <BluetoothOff size={20} />
             }
-          </button>
+          </PressableButton>
         )}
         {/* Fullscreen button */}
         <ProGate required="fighter_pro" inline>
-          <button
+          <PressableButton
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? 'Exit fullscreen gym display' : 'Fullscreen gym display'}
-            className="w-14 h-14 rounded-full bg-dark-700 border border-dark-500 flex items-center justify-center text-gray-400 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+            className="w-14 h-14 rounded-full bg-surface-1 border border-surface-2 flex items-center justify-center text-gray-400 hover:text-white hover:border-surface-3"
           >
             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-          </button>
+          </PressableButton>
         </ProGate>
       </div>
 
@@ -768,24 +752,45 @@ export default function RoundTimer() {
         {/* Ring Colors */}
         <div className="card space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ring Colors</p>
+          {/* The six swatches per phase are the shipped set (§3.4). They are
+              real hex rather than token references — and one of only two such
+              places in the app — because the fighter's choice is handed to the
+              Live Activity and the watch app over the Capacitor bridge, and
+              UIKit cannot resolve `var()`. The values are the design system's
+              accents written out, so a chosen ring color is still on-palette;
+              they were previously Tailwind defaults that matched nothing. */}
           {[
             {
               label: 'Work',
               current: workColor,
               set: setWorkColor,
-              swatches: ['#22c55e', '#3b82f6', '#06b6d4', '#a855f7', '#f97316', '#f1f5f9'],
+              swatches: [
+                { hex: '#00E676', name: 'green' },
+                { hex: '#4DA8FF', name: 'blue' },
+                { hex: '#00F5D4', name: 'cyan' },
+                { hex: '#9D4EDD', name: 'violet' },
+                { hex: '#FF5E1A', name: 'orange' },
+                { hex: '#FFFFFF', name: 'white' },
+              ],
             },
             {
               label: 'Rest',
               current: restColor,
               set: setRestColor,
-              swatches: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6', '#a855f7', '#94a3b8'],
+              swatches: [
+                { hex: '#FF2A00', name: 'red' },
+                { hex: '#FF5E1A', name: 'orange' },
+                { hex: '#FFD166', name: 'gold' },
+                { hex: '#4DA8FF', name: 'blue' },
+                { hex: '#9D4EDD', name: 'violet' },
+                { hex: '#8C94A1', name: 'gray' },
+              ],
             },
           ].map(row => (
             <div key={row.label} className="flex items-center justify-between">
               <span className="text-sm font-medium text-white w-10">{row.label}</span>
               <div className="flex gap-2">
-                {row.swatches.map(hex => (
+                {row.swatches.map(({ hex, name }) => (
                   <button
                     key={hex}
                     onClick={() => row.set(hex)}
@@ -793,7 +798,11 @@ export default function RoundTimer() {
                       row.current === hex ? 'border-white scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: hex }}
-                    aria-label={hex}
+                    /* The hex was the accessible name, which announced as
+                       "number F F five E one A" — a color name is the thing a
+                       screen-reader user can actually act on. */
+                    aria-label={`${row.label} ring: ${name}`}
+                    aria-pressed={row.current === hex}
                   />
                 ))}
               </div>

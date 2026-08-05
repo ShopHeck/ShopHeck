@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { FC } from 'react';
 import { Search, ChevronDown, ChevronUp, Dumbbell, Zap, Target, Shield, Waves } from 'lucide-react';
 import { EXERCISES, CATEGORY_LABELS, type Exercise, type ExerciseCategory } from '../data/workoutLibrary';
+import { DIFFICULTY_COLORS, tint } from '../utils/designTokens';
 
 const CATEGORIES: { value: ExerciseCategory | 'all'; label: string; Icon?: FC<{ size: number }> }[] = [
   { value: 'all',            label: 'All' },
@@ -12,11 +13,17 @@ const CATEGORIES: { value: ExerciseCategory | 'all'; label: string; Icon?: FC<{ 
   { value: 'flexibility',    label: 'Flexibility',    Icon: Waves    },
 ];
 
-const DIFFICULTY_COLORS: Record<Exercise['difficulty'], string> = {
-  Beginner:     'bg-green-900/40 text-green-300',
-  Intermediate: 'bg-yellow-900/40 text-yellow-300',
-  Advanced:     'bg-red-900/40 text-red-300',
-};
+/**
+ * Difficulty reuses the pace-status palette (§2.6) rather than introducing a
+ * fourth green/amber/red. Same ordinal meaning, same three tokens — a fighter
+ * who has learnt that gold means "watch this" on the weight screen reads an
+ * Intermediate badge the same way, which is the point of not inventing a new
+ * scale for every ordinal thing in the app.
+ */
+const difficultyStyle = (d: Exercise['difficulty']) => ({
+  backgroundColor: tint(DIFFICULTY_COLORS[d], 0.16),
+  color: DIFFICULTY_COLORS[d],
+});
 
 const CATEGORY_COLORS: Record<ExerciseCategory, string> = {
   conditioning:   'bg-orange-900/30 text-orange-400',
@@ -40,7 +47,10 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[ex.category]}`}>
               {CATEGORY_LABELS[ex.category]}
             </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${DIFFICULTY_COLORS[ex.difficulty]}`}>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={difficultyStyle(ex.difficulty)}
+            >
               {ex.difficulty}
             </span>
           </div>
@@ -155,13 +165,21 @@ export default function WorkoutLibrary() {
             key={d}
             onClick={() => setDifficulty(d)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-              difficulty === d
-                ? d === 'Beginner'     ? 'bg-green-700  border-green-600  text-white'
-                : d === 'Intermediate' ? 'bg-yellow-700 border-yellow-600 text-white'
-                : d === 'Advanced'     ? 'bg-red-700    border-red-600    text-white'
-                :                       'bg-brand-600  border-brand-500  text-white'
-                : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
+              difficulty === d ? '' : 'bg-surface-1 border-surface-2 text-gray-400 hover:border-surface-3'
             }`}
+            aria-pressed={difficulty === d}
+            style={
+              difficulty === d
+                ? {
+                    // The active chip is the filter's own tier color at full
+                    // strength, so the chip and the badges it selects for are
+                    // visibly the same scale.
+                    backgroundColor: d === 'all' ? 'var(--accent-flame)' : DIFFICULTY_COLORS[d],
+                    borderColor: d === 'all' ? 'var(--accent-flame)' : DIFFICULTY_COLORS[d],
+                    color: 'var(--bg-obsidian)',
+                  }
+                : undefined
+            }
           >
             {d === 'all' ? 'All Levels' : d}
           </button>

@@ -4,6 +4,7 @@ import { DEFAULT_FACTOR_WEIGHTS } from '../types';
 import { formatWeightDelta } from './units';
 import { getWeekNumberForDate } from './campGenerator';
 import { latestComparableTrend } from './conditioningMetrics';
+import { readinessColor } from './designTokens';
 
 export interface ReadinessBreakdownItem {
   label: string;
@@ -16,6 +17,7 @@ export interface ReadinessBreakdownItem {
 export interface ReadinessResult {
   overall: number;
   status: string;
+  /** A `var(--token)` reference, not a hex literal — see designTokens.ts. */
   statusColor: string;
   breakdown: ReadinessBreakdownItem[];
   insights: string[];
@@ -336,12 +338,11 @@ export function computeReadiness(state: AppState, asOf: Date = new Date()): Read
     overall >= 60 ? 'On Track' :
     overall >= 40 ? 'Building Base' : 'Needs Work';
 
-  const statusColor =
-    overall >= 90 ? '#10b981' :
-    overall >= 75 ? '#22c55e' :
-    overall >= 60 ? '#eab308' :
-    overall >= 40 ? '#f97316' :
-    '#ef4444';
+  // Delegated to the design system's tier table rather than restating the five
+  // thresholds in hex. The bands were previously written out here, again in the
+  // gauge, and again in the gauge's legend — three copies of one legend, which
+  // is how the legend ends up labelling bands the score no longer uses.
+  const statusColor = readinessColor(overall);
 
   return {
     overall,

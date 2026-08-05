@@ -20,6 +20,9 @@ import {
 import ConfirmDialog from './shared/ConfirmDialog';
 import Modal from './shared/Modal';
 import ProGate from './shared/ProGate';
+import PaceStatusCard from './shared/PaceStatusCard';
+import GlassMetricTile from './shared/GlassMetricTile';
+import { PACE_COLORS, type PaceTier } from '../utils/designTokens';
 import CutCoach from './CutCoach';
 import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
 import { parseWeightInput, weightRangeHint } from '../utils/validation';
@@ -87,12 +90,12 @@ export default function WeightTracker() {
 
   // Cut pace projection — on pace / ahead / behind + projected weigh-in.
   const proj = computeCutProjection(activeCamp, weightEntries);
-  const paceUi = {
-    ahead:      { label: 'Ahead of pace', text: 'text-green-400',  border: 'border-green-800/50' },
-    'on-pace':  { label: 'On pace',       text: 'text-blue-400',   border: 'border-blue-800/50' },
-    behind:     { label: 'Behind pace',   text: 'text-yellow-400', border: 'border-yellow-800/50' },
-    made:       { label: 'On weight ✓',   text: 'text-green-400',  border: 'border-green-800/50' },
-    'no-fight': { label: '',              text: '',                border: '' },
+  const paceLabel = {
+    ahead: 'Ahead of pace',
+    'on-pace': 'On pace',
+    behind: 'Behind pace',
+    made: 'On weight ✓',
+    'no-fight': 'Tracking',
   }[proj.status];
 
   // Build chart data: include camp start, all entries, target, and the ideal
@@ -169,17 +172,21 @@ export default function WeightTracker() {
     (cutRatePerDay !== null && cutRatePerDay >= 1) ||
     (daysUntilFight !== null && toGo > 10 && daysUntilFight < 14);
 
-  // The "cut done" chip reads off the same projection as the Cut Pace card
-  // below it. They used to disagree — a fighter could see a green dot next to a
-  // yellow "Behind pace" on the same screen — because this chip had its own
-  // lbs-per-remaining-day rule of thumb.
-  const cutChip = isCritical
-    ? { dot: 'bg-red-500', text: 'text-red-400' }
-    : !proj.trackable || proj.status === 'made' || proj.status === 'ahead'
-    ? { dot: 'bg-green-500', text: 'text-green-400' }
+  // The domain has five projection states; the design system has three pace
+  // tiers (§2.6). This is the one place the two are reconciled, so the header
+  // chip and the pace card cannot disagree — they used to, and a fighter could
+  // see a green dot next to a yellow "Behind pace" on the same screen.
+  //
+  // `on-pace` maps to `ahead`: the tier answers "is anything wrong", and on
+  // pace means nothing is. Only a genuinely unsafe rate reaches `critical`,
+  // which is what keeps crimson meaningful — most camps spend weeks merely
+  // behind, and a red screen for weeks is a red screen nobody reads.
+  const cutTier: PaceTier = isCritical
+    ? 'critical'
     : proj.status === 'behind'
-    ? { dot: 'bg-yellow-500', text: 'text-yellow-400' }
-    : { dot: 'bg-blue-500', text: 'text-blue-400' };
+      ? 'behind'
+      : 'ahead';
+  const cutChipColor = PACE_COLORS[cutTier];
 
   return (
     <div className="space-y-4 pb-4">
@@ -188,26 +195,41 @@ export default function WeightTracker() {
           used to render "0 current · ✓ lbs to cut · 100% cut done · 0 → 0 lbs",
           which reads as a completed cut that never existed. */}
       {hasCutTarget ? (
-        <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
-          <div className="stat-card">
-            <Scale size={16} className="text-blue-400" />
-            <div className="text-xl font-black text-white">{d(currentW)}</div>
-            <div className="text-xs text-gray-400">current ({unit})</div>
-          </div>
-          <div className="stat-card">
-            <TrendingDown size={16} className="text-brand-500" />
-            <div className={`text-xl font-black ${toGo > 0 ? 'text-brand-400' : 'text-green-400'}`}>
-              {toGo > 0 ? d(toGo).toFixed(1) : '✓'}
-            </div>
-            <div className="text-xs text-gray-400">{unit} to cut</div>
-          </div>
-          <div className="stat-card">
-            <div className={`w-4 h-4 rounded-full ${cutChip.dot}`} />
-            <div className={`text-xl font-black ${cutChip.text}`}>
-              {Math.round(cutProgress)}%
-            </div>
-            <div className="text-xs text-gray-400">cut done</div>
-          </div>
+        <div className="mx-4 mt-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+          {/* The weigh-in-to-weigh-in delta used to live as a badge on the cut
+              progress card, which <PaceStatusCard> replaced. It belongs on the
+              current-weight tile anyway — it is a property of that number.
+              goodDirection="down" because on this screen losing is progress,
+              which is the whole reason the tile takes that prop. */}
+          <GlassMetricTile
+            label="Weight"
+            value={d(currentW)}
+            icon={<Scale size={13} style={{ color: 'var(--accent-blue)' }} />}
+            trend={
+              weightTrend !== 0
+                ? {
+                    value: toDisplayWeight(Math.abs(weightTrend), unit).toFixed(1),
+                    direction: weightTrend < 0 ? 'down' : 'up',
+                  }
+                : undefined
+            }
+            goodDirection="down"
+          />
+          <GlassMetricTile
+            label="To cut"
+            value={toGo > 0 ? d(toGo).toFixed(1) : '✓'}
+            icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
+          />
+          <GlassMetricTile
+            label="Done"
+            value={<span style={{ color: cutChipColor }}>{Math.round(cutProgress)}%</span>}
+            icon={
+              <span
+                className="w-2.5 h-2.5 rounded-full inline-block"
+                style={{ backgroundColor: cutChipColor }}
+              />
+            }
+          />
         </div>
       ) : (
         <div className="mx-4 mt-4 card flex items-center gap-4">
@@ -242,67 +264,45 @@ export default function WeightTracker() {
         </div>
       )}
 
-      {/* Progress Arc — cut camps only (see hasCutTarget above). */}
+      {/* Cut progress + pace, one card (§3.5).
+          These were two stacked cards — a progress bar in one, the pace verdict
+          and its stat pair in the other — which put the bar and the judgement
+          about the bar on separate surfaces. <PaceStatusCard> is the shape the
+          design system defines for exactly this pattern, and the caution tier
+          is the substantive change: "behind pace" is now gold, distinct from
+          the crimson that means the cut is genuinely in trouble. */}
       {hasCutTarget && (
-      <div className="mx-4">
-        <div className="card">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-xs text-gray-400 mb-0.5">Weight Cut Progress</p>
-              <p className="text-sm text-white font-semibold">{d(startW)} → {formatWeight(targetW, unit)}</p>
-            </div>
-            <div className="text-right">
-              {weightTrend !== 0 && (
-                <span className={`badge ${weightTrend < 0 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}`}>
-                  {weightTrend > 0 ? '↑' : '↓'} {formatWeightDelta(weightTrend, unit)}
-                </span>
-              )}
-              {daysUntilFight !== null && <p className="text-xs text-gray-400 mt-1">{daysUntilFight} days out</p>}
-            </div>
-          </div>
-          <div className="h-3 bg-dark-500 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${cutProgress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-700 to-blue-500'}`}
-              style={{ width: `${cutProgress}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-450 mt-1.5">
-            <span>Start: {formatWeight(startW, unit)}</span>
-            <span>Target: {formatWeight(targetW, unit)}</span>
-          </div>
-        </div>
-      </div>
-      )}
-
-      {/* Cut Pace projection */}
-      {proj.trackable && proj.status !== 'made' && (
         <div className="mx-4">
-          <div className={`card border ${paceUi.border}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-400">Cut Pace</p>
-                <p className={`text-lg font-black ${paceUi.text}`}>{paceUi.label}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400">Projected weigh-in</p>
-                <p className="text-lg font-black text-white">
-                  {proj.trendEstablished
-                    ? <>{d(proj.projectedWeighIn)}<span className="text-xs text-gray-400"> {unit}</span></>
-                    : '—'}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="bg-dark-600 rounded-lg px-3 py-2">
-                <p className="text-xs text-gray-400">Need / day</p>
-                <p className="text-sm text-white font-semibold">{d(proj.lbsPerDayNeeded)} {unit}</p>
-              </div>
-              <div className="bg-dark-600 rounded-lg px-3 py-2">
-                <p className="text-xs text-gray-400">Avg so far / day</p>
-                <p className="text-sm text-white font-semibold">{proj.trendEstablished ? `${d(proj.lbsPerDayActual)} ${unit}` : '—'}</p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-400 mt-2.5">
+          <PaceStatusCard
+            eyebrow="Weight Cut"
+            tier={cutTier}
+            statusLabel={paceLabel}
+            progressPct={cutProgress}
+            from={`Start: ${formatWeight(startW, unit)}`}
+            to={`Target: ${formatWeight(targetW, unit)}`}
+            headline={
+              proj.trackable && proj.status !== 'made'
+                ? {
+                    label: 'Projected',
+                    value: proj.trendEstablished ? `${d(proj.projectedWeighIn)} ${unit}` : '—',
+                  }
+                : undefined
+            }
+            stats={
+              proj.trackable && proj.status !== 'made'
+                ? [
+                    { label: 'Need / day', value: `${d(proj.lbsPerDayNeeded)} ${unit}` },
+                    {
+                      label: 'Avg so far / day',
+                      value: proj.trendEstablished ? `${d(proj.lbsPerDayActual)} ${unit}` : '—',
+                    },
+                  ]
+                : undefined
+            }
+          />
+
+          {proj.trackable && proj.status !== 'made' && (
+            <p className="text-xs text-gray-400 mt-2.5 px-1">
               {!proj.trendEstablished
                 ? 'Log weigh-ins on a few different days and your projected weigh-in weight will appear here.'
                 : proj.projectedMiss > 0
@@ -311,7 +311,7 @@ export default function WeightTracker() {
                 ? `At your recent rate you'd be on weight about ${proj.daysEarlyAtRate} day${proj.daysEarlyAtRate === 1 ? '' : 's'} before weigh-in.`
                 : 'At your recent rate you make weight right on schedule.'}
             </p>
-          </div>
+          )}
         </div>
       )}
 
@@ -322,26 +322,37 @@ export default function WeightTracker() {
           <div role="img" aria-label={`Line chart of weigh-ins across the camp, from ${formatWeight(startW, unit)} to ${formatWeight(currentW, unit)}, against a target of ${formatWeight(targetW, unit)} and the steady-cut pace line.`} className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#666', fontSize: 10 }}
+                  tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
                   domain={[Math.min(d(targetW) - 2, d(currentW) - 2), Math.max(d(startW) + 2, d(currentW) + 2)]}
-                  tick={{ fill: '#666', fontSize: 10 }}
+                  tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <Tooltip content={<CustomTooltip unit={unit} />} />
-                <ReferenceLine y={d(targetW)} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1.5} label={{ value: 'Target', fill: '#f97316', fontSize: 10 }} />
+                {/* §3.5: target line is 1px dashed flame with an inline label
+                    rather than a legend; the data line is 2px in the metric's
+                    own color (blue for weight) with 4px point markers.
+                    Recharts passes these straight through to SVG, so token
+                    references resolve — no hex needed at the call site. */}
+                <ReferenceLine
+                  y={d(targetW)}
+                  stroke="var(--accent-flame)"
+                  strokeDasharray="5 5"
+                  strokeWidth={1.5}
+                  label={{ value: 'Target', fill: 'var(--accent-flame)', fontSize: 10 }}
+                />
                 {activeCamp.fightDate && (
                   <Line
                     type="monotone"
                     dataKey="pace"
-                    stroke="#9ca3af"
+                    stroke="var(--text-tertiary)"
                     strokeWidth={1.5}
                     strokeDasharray="4 4"
                     dot={false}
@@ -351,10 +362,10 @@ export default function WeightTracker() {
                 <Line
                   type="monotone"
                   dataKey="weight"
-                  stroke="#60a5fa"
+                  stroke="var(--accent-blue)"
                   strokeWidth={2.5}
-                  dot={{ fill: '#60a5fa', strokeWidth: 0, r: 4 }}
-                  activeDot={{ r: 6, fill: '#fff' }}
+                  dot={{ fill: 'var(--accent-blue)', strokeWidth: 0, r: 4 }}
+                  activeDot={{ r: 6, fill: 'var(--text-primary)' }}
                 />
               </LineChart>
             </ResponsiveContainer>

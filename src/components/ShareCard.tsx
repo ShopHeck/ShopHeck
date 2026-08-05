@@ -1,8 +1,52 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { resolveToken } from '../utils/designTokens';
 import { X, Share2, Download } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import type { WorkoutLog, FightCamp, FighterProfile } from '../types';
 import { useDialog } from '../hooks/useDialog';
+
+/**
+ * Canvas 2D cannot parse `var()`; it fails silently and paints black. Both
+ * generators below therefore resolve the palette once per draw rather than
+ * carrying a parallel set of hex literals, which is how an exported card ends
+ * up off-brand from the screen that exported it.
+ *
+ * `withAlpha` exists because the canvas code needs a few translucent fills, and
+ * the old code got them by concatenating an alpha suffix onto a hex string
+ * ('#ea580c22') — which silently produces an invalid color the moment the base
+ * is a token rather than a literal.
+ */
+function palette() {
+  return {
+    obsidian: resolveToken('var(--bg-obsidian)'),
+    ambient: resolveToken('var(--bg-ambient-warm)'),
+    flame: resolveToken('var(--accent-flame)'),
+    crimson: resolveToken('var(--accent-crimson)'),
+    green: resolveToken('var(--pace-ahead)'),
+    surface1: resolveToken('var(--surface-1)'),
+    surface2: resolveToken('var(--surface-2)'),
+    surface3: resolveToken('var(--surface-3)'),
+    white: resolveToken('var(--text-primary)'),
+    secondary: resolveToken('var(--text-secondary)'),
+    tertiary: resolveToken('var(--text-tertiary)'),
+  };
+}
+
+/** Hex or rgb() base + 0–1 alpha → an rgba() the canvas accepts. */
+function withAlpha(color: string, alpha: number): string {
+  const hex = color.trim().match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+  const rgb = color.trim().match(/^rgba?\(([^)]+)\)$/i);
+  if (rgb) {
+    const [r, g, b] = rgb[1].split(/[\s,/]+/).filter(Boolean);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+}
+
 
 /** A shareable win that isn't a training session — belt, streak, PR, fight. */
 export interface MilestoneShare {
@@ -73,29 +117,30 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
+  const c = palette();
 
   // Background gradient
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#0a0a0a');
-  bg.addColorStop(1, '#111827');
+  bg.addColorStop(0, c.obsidian);
+  bg.addColorStop(1, c.ambient);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
   // Subtle top accent line
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   ctx.fillRect(0, 0, W, 8);
 
   const cx = W / 2;
 
   // FIGHT CAMP brand
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   ctx.font = 'bold 52px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.letterSpacing = '0.15em';
   ctx.fillText('FIGHT CAMP', cx, 140);
 
   // Athlete name
-  ctx.fillStyle = '#6b7280';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '40px system-ui, sans-serif';
   ctx.fillText(user.name.toUpperCase(), cx, 210);
 
@@ -109,31 +154,31 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
     : 0;
 
   // Big day number
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = c.white;
   ctx.font = `bold 320px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText(String(dayNum), cx, 680);
 
-  ctx.fillStyle = '#9ca3af';
+  ctx.fillStyle = c.secondary;
   ctx.font = 'bold 72px system-ui, sans-serif';
   ctx.fillText(`of ${totalDays} days`, cx, 770);
 
   // Progress bar
   const barX = 120, barY = 820, barW = W - 240, barH = 20;
   const progress = Math.min(1, dayNum / totalDays);
-  ctx.fillStyle = '#1f2937';
+  ctx.fillStyle = c.surface3;
   drawRoundRect(ctx, barX, barY, barW, barH, 10);
   ctx.fill();
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   drawRoundRect(ctx, barX, barY, Math.max(barH, barW * progress), barH, 10);
   ctx.fill();
 
   // Session card
   const cardX = 80, cardY = 890, cardW = W - 160, cardH = 420;
-  ctx.fillStyle = '#1a1a1a';
+  ctx.fillStyle = c.surface1;
   drawRoundRect(ctx, cardX, cardY, cardW, cardH, 40);
   ctx.fill();
-  ctx.strokeStyle = '#2a2a2a';
+  ctx.strokeStyle = c.surface3;
   ctx.lineWidth = 2;
   drawRoundRect(ctx, cardX, cardY, cardW, cardH, 40);
   ctx.stroke();
@@ -141,16 +186,16 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   // Session type badge
   const emoji = SESSION_EMOJIS[log.sessionType] ?? '🏋️';
   const typeLabel = SESSION_LABELS[log.sessionType] ?? log.sessionType;
-  ctx.fillStyle = '#ea580c22';
+  ctx.fillStyle = withAlpha(c.flame, 0.13);
   drawRoundRect(ctx, cx - 160, cardY + 50, 320, 80, 40);
   ctx.fill();
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   ctx.font = 'bold 40px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(`${emoji}  ${typeLabel.toUpperCase()}`, cx, cardY + 103);
 
   // Session title
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = c.white;
   ctx.font = 'bold 72px system-ui, sans-serif';
   ctx.textAlign = 'center';
   // Truncate long titles
@@ -158,12 +203,12 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
   ctx.fillText(title, cx, cardY + 225);
 
   // Stats row
-  ctx.fillStyle = '#9ca3af';
+  ctx.fillStyle = c.secondary;
   ctx.font = '48px system-ui, sans-serif';
   ctx.fillText(`${log.duration} min  ·  RPE ${log.rpe}/10`, cx, cardY + 320);
 
   // Date
-  ctx.fillStyle = '#4b5563';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '36px system-ui, sans-serif';
   ctx.fillText(format(logDate, 'MMMM d, yyyy').toUpperCase(), cx, cardY + 390);
 
@@ -174,20 +219,21 @@ function buildCard(log: WorkoutLog, camp: FightCamp, user: FighterProfile): HTML
     ? (camp.opponent ? `vs. ${camp.opponent}  ·  ${fightDate}` : `Fight Date: ${fightDate}`)
     : 'Off-Season Training Block';
 
-  ctx.fillStyle = '#6b7280';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '42px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(fightLabel, cx, 1430);
 
   // Days to fight countdown
   if (daysToFight > 0) {
-    ctx.fillStyle = daysToFight < 14 ? '#ef4444' : daysToFight < 28 ? '#f97316' : '#22c55e';
+    // Same fight-week urgency ramp the countdown card uses.
+    ctx.fillStyle = daysToFight < 14 ? c.crimson : daysToFight < 28 ? c.flame : c.green;
     ctx.font = 'bold 56px system-ui, sans-serif';
     ctx.fillText(`${daysToFight} days to fight`, cx, 1510);
   }
 
   // Bottom brand watermark
-  ctx.fillStyle = '#374151';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '36px system-ui, sans-serif';
   ctx.fillText(SHARE_DOMAIN, cx, H - 80);
 
@@ -200,34 +246,35 @@ function buildMilestoneCard(m: MilestoneShare, user: FighterProfile): HTMLCanvas
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
+  const c = palette();
 
   // Same visual system as the session card: dark gradient, brand accent line.
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#0a0a0a');
-  bg.addColorStop(1, '#111827');
+  bg.addColorStop(0, c.obsidian);
+  bg.addColorStop(1, c.ambient);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   ctx.fillRect(0, 0, W, 8);
 
   const cx = W / 2;
 
-  ctx.fillStyle = '#ea580c';
+  ctx.fillStyle = c.flame;
   ctx.font = 'bold 52px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.letterSpacing = '0.15em';
   ctx.fillText('FIGHT CAMP', cx, 140);
 
-  ctx.fillStyle = '#6b7280';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '40px system-ui, sans-serif';
   ctx.fillText(user.name.toUpperCase(), cx, 210);
 
   // Soft radial glow behind the emoji so the moment reads celebratory even in
   // a feed thumbnail.
   const glow = ctx.createRadialGradient(cx, 700, 60, cx, 700, 460);
-  glow.addColorStop(0, '#ea580c33');
-  glow.addColorStop(1, '#ea580c00');
+  glow.addColorStop(0, withAlpha(c.flame, 0.2));
+  glow.addColorStop(1, withAlpha(c.flame, 0));
   ctx.fillStyle = glow;
   ctx.fillRect(0, 240, W, 920);
 
@@ -236,22 +283,22 @@ function buildMilestoneCard(m: MilestoneShare, user: FighterProfile): HTMLCanvas
 
   // Headline, shrunk to fit long titles ("NEW PR: MOST SPARRING ROUNDS").
   let size = 130;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = c.white;
   do {
     ctx.font = `bold ${size}px system-ui, sans-serif`;
     size -= 8;
   } while (ctx.measureText(m.title).width > W - 140 && size > 56);
   ctx.fillText(m.title, cx, 1080);
 
-  ctx.fillStyle = '#9ca3af';
+  ctx.fillStyle = c.secondary;
   ctx.font = '52px system-ui, sans-serif';
   ctx.fillText(m.subtitle, cx, 1180);
 
-  ctx.fillStyle = '#4b5563';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '36px system-ui, sans-serif';
   ctx.fillText(format(new Date(), 'MMMM d, yyyy').toUpperCase(), cx, 1290);
 
-  ctx.fillStyle = '#374151';
+  ctx.fillStyle = c.tertiary;
   ctx.font = '36px system-ui, sans-serif';
   ctx.fillText(SHARE_DOMAIN, cx, H - 80);
 

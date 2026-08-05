@@ -23,7 +23,11 @@ export default function Header({ title, showBack, onBack, onSettings, subtitle, 
   const showTimerPill = signal.isRunning && currentView !== 'timer' && onNavigate;
 
   return (
-    <header className="sticky top-0 z-40 bg-dark-800/90 backdrop-blur border-b border-dark-500 safe-area-top">
+    /* One of only two surfaces in the app that carries a live backdrop-filter.
+       Legitimate here because the header sits outside the scrolling container
+       (§3.2 forbids live blur inside one) and blurs content passing beneath it,
+       which is the effect actually doing work. */
+    <header className="sticky top-0 z-40 glass-live border-b border-surface-2 safe-area-top" style={{ borderRadius: 0 }}>
       <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
         {showBack ? (
           <button

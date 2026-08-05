@@ -6,6 +6,7 @@ import {
 import { format, parseISO, subDays } from 'date-fns';
 import { useApp } from '../context/AppContext';
 import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
+import { PACE_COLORS } from '../utils/designTokens';
 import { useHeartRate } from '../context/HeartRateContext';
 import {
   initiateFitbitConnect, handleFitbitCallback, getFitbitCallbackCode,
@@ -31,7 +32,10 @@ function computeRecovery(rrmssdValues: number[]): {
   const score = Math.min(100, Math.max(0, Math.round(ratio * 100)));
 
   const label  = score >= 105 ? 'Peak Recovery' : score >= 90 ? 'Well Recovered' : score >= 70 ? 'Moderate' : 'Low Recovery';
-  const color  = score >= 90 ? '#22c55e' : score >= 70 ? '#eab308' : '#ef4444';
+  // A recovery score is the same three-tier "is anything wrong" judgement the
+  // weight cut and adherence use, so it takes the pace palette rather than a
+  // fourth green/amber/red of its own (§2.6).
+  const color  = PACE_COLORS[score >= 90 ? 'ahead' : score >= 70 ? 'behind' : 'critical'];
 
   const prev2avg = rrmssdValues.length >= 3
     ? (rrmssdValues[rrmssdValues.length - 2] + rrmssdValues[rrmssdValues.length - 3]) / 2
@@ -56,7 +60,7 @@ function HRVSparkline({ values }: { values: number[] }) {
   });
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-10" preserveAspectRatio="none">
-      <polyline points={pts.join(' ')} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={pts.join(' ')} fill="none" stroke="var(--pace-ahead)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -245,7 +249,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16 flex-shrink-0">
               <svg viewBox="0 0 40 40" className="w-full h-full -rotate-90">
-                <circle cx="20" cy="20" r="16" fill="none" stroke="#1e293b" strokeWidth="4" />
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--surface-3)" strokeWidth="4" />
                 <circle cx="20" cy="20" r="16" fill="none" strokeWidth="4" strokeLinecap="round"
                   stroke={recovery.color}
                   strokeDasharray={`${2 * Math.PI * 16 * (Math.min(recovery.score, 100) / 100)} ${2 * Math.PI * 16}`} />
@@ -339,7 +343,7 @@ export default function FitnessTrackerHub({ onNavigate }: Props) {
               {/* Live metrics */}
               <div className="grid grid-cols-3 gap-3 pt-1">
                 <div className="bg-dark-600 rounded-xl p-3 text-center">
-                  <div className="text-2xl font-black" style={{ color: hr.hr ? ZONE_COLORS[hr.zone] : '#6b7280' }}>
+                  <div className="text-2xl font-black" style={{ color: hr.hr ? ZONE_COLORS[hr.zone] : 'var(--text-tertiary)' }}>
                     {hr.hr ?? '—'}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">bpm</div>

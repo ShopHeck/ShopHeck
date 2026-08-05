@@ -596,12 +596,12 @@ export default function CoachDashboard() {
             <div role="img" aria-label="Bar chart of sessions logged per week across your fighters." className="card p-2">
               <ResponsiveContainer width="100%" height={140}>
                 <LineChart data={weeklyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="week" tick={{ fill: '#666', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                  <XAxis dataKey="week" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Line type="monotone" dataKey="sessions" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316' }} name="Sessions" />
-                  <Line type="monotone" dataKey="sparRounds" stroke="#60a5fa" strokeWidth={2} dot={{ r: 3, fill: '#60a5fa' }} name="Spar Rds" />
+                  <Line type="monotone" dataKey="sessions" stroke="var(--accent-flame)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent-flame)' }} name="Sessions" />
+                  <Line type="monotone" dataKey="sparRounds" stroke="var(--accent-blue)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent-blue)' }} name="Spar Rds" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -619,11 +619,11 @@ export default function CoachDashboard() {
               </div>
               <ResponsiveContainer width="100%" height={120}>
                 <LineChart data={weightChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="date" tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                  <XAxis dataKey="date" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Line type="monotone" dataKey="weight" stroke="#60a5fa" strokeWidth={2.5} dot={{ r: 3, fill: '#60a5fa' }} />
+                  <Line type="monotone" dataKey="weight" stroke="var(--accent-blue)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--accent-blue)' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

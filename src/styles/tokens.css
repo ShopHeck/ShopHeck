@@ -1,0 +1,213 @@
+/**
+ * Liquid Glass design tokens — single source of truth.
+ *
+ * Implements the FightCamp Liquid Glass v6 spec (§2). Nothing in `src/` may
+ * hard-code a hex value; everything resolves through this file, either directly
+ * as `var(--token)` or via the Tailwind theme, which is mapped onto these
+ * properties in `tailwind.config.js`.
+ *
+ * WHY THE RGB TRIPLETS: Tailwind's opacity modifiers (`bg-glass-surface/40`)
+ * compile to `rgb(<channels> / <alpha>)`, which needs the channels unwrapped.
+ * A token used with an opacity modifier anywhere therefore ships in two forms —
+ * `--x-rgb` (space-separated channels, what Tailwind consumes) and `--x` (the
+ * ready-to-use color, what hand-written CSS and inline styles consume). The
+ * pair is derived, never independently edited: `--x` is always
+ * `rgb(var(--x-rgb))`.
+ */
+
+:root {
+  /* Prevents iOS force-inverting the WKWebView to light mode on some
+     device/accessibility combinations. The spec writes `dark only`; the
+     grammar is `only <scheme>`, so the keyword order here is deliberate —
+     `dark only` parses as invalid and silently drops the whole declaration. */
+  color-scheme: only dark;
+
+  /* ── Surfaces (§2.1) ─────────────────────────────────────────────────── */
+  --bg-obsidian-rgb: 11 13 18;
+  --bg-obsidian: rgb(var(--bg-obsidian-rgb));
+  /* The ambient wash's warm endpoint, exposed on its own because --bg-ambient
+     is a gradient and cannot be sampled — the share-image canvas needs the
+     stop, not the gradient. */
+  --bg-ambient-warm: #1A0D22;
+  --bg-ambient: radial-gradient(circle at top right, var(--bg-ambient-warm) 0%, var(--bg-obsidian) 70%);
+
+  /* Raised solid fills, for the many surfaces that must NOT carry live blur
+     (§3.2: anything inside a scrolling container, the metric grid, anything
+     on-screen during a timer). These are the composited appearance of the
+     glass recipe over --bg-obsidian, so a solid card and a blurred card read
+     as the same material rather than as two different design languages. */
+  --surface-1-rgb: 20 23 34;
+  --surface-1: rgb(var(--surface-1-rgb));
+  --surface-2-rgb: 26 30 43;
+  --surface-2: rgb(var(--surface-2-rgb));
+  --surface-3-rgb: 34 39 54;
+  --surface-3: rgb(var(--surface-3-rgb));
+
+  --glass-surface: rgba(255, 255, 255, 0.05);
+  --glass-elevated: rgba(255, 255, 255, 0.09);
+  /* Chrome material — the header and bottom nav.
+     Deliberately NOT --glass-surface. That token is a 5% white veil designed to
+     sit over the page background, which is right for a card and wrong for
+     chrome: content scrolls *underneath* the header and nav, and at 5% it
+     showed straight through, so tab labels sat on top of whatever card happened
+     to be passing behind them. Blur alone does not fix that — blurred bright
+     content is still bright. The fix is an opaque-enough obsidian base that the
+     blur decorates rather than carries. */
+  --glass-chrome: rgba(11, 13, 18, 0.82);
+  --glass-border-highlight: rgba(255, 255, 255, 0.35);
+  --glass-border-shadow: rgba(255, 255, 255, 0.08);
+  --glass-hairline: rgba(255, 255, 255, 0.18);
+
+  /* ── Accents (§2.1) ──────────────────────────────────────────────────── */
+  --accent-flame-rgb: 255 94 26;
+  --accent-flame: rgb(var(--accent-flame-rgb));
+  --accent-crimson-rgb: 255 42 0;
+  --accent-crimson: rgb(var(--accent-crimson-rgb));
+  /* Violet has exactly three meanings in this app, and none of them is
+     "AI" generally — see the AI branding note below:
+       1. AI Coach Insights, the feature it brands (§2.6)
+       2. fat-macro tagging (§2.6 anticipated this and allowed it)
+       3. the coach role and the Coach Pro tier
+     The third is not in v6, because v6 was reconciled against fighter-side
+     screens; the coach-side UI has used violet to distinguish Coach Pro from
+     the flame of Fighter Pro since well before this design system existed.
+     Recorded rather than recoloured — which tier owns which colour is a
+     product decision, not one for a design pass to make silently. */
+  --accent-violet-rgb: 157 78 221;
+  --accent-violet: rgb(var(--accent-violet-rgb));
+  /* Readiness / hydration. Deliberately not reused for the Peak readiness
+     tier — see --readiness-peak. */
+  --accent-cyan-rgb: 0 245 212;
+  --accent-cyan: rgb(var(--accent-cyan-rgb));
+  --accent-gold-rgb: 255 209 102;
+  --accent-gold: rgb(var(--accent-gold-rgb));
+  --accent-green-rgb: 0 230 118;
+  --accent-green: rgb(var(--accent-green-rgb));
+  /* Secondary data series — weight trend line, rest-time badges, carbs, and
+     the "current phase" label. v6 §2.1 left this estimated-from-capture and
+     asked for confirmation before lock; locked here at the spec's value, which
+     sits between the two blues the app was shipping (#60a5fa, #3b82f6). */
+  --accent-blue-rgb: 77 168 255;
+  --accent-blue: rgb(var(--accent-blue-rgb));
+
+  /* ── Text (§2.1) ─────────────────────────────────────────────────────── */
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.40);
+  /* Guarantees the 4.5:1 floor under any composited backdrop (§8.3). Applied
+     by <GlassSurface> itself, never opted into per-component. */
+  --text-scrim: linear-gradient(rgba(11, 13, 18, 0) 0%, rgba(11, 13, 18, 0.55) 100%);
+
+  /* ── Spacing (§2.2) — never invent values outside this scale ─────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* ── Corner radius (§2.3) ────────────────────────────────────────────── */
+  /* Standard border-radius throughout. True continuous (squircle) corners have
+     no reliable cross-version CSS support, and the spec's SVG clip-path escape
+     hatch is scoped to one component if it is ever wanted — not system-wide. */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-full: 999px;
+
+  /* ── Elevation (§2.4) ────────────────────────────────────────────────── */
+  --shadow-1: 0 8px 16px -4px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 16px 32px -8px rgba(0, 0, 0, 0.50);
+  /* Level 3 = shadow-2 + accent glow, active CTAs only. The 40% the spec
+     specifies is baked into the color stop rather than left to the caller,
+     because "apply at 40% opacity" on a box-shadow is ambiguous enough that
+     two engineers would implement it two ways. */
+  --glow-active: 0 0 20px rgb(var(--accent-flame-rgb) / 0.4);
+
+  /* ── Motion (§5, §7) ─────────────────────────────────────────────────── */
+  /* Approximates SwiftUI spring(response: 0.28, dampingFraction: 0.65). */
+  --ease-press: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-press: 0.28s;
+
+  /* ── Fight Readiness, 5 tiers (§2.6) ─────────────────────────────────── */
+  /* A different scale from pace status below, despite sharing four colors.
+     They are kept separate because they mean different things and drive
+     differently-shaped components; collapsing them is how a 5-tier gauge ends
+     up rendering 3-tier logic. */
+  --readiness-needs-work: var(--accent-crimson); /*  0–39 */
+  --readiness-building: var(--accent-flame);     /* 40–59 */
+  --readiness-on-track: var(--accent-gold);      /* 60–74 */
+  --readiness-fight-ready: var(--accent-green);  /* 75–89 */
+  /* 90+. v6 §2.6 left this tier's color open, noting only that it must be a
+     distinct teal/emerald and warning against reusing --accent-cyan because
+     cyan already means hydration. Resolved from the shipping app, which was
+     already rendering #10b981 here: emerald, distinct from both --accent-green
+     and --accent-cyan, so Peak does not read as either "Fight Ready" or
+     "hydration". Locked rather than re-invented. */
+  --readiness-peak-rgb: 16 185 129;
+  --readiness-peak: rgb(var(--readiness-peak-rgb));
+
+  /* ── Pace status, 3 tiers (§2.6) — weight cut, countdown, adherence ──── */
+  --pace-ahead: var(--accent-green);
+  --pace-behind: var(--accent-gold);
+  --pace-critical: var(--accent-crimson);
+
+  /* ── Difficulty tiers (§2.6) — same ordinal meaning, same three tokens ─ */
+  --difficulty-beginner: var(--pace-ahead);
+  --difficulty-intermediate: var(--pace-behind);
+  --difficulty-advanced: var(--pace-critical);
+
+  /* ── Macro nutrients (§2.6) — its own system, not status semantics ───── */
+  --macro-calories: var(--accent-flame);
+  --macro-protein: var(--accent-green);
+  --macro-carbs: var(--accent-blue);
+  /* v6 §2.6 asked whether fat's purple is genuinely --accent-violet, and said
+     that if it is, the "AI Coach Insights only" framing needs loosening to
+     "AI Coach Insights and fat-macro tagging". It is: the app was shipping
+     #a855f7 here, the same family, with no reason for a near-duplicate token.
+     Loosened accordingly — violet now has exactly two documented meanings. */
+  --macro-fat: var(--accent-violet);
+
+  /* ── Session type → color (§2.7) ─────────────────────────────────────── */
+  /* v6 read these off a screen recording and asked for the real mapping from
+     the session-type data model before build. Locked here against the actual
+     `SessionType` union in src/types/index.ts, which confirmed four of the
+     spec's four guesses and supplied the two it had not observed (strength,
+     rest). Adding a session type without adding its token is now a visible
+     gap rather than a silent fallback to gray. */
+  --session-conditioning: var(--accent-flame);
+  --session-skill: var(--accent-blue);
+  --session-sparring: var(--accent-crimson);
+  --session-strength: var(--accent-gold);
+  --session-recovery: var(--accent-green);
+  --session-rest: var(--text-tertiary);
+}
+
+/**
+ * Reduced transparency (§2.1, §8.1).
+ *
+ * Blur off, translucency swapped for opaque fills. The glass tokens collapse to
+ * the solid surfaces above rather than to a single flat color, so elevation
+ * survives the switch — a fighter using this setting still sees which card is
+ * raised, they just do not see through it.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-surface: var(--surface-1);
+    --glass-elevated: var(--surface-2);
+    --glass-chrome: var(--bg-obsidian);
+    --glass-border-highlight: #2A2F42;
+    --glass-border-shadow: #2A2F42;
+    --glass-hairline: #2A2F42;
+  }
+
+  .glass,
+  .glass-live {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
