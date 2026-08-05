@@ -42,6 +42,36 @@ the workflow. Revoking a development cert does not affect the shipped app.
 
 Until step 3 is complete the pipeline stays on automatic signing, so nothing breaks.
 
+## Adding an app extension
+
+An embedded extension is a **separate signed bundle** with its own App ID and
+its own provisioning profile — none of it is inherited from the host app. The
+Live Activity widget (`TimerLiveActivity`, bundle
+`app.fightcamptraining.timerliveactivity`) is one; anything added later will be
+too.
+
+Everything signing-related is driven off one list, `SIGNED_BUNDLES` at the top
+of `ios/fastlane/Fastfile`. **Add a row when you add an extension target** — its
+Xcode target name, bundle identifier, and a display name for the Developer
+Portal entry — and the lanes pick it up everywhere: App ID registration, match
+profiles, per-target manual signing, and gym's export options.
+
+Omitting it fails the archive with
+
+```
+No profiles for 'app.fightcamptraining.timerliveactivity' were found ...
+(in target 'TimerLiveActivity' from project 'App')
+```
+
+which lands *after* the app target has signed cleanly, so it reads like an
+app-level signing fault rather than a missing extension profile.
+
+The first build after a new row runs `match` read-only, finds no stored profile
+for the new bundle, and provisions it: it registers the App ID (if needed) and
+generates and pushes just the missing profile. The shared certificate is reused,
+never reissued, so this cannot contribute to the certificate cap. Running the
+`certs` lane by hand does the same thing up front.
+
 ### Why a deploy key rather than a token
 
 A personal access token works, but it expires. When it lapses the build fails at
@@ -73,3 +103,4 @@ credentials.
 | `Permission denied (publickey)` | Deploy key missing, or `MATCH_GIT_URL` still on `https://` instead of `git@github.com:` |
 | `remote: Write access to repository not granted` | Deploy key added without **Allow write access** |
 | Archive hangs with no output | Missing `setup_ci` — codesign blocks on a locked login keychain (already fixed in the Fastfile) |
+| `No profiles for 'app.fightcamptraining.<something>' were found` naming an extension target | That bundle is missing from `SIGNED_BUNDLES` in the Fastfile — see *Adding an app extension* above |
