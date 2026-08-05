@@ -22,6 +22,17 @@
   to = "/index.html"
   status = 200
 
+# Apple fetches this to decide whether this domain may open the app, and it
+# rejects any content-type that is not application/json. The file has no
+# extension, so nothing else would infer one. It must also be reachable
+# without a redirect, which the SPA catch-all above would otherwise apply —
+# Netlify serves real static files ahead of a 200-rewrite, so the file itself
+# is what gets served, but the header has to be set explicitly.
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
+
 # Baseline security headers. These are safe for a standalone SPA and add no
 # runtime cost. A Content-Security-Policy is intentionally NOT set here: it must
 # be validated against the live third-party endpoints (Supabase, Anthropic,

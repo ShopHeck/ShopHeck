@@ -22,7 +22,7 @@ For CI / Fastlane: instead of editing the file, export `REVENUECAT_API_KEY` and 
 
 1. Sign in at https://appstoreconnect.apple.com.
 2. **Users and Access → Integrations → App Store Connect API**: create an API key with Admin role. Save the `.p8`, Issuer ID, and Key ID for Fastlane.
-3. **Certificates, Identifiers & Profiles** → register App ID `app.fightcamptraining` with capabilities: In-App Purchase, Sign in with Apple, HealthKit, Push Notifications (if used), Associated Domains (if deep linking). HealthKit is required by the "Sync to Apple Health" write-back (Settings); the app already declares `NSHealthUpdateUsageDescription`/`NSHealthShareUsageDescription` in Info.plist.
+3. **Certificates, Identifiers & Profiles** → register App ID `app.fightcamptraining` with capabilities: In-App Purchase, Sign in with Apple, HealthKit, Push Notifications (if used), **Associated Domains**. HealthKit is required by the "Sync to Apple Health" write-back (Settings); the app already declares `NSHealthUpdateUsageDescription`/`NSHealthShareUsageDescription` in Info.plist. Associated Domains is required — it is no longer optional — because password-reset links open the app as universal links (see §3a).
 4. **My Apps → +** → New App:
    - Platform: iOS
    - Name: `Fight Camp Training`
@@ -72,6 +72,51 @@ Add these under **GitHub → repo Settings → Secrets and variables → Actions
    ```bash
    npm run cap:ios
    ```
+
+## 3a. Universal links (password reset)
+
+A password-reset email has to be opened from a mail client, which cannot resolve
+`capacitor://localhost` — so the link points at the web origin. Without
+universal links that means a fighter who resets from the iOS app sets their new
+password in Safari and then returns to the app to sign in. It works, but it is a
+seam, and it is the kind of seam a reviewer notices.
+
+Three pieces, all of them already in the repo:
+
+| Piece | Where | What it does |
+| --- | --- | --- |
+| `applinks:fightcamp.netlify.app` | `ios/App/App/App.entitlements` | Tells iOS this app may claim URLs on that domain. |
+| `apple-app-site-association` | `public/.well-known/` (ships to `dist/`) | Tells the domain which app may claim them, and which paths. |
+| `Content-Type: application/json` | `netlify.toml` | Apple rejects the file under any other type, and it has no extension for Netlify to infer one from. |
+
+The file claims `/auth/*` only. A rule matching `/` would claim every URL on the
+domain, so a tap on the privacy policy or the support page would launch the app
+instead of opening the page.
+
+Two things must be true outside the repo:
+
+1. The App ID has the **Associated Domains** capability enabled (§1.3). Without
+   it the entitlement fails to sign and the build is rejected at upload.
+2. `https://fightcamp.netlify.app/auth/recovery` is in the Supabase project's
+   **Authentication → URL Configuration → Redirect URLs** allow-list. Supabase
+   silently falls back to the project Site URL for any redirect that is not
+   listed, which would send the link back to `/` — where nothing claims it.
+
+Verify after deploying, before submitting:
+
+```bash
+# Must return 200 with content-type: application/json, and no redirect.
+curl -sI https://fightcamp.netlify.app/.well-known/apple-app-site-association | head -3
+
+# Apple's own CDN copy — the one the device actually reads. Can lag a deploy
+# by up to 24h on a first publish.
+curl -s "https://app-site-association.cdn-apple.com/a/v1/fightcamp.netlify.app"
+```
+
+On device: request a reset, then tap the link in Mail. It should open the app on
+the set-a-new-password screen. If it opens Safari instead, the app has not yet
+fetched the association file — delete and reinstall the app, which forces a
+fresh fetch.
 
 ## 4. App Store listing assets
 

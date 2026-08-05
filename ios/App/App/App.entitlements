@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Universal links. Lets a Supabase password-reset email open the app
+	     directly instead of dead-ending in Safari; the matching
+	     apple-app-site-association file is served from public/.well-known/. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:fightcamp.netlify.app</string>
+	</array>
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>
