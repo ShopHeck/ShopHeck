@@ -17,11 +17,14 @@ export type Database = {
     Tables: {
       camps: {
         Row: {
+          adaptations: Json | null
           camp_weeks: number
           completed_sessions: Json | null
+          corner_sessions: Json | null
           created_at: string
           current_weight: number
           day_overrides: Json | null
+          dismissed_adaptations: Json | null
           deleted_at: string | null
           experience: string
           fight_date: string | null
@@ -41,11 +44,14 @@ export type Database = {
           weight_class: string
         }
         Insert: {
+          adaptations?: Json | null
           camp_weeks: number
           completed_sessions?: Json | null
+          corner_sessions?: Json | null
           created_at?: string
           current_weight: number
           day_overrides?: Json | null
+          dismissed_adaptations?: Json | null
           deleted_at?: string | null
           experience: string
           fight_date?: string | null
@@ -65,11 +71,14 @@ export type Database = {
           weight_class: string
         }
         Update: {
+          adaptations?: Json | null
           camp_weeks?: number
           completed_sessions?: Json | null
+          corner_sessions?: Json | null
           created_at?: string
           current_weight?: number
           day_overrides?: Json | null
+          dismissed_adaptations?: Json | null
           deleted_at?: string | null
           experience?: string
           fight_date?: string | null
@@ -718,6 +727,7 @@ export type Database = {
       }
       user_state: {
         Row: {
+          ai_analyses: Json | null
           dashboard_prefs: Json | null
           fitbit_config: Json | null
           gamification: Json | null
@@ -726,6 +736,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_analyses?: Json | null
           dashboard_prefs?: Json | null
           fitbit_config?: Json | null
           gamification?: Json | null
@@ -734,6 +745,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_analyses?: Json | null
           dashboard_prefs?: Json | null
           fitbit_config?: Json | null
           gamification?: Json | null

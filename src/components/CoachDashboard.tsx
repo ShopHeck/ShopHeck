@@ -15,7 +15,18 @@ import {
 import { buildTeamOverview, FLAG_LABELS, type TeamOverviewRow } from '../utils/teamOverview';
 import UpgradeModal from './shared/UpgradeModal';
 import GlassMetricTile from './shared/GlassMetricTile';
-import type { CoachNoteCategory } from '../types';
+import type { AdaptationKind, CampAdaptation, CoachNoteCategory } from '../types';
+
+/**
+ * An adaptation is a decision, not a verdict — so these are not the pace tiers.
+ * A deload is a fighter listening to their body, and colouring it amber would
+ * tell the coach something went wrong.
+ */
+const ADAPTATION_COLORS: Record<AdaptationKind, string> = {
+  recovery: 'var(--accent-green)',
+  deload: 'var(--accent-blue)',
+  intensify: 'var(--accent-flame)',
+};
 import {
   LineChart,
   Line,
@@ -238,6 +249,10 @@ export default function CoachDashboard({ mode = 'overview', onNavigate }: Props)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       : [];
     const latestW = campWeights[campWeights.length - 1]?.weight ?? camp?.current_weight ?? 0;
+    // Stored camp-relative (no campId inside), so this is the shape as written
+    // — the coach never needs the local id it was stripped of.
+    const campAdaptations = [...((camp?.adaptations ?? []) as unknown as Omit<CampAdaptation, 'campId'>[])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     return (
       <div className="space-y-4 pb-4">
@@ -299,6 +314,41 @@ export default function CoachDashboard({ mode = 'overview', onNavigate }: Props)
                 icon={<Scale size={13} style={{ color: 'var(--accent-blue)' }} />}
               />
             </div>
+
+            {/* Accepted adaptations. Until these synced, a coach opening this
+                screen saw the plan as generated — so a fighter who had accepted
+                a deload looked like one who had simply skipped the sessions.
+                Newest first, and only the last few: the full audit trail is on
+                the fighter's own screen. */}
+            {campAdaptations.length > 0 && (
+              <div className="mx-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Plan Adaptations</p>
+                <div className="space-y-2">
+                  {campAdaptations.slice(0, 4).map(a => (
+                    <div key={a.id} className="card flex items-start gap-3">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: tint(ADAPTATION_COLORS[a.kind], 0.18),
+                          color: ADAPTATION_COLORS[a.kind],
+                        }}
+                        aria-hidden="true"
+                      >
+                        <Activity size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white capitalize">
+                          {a.kind} · Week {a.weekNumber}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {a.reasons.join(' · ') || 'Accepted by the fighter'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {campSparring.length > 0 && (
               <div className="mx-4">

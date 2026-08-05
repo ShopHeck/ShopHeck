@@ -48,7 +48,10 @@ vi.mock('../src/lib/supabase', () => ({ supabase: mock.client }));
 
 import { mergeCloud, pullState, type CloudSnapshot } from '../src/lib/sync';
 import { createDefaultState } from '../src/utils/storage';
-import type { AppState, FightCamp, FighterProfile, GamePlan, WorkoutLog } from '../src/types';
+import type {
+  AiAnalysis, AiAnalysisKind, AppState, CampAdaptation, CornerSession, FightCamp,
+  FighterProfile, FightResult, GamePlan, WorkoutLog,
+} from '../src/types';
 
 // mergeCloud is the highest-risk pure function in the app: it is the only place
 // that decides whether a record the user cannot see any more should come back,
@@ -135,6 +138,10 @@ function snapshot(partial: Partial<CloudSnapshot> = {}): CloudSnapshot {
     gamification: null,
     dashboardPrefs: null,
     fitbitConfig: null,
+    campAdaptations: [],
+    dismissedAdaptations: [],
+    cornerSessions: [],
+    aiAnalyses: {},
     previouslySynced: new Set<string>(),
     tombstoned: new Set<string>(),
     ...partial,
@@ -564,5 +571,178 @@ describe('mergeCloud — coach notes', () => {
     );
     expect(merged.coachNotes).toHaveLength(1);
     expect(merged.coachNotes[0].content).toBe('local edit');
+  });
+});
+
+// ── The three slices that used to stop at the device ────────────────────────
+//
+// campAdaptations, cornerSessions and aiAnalyses were local-only: a coach saw
+// the unadapted plan for a fighter who had accepted a deload, and a reinstall
+// lost every corner-scored fight. They now travel, and they carry local ids —
+// which is exactly what makes the merge worth pinning.
+
+function adaptation(id: string, campId: string, weekNumber = 3): CampAdaptation {
+  return {
+    id,
+    campId,
+    weekNumber,
+    kind: 'deload',
+    reasons: ['HRV suppressed'],
+    signals: {
+      readiness: 52,
+      readinessConfidence: 'medium',
+      hrvDeltaPct: -12,
+      weekAdherencePct: 80,
+      avgRpe7d: 8.1,
+      sessions7d: 5,
+    },
+    createdAt: '2026-08-01T12:00:00.000Z',
+  };
+}
+
+function cornerSession(id: string, campId: string): CornerSession {
+  return {
+    id,
+    campId,
+    startedAt: '2026-08-01T20:00:00.000Z',
+    totalRounds: 3,
+    roundSeconds: 180,
+    restSeconds: 60,
+    rounds: [],
+  };
+}
+
+function fightResult(id: string, campId: string): FightResult {
+  return {
+    id,
+    campId,
+    fighterId: 'fighter-1',
+    fightDate: '2026-08-02',
+    opponent: 'Opponent',
+    outcome: 'win',
+    method: 'decision',
+    totalRounds: 3,
+    rounds: [],
+    stylePlanFollowed: 3,
+    overallNotes: '',
+    lessons: '',
+    createdAt: '2026-08-02T22:00:00.000Z',
+  };
+}
+
+function analysis(subjectId: string, kind: AiAnalysisKind = 'insights'): AiAnalysis {
+  return { kind, subjectId, content: 'text', generatedAt: '2026-08-01T12:00:00.000Z' };
+}
+
+describe('mergeCloud — adaptations, corner sessions and analyses', () => {
+  it('restores a corner session and an adaptation this device has never seen', () => {
+    const merged = mergeCloud(
+      localState({ camps: [camp('camp-1', '2026-06-01')] }),
+      snapshot({
+        camps: [camp('camp-1', '2026-06-01')],
+        campAdaptations: [adaptation('a-1', 'camp-1')],
+        cornerSessions: [cornerSession('s-1', 'camp-1')],
+      }),
+    );
+
+    expect(merged.campAdaptations?.map(a => a.id)).toEqual(['a-1']);
+    expect(merged.cornerSessions?.map(s => s.id)).toEqual(['s-1']);
+  });
+
+  it('does not resurrect an adaptation reverted on this device', () => {
+    // revertAdaptation removed it locally; the id is in previouslySynced, so the
+    // still-present cloud row is a stale copy rather than a new record.
+    const merged = mergeCloud(
+      localState({ camps: [camp('camp-1', '2026-06-01')], campAdaptations: [] }),
+      snapshot({
+        camps: [camp('camp-1', '2026-06-01')],
+        campAdaptations: [adaptation('a-1', 'camp-1')],
+        previouslySynced: new Set(['a-1']),
+      }),
+    );
+
+    expect(merged.campAdaptations).toEqual([]);
+  });
+
+  it('drops records belonging to a camp that did not survive the merge', () => {
+    const merged = mergeCloud(
+      localState({ camps: [camp('camp-1', '2026-06-01')] }),
+      snapshot({
+        camps: [camp('camp-1', '2026-06-01'), camp('camp-2', '2026-01-01')],
+        previouslySynced: new Set(['camp-2']),
+        campAdaptations: [adaptation('a-1', 'camp-1'), adaptation('a-2', 'camp-2')],
+        cornerSessions: [cornerSession('s-1', 'camp-1'), cornerSession('s-2', 'camp-2')],
+        dismissedAdaptations: ['camp-1:4:recovery', 'camp-2:4:recovery'],
+      }),
+    );
+
+    expect(merged.campAdaptations?.map(a => a.id)).toEqual(['a-1']);
+    expect(merged.cornerSessions?.map(s => s.id)).toEqual(['s-1']);
+    expect(merged.dismissedAdaptations).toEqual(['camp-1:4:recovery']);
+  });
+
+  it('unions the dismissal list rather than letting one side win', () => {
+    // Dismissals have no ids and no tombstones, and undismissing is not an
+    // action the app offers — so a key on either side stays dismissed.
+    const merged = mergeCloud(
+      localState({
+        camps: [camp('camp-1', '2026-06-01')],
+        dismissedAdaptations: ['camp-1:2:deload'],
+      }),
+      snapshot({
+        camps: [camp('camp-1', '2026-06-01')],
+        dismissedAdaptations: ['camp-1:5:intensify', 'camp-1:2:deload'],
+      }),
+    );
+
+    expect(merged.dismissedAdaptations?.sort()).toEqual([
+      'camp-1:2:deload',
+      'camp-1:5:intensify',
+    ]);
+  });
+
+  it('keeps a locally-regenerated analysis over the stored one', () => {
+    const merged = mergeCloud(
+      localState({
+        camps: [camp('camp-1', '2026-06-01')],
+        aiAnalyses: { 'insights:camp-1': { ...analysis('camp-1'), content: 'fresh' } },
+      }),
+      snapshot({
+        camps: [camp('camp-1', '2026-06-01')],
+        aiAnalyses: { 'insights:camp-1': { ...analysis('camp-1'), content: 'stale' } },
+      }),
+    );
+
+    expect(merged.aiAnalyses?.['insights:camp-1'].content).toBe('fresh');
+  });
+
+  it('drops an analysis whose subject no longer exists', () => {
+    // Saved output filed against a camp that was deleted elsewhere would render
+    // nowhere and re-upload forever.
+    const merged = mergeCloud(
+      localState({
+        camps: [camp('camp-1', '2026-06-01'), camp('camp-2', '2026-01-01')],
+        aiAnalyses: {
+          'insights:camp-1': analysis('camp-1'),
+          'insights:camp-2': analysis('camp-2'),
+        },
+      }),
+      snapshot({ tombstoned: new Set(['camp-2']) }),
+    );
+
+    expect(Object.keys(merged.aiAnalyses ?? {})).toEqual(['insights:camp-1']);
+  });
+
+  it('keeps a post-fight analysis, which hangs off a fight and not a camp', () => {
+    const merged = mergeCloud(
+      localState({
+        camps: [camp('camp-1', '2026-06-01')],
+        fightResults: [fightResult('f-1', 'camp-1')],
+        aiAnalyses: { 'post-fight:f-1': analysis('f-1', 'post-fight') },
+      }),
+      snapshot({ camps: [camp('camp-1', '2026-06-01')] }),
+    );
+
+    expect(Object.keys(merged.aiAnalyses ?? {})).toEqual(['post-fight:f-1']);
   });
 });

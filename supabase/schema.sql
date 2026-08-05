@@ -82,6 +82,12 @@ create table if not exists public.camps (
   game_plan      jsonb,                    -- GamePlan inlined (one per camp)
   completed_sessions jsonb default '{}'::jsonb,  -- map keyed by "${weekNum}-${dow}-${idx}"
   day_overrides  jsonb default '{}'::jsonb,      -- map keyed by "${weekNum}-${dow}"
+  -- Camp-relative like the two above: no campId inside, because local camp ids
+  -- differ per device. A linked coach reads these through the existing camps
+  -- policy, which is why they live here rather than in tables of their own.
+  adaptations    jsonb default '[]'::jsonb,      -- CampAdaptation[], campId stripped
+  dismissed_adaptations jsonb default '[]'::jsonb, -- declined keys, "${weekNum}:${kind}"
+  corner_sessions jsonb default '[]'::jsonb,     -- CornerSession[], campId stripped
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
   deleted_at     timestamptz
@@ -305,6 +311,10 @@ create table if not exists public.user_state (
   dashboard_prefs  jsonb,
   fitbit_config    jsonb,
   subscription     jsonb,                      -- mirrors RevenueCat entitlement, not source of truth
+  -- Saved AI output, keyed "${kind}:${cloud subject uuid}". Per-user rather
+  -- than per-camp because post-fight analyses hang off a fight result; here
+  -- rather than on camps because a coach must not be able to read them.
+  ai_analyses      jsonb,
   updated_at       timestamptz not null default now()
 );
 drop trigger if exists user_state_touch on public.user_state;

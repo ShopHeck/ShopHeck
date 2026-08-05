@@ -67,5 +67,31 @@ device:
 |---|---|
 | `subscription` | Entitlement is server-authoritative — read from the Stripe/RevenueCat tables, never from client-synced state |
 | Fitbit OAuth tokens | Long-lived third-party credentials; the connect flow is per-device PKCE, so syncing them buys nothing and puts a reusable credential in our database |
-| `aiAnalyses` | Large text blobs, cheap to regenerate |
-| `campAdaptations`, `cornerSessions` | See [`open-work.md`](./open-work.md) — worth syncing eventually, needs a migration |
+
+Everything else now travels. `campAdaptations`, `dismissedAdaptations` and
+`cornerSessions` are camp-scoped and ride along on `camps`
+(`adaptations` / `dismissed_adaptations` / `corner_sessions`); `aiAnalyses` is
+per-user and rides on `user_state.ai_analyses`. Migration:
+`supabase/migrations/20260805210000_sync_adaptations_corner_and_analyses.sql`.
+
+Two things about that choice are load-bearing:
+
+- **Columns on `camps`, not new tables.** The coach's `select('*')` on camps
+  already returns them, under the policy that already governs the camp — so a
+  linked coach reads a fighter's adaptations by construction. New tables would
+  have needed policies duplicating the camp ones, i.e. a second place for a
+  coach's read access to be got wrong. Before this, a coach saw the plan as
+  generated, so a fighter who accepted a deload looked like one who had skipped
+  the sessions.
+- **Everything camp-scoped is stored camp-RELATIVE.** No `campId` inside the
+  adaptations or corner sessions, and dismissal keys with the camp-id prefix
+  stripped, exactly as `completed_sessions` and `day_overrides` already do.
+  Local camp ids differ per device, so anything carrying one does not survive a
+  pull onto a second device.
+
+`aiAnalyses` is the exception to both: a post-fight analysis hangs off a fight
+result rather than a camp, and a coach must not be able to read one. Its keys
+are `${kind}:${subjectId}` where the subject is a local id, so the id is
+rewritten to its cloud uuid on push and back on pull; an analysis whose subject
+a pull did not return is dropped rather than filed against a camp that is not
+there.
