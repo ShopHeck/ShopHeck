@@ -122,16 +122,23 @@ export function computeCutProjection(
 
   // Off-season / no scheduled weigh-in → nothing to project against.
   if (!camp.fightDate) return base;
-  // Already at or under target.
-  if (currentWeight <= targetWeight) return { ...base, trackable: true, status: 'made' };
-  // No cut configured.
-  if (startWeight <= targetWeight) return base;
 
   const start = parseISO(camp.startDate);
   const fight = parseISO(camp.fightDate);
   const totalDays = Math.max(1, differenceInCalendarDays(fight, start));
   const daysElapsed = Math.min(totalDays, Math.max(0, differenceInCalendarDays(now, start)));
   const daysRemaining = Math.max(0, differenceInCalendarDays(fight, now));
+
+  // Already at or under target. The calendar fields are filled in rather than
+  // left at the `base` zeros: a made cut still has a fight date, and how far
+  // away it is decides whether the fighter is holding weight or refuelling
+  // (see cutPhase). Reporting 0 days remaining here said every made cut was
+  // weigh-in day.
+  if (currentWeight <= targetWeight) {
+    return { ...base, trackable: true, status: 'made', totalDays, daysElapsed, daysRemaining };
+  }
+  // No cut configured.
+  if (startWeight <= targetWeight) return base;
 
   const idealToday = +(startWeight - (startWeight - targetWeight) * (daysElapsed / totalDays)).toFixed(1);
   const paceDelta = +(currentWeight - idealToday).toFixed(1);
@@ -201,4 +208,27 @@ export function computeCutProjection(
     daysEarlyAtRate,
     trendEstablished,
   };
+}
+
+/**
+ * Which question the AI cut panel should be answering.
+ *
+ * A made cut is not the end of the weight problem, it is the middle of it: the
+ * fighter still has to hold the weight if the fight is weeks out, and refuel if
+ * it is days out. The panel used to be hidden outright on `made`, which removed
+ * the feature at the moment it is worth the most — two rounds of a bad refuel
+ * cost more than a slow cut does.
+ *
+ * Lives here rather than in the component so the phase is derived from the
+ * projection by the same module that produces it, and so it is testable without
+ * mounting React.
+ */
+export type CutPhase = 'cut' | 'hold' | 'rehydrate';
+
+/** Days out at which "made weight" stops meaning hold and starts meaning refuel. */
+export const REHYDRATION_WINDOW_DAYS = 7;
+
+export function cutPhase(proj: CutProjection): CutPhase {
+  if (proj.status !== 'made') return 'cut';
+  return proj.daysRemaining <= REHYDRATION_WINDOW_DAYS ? 'rehydrate' : 'hold';
 }

@@ -373,8 +373,12 @@ export default function WeightTracker() {
         </div>
       )}
 
-      {/* AI Cut Coach — Fighter Pro */}
-      {activeCamp.fightDate && proj.status !== 'made' && (
+      {/* AI Cut Coach — Fighter Pro.
+          Rendered for every projection state, including 'made'. It used to be
+          dropped once the fighter hit target, which removed the feature at the
+          moment fight-week rehydration advice matters most; the panel now
+          changes its question instead of disappearing (see cutPhase). */}
+      {activeCamp.fightDate && (
         <div className="mx-4">
           <ProGate required="fighter_pro">
             <CutCoach camp={activeCamp} user={currentUser} proj={proj} entries={weightEntries} />
