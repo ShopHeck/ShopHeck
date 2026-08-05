@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // A chainable stand-in for the Supabase query builder that records the ORDER BY
-// each table is pulled with. pullState's ordering is load-bearing (see the
-// active-camp test below), and it can only be pinned at the query itself.
+// and the .range() pages each table is pulled with. pullState's ordering is
+// load-bearing (see the active-camp test below), and it can only be pinned at
+// the query itself. Rows can be seeded per table to exercise pagination:
+// selectAll pages PAGE_SIZE (1,000) rows at a time, so a seed of >1,000 rows
+// must force a second request for the tail.
 const mock = vi.hoisted(() => {
   const orders: { table: string; column: string; ascending: boolean | undefined }[] = [];
+  const ranges: { table: string; from: number; to: number }[] = [];
+  const rowsByTable: Record<string, unknown[]> = {};
   const client = {
     from(table: string) {
+      // Range state is per builder instance, so each query pages independently.
+      let from = 0;
+      let to = Number.MAX_SAFE_INTEGER;
       const q: Record<string, unknown> = {
         select: () => q,
         eq: () => q,
@@ -14,15 +22,26 @@ const mock = vi.hoisted(() => {
           orders.push({ table, column, ascending: opts?.ascending });
           return q;
         },
+        range: (f: number, t: number) => {
+          from = f;
+          to = t;
+          ranges.push({ table, from: f, to: t });
+          return q;
+        },
         maybeSingle: () => Promise.resolve({ data: null, error: null }),
         // Thenable, so `await`/Promise.all resolve it like a real query.
-        then: (resolve: (v: unknown) => unknown) =>
-          Promise.resolve({ data: [], error: null }).then(resolve),
+        // Serves the seeded rows sliced by the last .range() call — exactly
+        // what PostgREST does with Range/from/to.
+        then: (resolve: (v: unknown) => unknown) => {
+          const all = rowsByTable[table] ?? [];
+          const page = all.slice(from, to + 1);
+          return Promise.resolve({ data: page, error: null }).then(resolve);
+        },
       };
       return q;
     },
   };
-  return { orders, client };
+  return { orders, ranges, rowsByTable, client };
 });
 
 vi.mock('../src/lib/supabase', () => ({ supabase: mock.client }));
@@ -158,6 +177,83 @@ describe('pullState — ordering', () => {
       ]) {
         expect(byTable[table].ascending, `${table} must be newest-first`).toBe(false);
       }
+    });
+  });
+});
+
+describe('pullState — pagination', () => {
+  beforeEach(() => {
+    mock.ranges.length = 0;
+    for (const k of Object.keys(mock.rowsByTable)) delete mock.rowsByTable[k];
+  });
+
+  it('requests every list table with an explicit first page', () => {
+    // Without .range(), PostgREST caps each query at its default page size and
+    // silently drops everything past it — see selectAll's docs in sync.ts.
+    return pullState('user-1').then(() => {
+      const tables = mock.ranges.map(r => r.table).sort();
+      expect(tables).toEqual([
+        'camps', 'conditioning_tests', 'fight_results', 'hrv_entries',
+        'nutrition_logs', 'sparring_logs', 'weight_entries', 'workout_logs',
+      ]);
+      for (const r of mock.ranges) {
+        expect(r.from).toBe(0);
+        expect(r.to).toBe(999);
+      }
+    });
+  });
+
+  it('fetches rows past the first 1,000 instead of silently truncating them', () => {
+    // Regression: a heavy account (daily weigh-ins across many camps) passes
+    // the server page size in weight_entries, and an unpaged select would lose
+    // every row past #1,000 — the OLDEST rows, furthest down the ORDER BY.
+    // Seed 1,004 rows; the pull must issue a second page and surface all 1,004.
+    const rows = Array.from({ length: 1004 }, (_, i) => ({
+      id: `uuid-w-${i}`,
+      camp_id: 'uuid-camp-1',
+      date: `2026-01-${String((i % 28) + 1).padStart(2, '0')}`,
+      weight: 160 - i * 0.01,
+      notes: '',
+      created_at: '2026-01-01T00:00:00.000Z',
+      deleted_at: null,
+    }));
+    mock.rowsByTable.weight_entries = rows;
+    // The resolver mints local ids via makeLocalIdResolver, which needs a
+    // stable camp uuid to map; the camp row anchors it.
+    mock.rowsByTable.camps = [{
+      id: 'uuid-camp-1', user_id: 'user-1', fight_date: null, opponent: null,
+      weight_class: 'Lightweight', current_weight: 160, target_weight: 155,
+      rounds: 3, round_duration: 3, sport: 'Boxing', experience: 'Amateur',
+      camp_weeks: 8, start_date: '2026-01-01', is_off_season: false,
+      off_season_goal: null, game_plan: null, completed_sessions: null,
+      day_overrides: null, created_at: '2026-01-01T00:00:00.000Z', deleted_at: null,
+    }];
+
+    return pullState('user-1').then(res => {
+      expect(res.ok).toBe(true);
+      const weightPages = mock.ranges.filter(r => r.table === 'weight_entries');
+      expect(weightPages.length).toBe(2);
+      expect(weightPages[1]).toEqual({ table: 'weight_entries', from: 1000, to: 1999 });
+      // All 1,004 rows survive the pull — the four past the page boundary
+      // included. Truncation here was the bug this test pins.
+      expect(res.snapshot?.weightEntries).toHaveLength(1004);
+    });
+  });
+
+  it('stops paging once a short page returns', () => {
+    // A 3-row table must be a single request, not an infinite page loop.
+    mock.rowsByTable.workout_logs = Array.from({ length: 3 }, (_, i) => ({
+      id: `uuid-l-${i}`, camp_id: 'uuid-camp-x', date: '2026-02-01',
+      week_number: 1, day_label: 'Monday', session_type: 'conditioning',
+      title: 'Roadwork', duration: 45, rpe: 7, notes: '', completed: true,
+      mep: null, created_at: '2026-02-01T00:00:00.000Z', deleted_at: null,
+    }));
+
+    return pullState('user-1').then(res => {
+      expect(res.ok).toBe(true);
+      const logPages = mock.ranges.filter(r => r.table === 'workout_logs');
+      expect(logPages.length).toBe(1);
+      expect(res.snapshot?.workoutLogs).toHaveLength(3);
     });
   });
 });

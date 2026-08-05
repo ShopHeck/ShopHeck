@@ -126,6 +126,8 @@ public class RevenueCatPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "presentPaywall",         returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "presentCustomerCenter",  returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "purchasePackage",        returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPackages",            returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logIn",                  returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logOut",                 returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getDiagnostics",         returnType: CAPPluginReturnPromise),
@@ -240,6 +242,83 @@ public class RevenueCatPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             var topVC: UIViewController = rootVC
             while let presented = topVC.presentedViewController { topVC = presented }
             topVC.present(paywallVC, animated: true)
+        }
+    }
+
+    /// The packages available in the current offering, so the app's OWN
+    /// upgrade screen can offer a direct purchase instead of opening the
+    /// RevenueCat paywall as a second decision screen. Resolves with
+    /// identifier + localized price string per package; empty when no
+    /// offering is configured.
+    @objc func getPackages(_ call: CAPPluginCall) {
+        guard requireConfigured(call) else { return }
+        Purchases.shared.getOfferings { offerings, error in
+            if let error {
+                call.reject(describeRevenueCatError(error))
+                return
+            }
+            guard let packages = offerings?.current?.availablePackages else {
+                call.resolve(["packages": [[String: Any]]()])
+                return
+            }
+            let out: [[String: Any]] = packages.map { p in
+                [
+                    "identifier": p.identifier,
+                    "productIdentifier": p.storeProduct.productIdentifier,
+                    "packageType": String(describing: p.packageType),
+                    "localizedPrice": p.localizedPriceString,
+                    "productTitle": p.storeProduct.localizedTitle,
+                ]
+            }
+            call.resolve(["packages": out])
+        }
+    }
+
+    /// Purchases a specific package by identifier (from getPackages), going
+    /// straight to StoreKit's payment sheet — no RevenueCat paywall in
+    /// between. This is what lets the app's custom upgrade modal own the
+    /// entire purchase decision on native instead of stacking a second
+    /// full-screen paywall on top of it.
+    @objc func purchasePackage(_ call: CAPPluginCall) {
+        guard requireConfigured(call) else { return }
+        guard let identifier = call.getString("packageId"), !identifier.isEmpty else {
+            call.reject("packageId is required")
+            return
+        }
+        Purchases.shared.getOfferings { [weak self] offerings, error in
+            guard let self else { return }
+            if let error {
+                call.reject(describeRevenueCatError(error))
+                return
+            }
+            guard let packages = offerings?.current?.availablePackages,
+                  let package = packages.first(where: { $0.identifier == identifier })
+            else {
+                call.reject("That subscription option is no longer available. Close this screen and try again.")
+                return
+            }
+            Purchases.shared.purchase(package: package) { transaction, customerInfo, purchaseError, cancelled in
+                if let purchaseError {
+                    // A user changing their mind is not an error — report it as
+                    // a normal non-purchase result, not a red failure notice.
+                    // purchaseError is PublicError (NSError); compare its code
+                    // the same way describeRevenueCatError does.
+                    let nsError = purchaseError as NSError
+                    if cancelled || nsError.code == ErrorCode.purchaseCancelledError.rawValue {
+                        call.resolve(["isPro": false, "tier": "free", "cancelled": true])
+                        return
+                    }
+                    call.reject(describeRevenueCatError(purchaseError))
+                    return
+                }
+                _ = transaction
+                guard let info = customerInfo else {
+                    call.resolve(["isPro": false, "tier": "free", "cancelled": false])
+                    return
+                }
+                let tier = self.tierFromEntitlements(info.entitlements)
+                call.resolve(["isPro": tier != "free", "tier": tier, "cancelled": false])
+            }
         }
     }
 

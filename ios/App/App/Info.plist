@@ -63,5 +63,10 @@
 	<string>$(REVENUECAT_API_KEY)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Live Activities (Dynamic Island / Lock Screen) for the round timer.
+	     Requires iOS 16.1+; the app target still deploys to 15.0 with an
+	     availability guard around every ActivityKit call. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 </dict>
 </plist>

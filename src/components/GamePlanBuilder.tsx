@@ -42,8 +42,9 @@ export default function GamePlanBuilder() {
   const [saved, setSaved] = useState(false);
 
   // Auto-load when camp changes
+  const activeCampId = activeCamp?.id;
   useEffect(() => {
-    const p = activeCamp ? gamePlans[activeCamp.id] : null;
+    const p = activeCampId ? gamePlans[activeCampId] : null;
     if (p) {
       setForm({
         opponentName: p.opponentName ?? '',
@@ -61,7 +62,11 @@ export default function GamePlanBuilder() {
     } else {
       setForm({ ...EMPTY_PLAN });
     }
-  }, [activeCamp?.id]);
+    // `gamePlans` is a real dependency: it is also how a cloud restore that
+    // lands while this screen is mounted reaches the form. The only in-app
+    // writer is this screen's own save, after which the form already matches,
+    // so re-hydrating on it is harmless.
+  }, [activeCampId, gamePlans]);
 
   const set = (key: keyof typeof form, val: string) => {
     setForm(f => ({ ...f, [key]: val }));

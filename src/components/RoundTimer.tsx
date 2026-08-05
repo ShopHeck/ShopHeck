@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useId } from 'react';
 import {
   Play, Pause, RotateCcw, ChevronUp, ChevronDown,
   Volume2, VolumeX, Smartphone, Shuffle, Maximize2, Minimize2,
-  Plus, X, Bluetooth, BluetoothOff, Bell
+  Plus, X, Bluetooth, BluetoothOff, Bell, SkipForward
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
@@ -19,6 +19,7 @@ import GymDisplay from './GymDisplay';
 import ReactionPrompt from './ReactionPrompt';
 import { useBluetoothHR, ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
+import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
 
 // Session id of the last completion we logged — makes the completion effect
 // idempotent across relaunches that restore a finished session.
@@ -122,8 +123,8 @@ export default function RoundTimer() {
     selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
     voiceEnabled, hapticEnabled, reactionMode, bgAlerts, bgAlertsSupported,
     workColor, restColor,
-    phase, currentRound, timeLeft, isRunning, sessionId,
-    handleStartPause, reset, selectPreset,
+    phase, currentRound, timeLeft, isRunning, sessionId, phaseSec, deadlineMs,
+    handleStartPause, reset, selectPreset, skipPhase, extendPhase,
     setRounds, setWorkSec, setRestSec, setPrepSec, setWarningSec,
     setVoiceEnabled, setHapticEnabled, setReactionMode, setBgAlerts,
     setWorkColor, setRestColor,
@@ -224,6 +225,59 @@ export default function RoundTimer() {
     prevPhaseRef.current = phase;
   }, [phase, resetMEP]);
 
+  // ── Live Activity (iOS 16.1+) ─────────────────────────────────────────────
+  // The web timer freezes when the app backgrounds, so push the session's
+  // REMAINING SCHEDULE as absolute wall-clock segments: the widget renders
+  // the countdown from Date() itself and keeps counting while WKWebView is
+  // suspended.
+  //
+  // Keyed on `deadlineMs`, not `timeLeft` — the deadline only moves on phase
+  // transitions, skips and +30s extensions, so this pushes exactly when the
+  // schedule changes and never once a second.
+  const presetLabel = selectedPreset < PRESETS.length
+    ? PRESETS[selectedPreset].label
+    : customPresets[selectedPreset - PRESETS.length]?.label ?? 'Custom';
+
+  // Latest activity payload, refreshed every render. The push effects below
+  // read it through a ref so they can re-run ONLY on schedule-change signals
+  // (deps) instead of on every second tick.
+  const laSnapshotRef = React.useRef({
+    phase, round: currentRound, rounds, deadlineMs, phaseSec, workSec,
+    restSec, prepSec, isRunning, pausedTimeLeft: timeLeft, presetLabel,
+    workColorHex: workColor, restColorHex: restColor,
+  });
+  laSnapshotRef.current = {
+    phase, round: currentRound, rounds, deadlineMs, phaseSec, workSec,
+    restSec, prepSec, isRunning, pausedTimeLeft: timeLeft, presetLabel,
+    workColorHex: workColor, restColorHex: restColor,
+  };
+
+  useEffect(() => {
+    if (phase === 'idle' || phase === 'done' || !sessionId) {
+      void endLiveActivity();
+      return;
+    }
+    void syncLiveActivity(laSnapshotRef.current, sessionId);
+    // deadlineMs (not timeLeft) is the schedule-change signal: it moves only
+    // on phase transitions, skips and +30s extensions, so this pushes exactly
+    // when the schedule changes and never once a second. pausedTimeLeft is
+    // only consumed by the widget while paused, where timeLeft is constant.
+  }, [phase, currentRound, isRunning, sessionId, deadlineMs, phaseSec,
+      rounds, workSec, restSec, prepSec, presetLabel, workColor, restColor]);
+
+  // The push that matters most: the last foreground moment before WKWebView
+  // suspends. Without it the activity would be one transition stale by the
+  // time the phone is locked.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (phase === 'idle' || phase === 'done' || !sessionId) return;
+      void syncLiveActivity(laSnapshotRef.current, sessionId);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [phase, sessionId]);
+
   const savePreset = useCallback((p: Omit<CustomTimerPreset, 'id' | 'createdAt'>) => {
     const newPreset: CustomTimerPreset = { ...p, id: generateId(), createdAt: new Date().toISOString() };
     const next = [...customPresets, newPreset];
@@ -279,6 +333,18 @@ export default function RoundTimer() {
     );
   }
 
+  // ── Progress ring geometry ────────────────────────────────────────────────
+  // The ring depletes as the phase advances — the single glance a fighter
+  // needs mid-round. Denominator is phaseSec (the CURRENT phase's nominal
+  // duration, grown by +30s extensions), not the work/rest setting, so an
+  // extended phase never shows past 100%.
+  const RING_R = 98;
+  const RING_C = 2 * Math.PI * RING_R;
+  const progress = phase === 'idle' || phase === 'done'
+    ? 1
+    : Math.max(0, Math.min(1, timeLeft / Math.max(1, phaseSec)));
+  const ringDash = `${RING_C * progress} ${RING_C}`;
+
   // ── Derived UI ────────────────────────────────────────────────────────────
   // Active color: work=user's workColor, rest=user's restColor, prep=yellow, done=green, idle=gray
   const activeColor =
@@ -286,11 +352,6 @@ export default function RoundTimer() {
     phase === 'rest' ? restColor :
     phase === 'prep' ? '#eab308' :
     phase === 'done' ? '#22c55e' : '#4b5563';
-
-  // Ring border uses activeColor at 50% opacity (append '80' hex for alpha)
-  const ringBorderStyle = { borderColor: `${activeColor}80` };
-  // Clock text uses activeColor
-  const ringTextStyle = { color: activeColor };
 
   const phaseLabel =
     phase === 'idle' ? 'Ready'     :
@@ -318,7 +379,8 @@ export default function RoundTimer() {
           <button
             key={p.label}
             onClick={() => selectPreset(i)}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+            disabled={isRunning}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               selectedPreset === i
                 ? 'bg-brand-600 border-brand-500 text-white'
                 : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
@@ -328,7 +390,7 @@ export default function RoundTimer() {
           </button>
         ))}
         {customPresets.map((p, i) => (
-          <div key={p.id} className="flex-shrink-0 relative group">
+          <div key={p.id} className="flex-shrink-0 relative">
             <button
               onClick={() => {
                 const idx = PRESETS.length + i;
@@ -338,7 +400,8 @@ export default function RoundTimer() {
                 setRestSec(preset.restSec);
                 selectPreset(idx);
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+              disabled={isRunning}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 selectedPreset === PRESETS.length + i
                   ? 'bg-purple-600 border-purple-500 text-white'
                   : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
@@ -346,9 +409,13 @@ export default function RoundTimer() {
             >
               {p.label}
             </button>
+            {/* Always-visible delete — hover-only affordances are invisible on
+                touch, which is the entire target platform. */}
             <button
               onClick={() => deleteCustomPreset(p.id)}
-              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-dark-500 border border-dark-400 text-gray-400 hover:text-white hidden group-hover:flex items-center justify-center"
+              disabled={isRunning}
+              aria-label={`Delete preset ${p.label}`}
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-dark-500 border border-dark-400 text-gray-400 hover:text-white flex items-center justify-center disabled:opacity-50"
             >
               <X size={9} />
             </button>
@@ -400,14 +467,30 @@ export default function RoundTimer() {
           </div>
         )}
 
-        {/* Timer ring */}
-        <div
-          className="w-52 h-52 rounded-full border-4 flex items-center justify-center bg-dark-800 transition-colors duration-500"
-          style={ringBorderStyle}
-        >
-          <span className="text-6xl font-black tabular-nums tracking-tight transition-colors duration-300" style={ringTextStyle}>
-            {phase === 'done' ? '✓' : fmt(timeLeft)}
-          </span>
+        {/* Timer ring — SVG arc depletes with the phase so elapsed time is
+            visible at a glance, not just the counting number. */}
+        <div className="relative w-52 h-52 flex items-center justify-center">
+          <svg viewBox="0 0 208 208" className="absolute inset-0 w-full h-full -rotate-90">
+            {/* Track */}
+            <circle cx="104" cy="104" r={RING_R} fill="none" stroke="#222222" strokeWidth="8" />
+            {/* Progress arc */}
+            <circle
+              cx="104" cy="104" r={RING_R} fill="none"
+              stroke={activeColor} strokeWidth="8" strokeLinecap="round"
+              strokeDasharray={ringDash}
+              style={{ transition: 'stroke-dasharray 250ms linear, stroke 300ms ease' }}
+            />
+          </svg>
+          <div className="rounded-full bg-dark-800 flex items-center justify-center" style={{ width: '11.5rem', height: '11.5rem' }}>
+            <span
+              className="text-6xl font-black tabular-nums tracking-tight transition-colors duration-300"
+              style={{ color: activeColor }}
+              role="timer"
+              aria-label={`${phaseLabel} — ${fmt(timeLeft)} remaining`}
+            >
+              {phase === 'done' ? '✓' : fmt(timeLeft)}
+            </span>
+          </div>
         </div>
 
         {/* Phase badge when running */}
@@ -444,6 +527,29 @@ export default function RoundTimer() {
           </div>
         )}
 
+        {/* In-session controls — skip the phase or add 30s. Shown only while a
+            phase is live; idle/done use the main start/reset row below. */}
+        {(phase === 'work' || phase === 'rest' || phase === 'prep') && (
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => extendPhase(30)}
+              aria-label="Add 30 seconds to the current phase"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-dark-700 border border-dark-500 text-sm font-semibold text-gray-300 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+            >
+              <Plus size={15} />
+              30s
+            </button>
+            <button
+              onClick={skipPhase}
+              aria-label={phase === 'rest' ? 'Skip rest — go to the next round' : phase === 'prep' ? 'Skip the countdown' : 'Skip to the rest period'}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-dark-700 border border-dark-500 text-sm font-semibold text-gray-300 hover:text-white hover:border-dark-300 transition-all active:scale-95"
+            >
+              <SkipForward size={15} />
+              {phase === 'rest' ? 'Skip rest' : phase === 'prep' ? 'Skip' : 'End round'}
+            </button>
+          </div>
+        )}
+
         {/* Round dots */}
         {phase !== 'idle' && phase !== 'done' && phase !== 'prep' && (
           <div className="flex gap-2 mt-3">
@@ -463,10 +569,28 @@ export default function RoundTimer() {
         )}
 
         {phase === 'done' && (
-          <div className="mt-4 text-center">
-            <p className="text-green-400 font-semibold text-lg">Session complete!</p>
+          <div className="mt-4 w-full max-w-xs mx-auto">
+            <p className="text-green-400 font-semibold text-lg text-center">Session complete!</p>
+            {/* Session summary — rounds, clock time and MEP in one card, so the
+                fighter leaves the timer with the workout's shape, not just a
+                checkmark. The session itself is auto-logged (see completion
+                effect); this is the receipt. */}
+            <div className="card mt-3 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-lg font-black text-white">{rounds}</div>
+                <div className="text-[11px] text-gray-400">rounds</div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-white">{fmt(rounds * workSec + Math.max(0, rounds - 1) * restSec)}</div>
+                <div className="text-[11px] text-gray-400">clock time</div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-white">{hr.connected && mep > 0 ? mep : '—'}</div>
+                <div className="text-[11px] text-gray-400">MEP</div>
+              </div>
+            </div>
             {hr.connected && mep > 0 && (
-              <p className="text-sm mt-1" style={{ color: mep >= mepTarget ? '#22c55e' : '#9ca3af' }}>
+              <p className="text-sm mt-2 text-center" style={{ color: mep >= mepTarget ? '#22c55e' : '#9ca3af' }}>
                 {mep} MEP {mep >= mepTarget ? `✓ target hit (${mepTarget})` : `/ ${mepTarget} target`}
               </p>
             )}
