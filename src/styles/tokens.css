@@ -89,6 +89,18 @@
      sits between the two blues the app was shipping (#60a5fa, #3b82f6). */
   --accent-blue-rgb: 77 168 255;
   --accent-blue: rgb(var(--accent-blue-rgb));
+  /* Off-season mode brand. Not in v6, which was reconciled entirely against
+     fight-camp screens — but the app has always drawn a deliberate distinction
+     between the two modes, flame for the urgency of a camp and teal for the
+     calm of the block between them, and flattening that onto flame would lose
+     real information a fighter reads before they read any number.
+     Its own token rather than a third meaning for --accent-cyan: cyan already
+     carries readiness and hydration, and stacking a mode brand on a metric
+     colour is exactly how violet ended up meaning three things. Deliberately
+     distinguishable from --readiness-peak, though the two can never actually
+     co-occur — readiness needs a fight date, which off-season blocks lack. */
+  --accent-teal-rgb: 45 212 191;
+  --accent-teal: rgb(var(--accent-teal-rgb));
 
   /* ── Text (§2.1) ─────────────────────────────────────────────────────── */
   --text-primary: #FFFFFF;

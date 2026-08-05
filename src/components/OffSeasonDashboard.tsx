@@ -1,4 +1,4 @@
-import { Activity, Brain, Bluetooth, ChevronRight, Clock, Dumbbell, Droplets, Flame, Target, UtensilsCrossed, Zap } from 'lucide-react';
+import { Activity, Brain, Bluetooth, ChevronRight, Dumbbell, Droplets, Flame, UtensilsCrossed } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
@@ -6,7 +6,15 @@ import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGen
 import { weekAdherence } from '../utils/adherence';
 import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
+import type { SessionType } from '../types';
 import ProgressWidget from './gamification/ProgressWidget';
+import GlassSurface from './shared/GlassSurface';
+import GlassMetricTile from './shared/GlassMetricTile';
+import DurationBadge from './shared/DurationBadge';
+import OffSeasonHeroCard from './shared/OffSeasonHeroCard';
+import ToolTile from './shared/ToolTile';
+import { SESSION_COLORS, SESSION_ICONS, SESSION_LABELS } from '../utils/sessionVisuals';
+import { PACE_COLORS, paceTier, tint } from '../utils/designTokens';
 
 const GOAL_LABELS: Record<string, string> = {
   'base-building': 'Base Building',
@@ -15,21 +23,24 @@ const GOAL_LABELS: Record<string, string> = {
   'recovery': 'Active Recovery',
 };
 
+/**
+ * Off-season phases, matching the values WeeklyPlanner already uses for the
+ * same four names — they were two separate records that had drifted apart on
+ * Foundation (indigo here, blue there).
+ */
 const PHASE_COLORS: Record<string, string> = {
-  Foundation:        'bg-indigo-900/40 text-indigo-400 border-indigo-800',
-  Development:       'bg-teal-900/40 text-teal-400 border-teal-800',
-  Performance:       'bg-purple-900/40 text-purple-400 border-purple-800',
-  'Active Recovery': 'bg-green-900/40 text-green-400 border-green-800',
+  Foundation:        'var(--accent-blue)',
+  Development:       'var(--accent-cyan)',
+  Performance:       'var(--accent-violet)',
+  'Active Recovery': 'var(--accent-green)',
 };
 
-const SESSION_TYPE_COLORS: Record<string, string> = {
-  conditioning: 'bg-orange-500',
-  skill:        'bg-blue-500',
-  sparring:     'bg-red-500',
-  strength:     'bg-yellow-500',
-  recovery:     'bg-green-500',
-  rest:         'bg-gray-600',
-};
+/*
+ * The session→colour mapping is NOT redeclared here. This file used to carry a
+ * fourth copy of it (a `SESSION_TYPE_COLORS` record of Tailwind classes), on
+ * top of the ones in Dashboard, WeeklyPlanner and the training log. It now
+ * reads SESSION_COLORS from utils/sessionVisuals like everything else.
+ */
 
 interface Props {
   onNavigate: (view: string, prefill?: LogPrefill) => void;
@@ -47,14 +58,6 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const currentWeek = trainingSchedule[currentWeekNum - 1];
   const goalLabel = GOAL_LABELS[activeCamp.offSeasonGoal ?? 'maintain'] ?? 'Off Season';
   const pro = isPro(state.subscription);
-  // Same chip as the fight-camp dashboard: a gated tile announces its tier
-  // instead of ambushing the tap with a paywall.
-  const proChip = (
-    <span className="ml-auto flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-900/50 border border-brand-800/60 text-brand-400">
-      PRO
-    </span>
-  );
-
   // Week stats
   const weekLogs = workoutLogs.filter(l => l.campId === activeCamp.id && l.weekNumber === currentWeekNum);
   const weekMinutes = weekLogs.reduce((sum, l) => sum + l.duration, 0);
@@ -70,7 +73,7 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
   const weekDone = weekScore.done;
 
   // Training variety (current week logs by type)
-  const typeCounts = weekLogs.reduce<Record<string, number>>((acc, l) => {
+  const typeCounts = weekLogs.reduce<Partial<Record<SessionType, number>>>((acc, l) => {
     acc[l.sessionType] = (acc[l.sessionType] ?? 0) + 1;
     return acc;
   }, {});
@@ -101,129 +104,131 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Off Season Header Card */}
-      <div className="mx-4 mt-4 relative overflow-hidden bg-gradient-to-br from-teal-900/50 to-dark-700 rounded-2xl border border-teal-800/50 p-5">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-600/10 rounded-full -translate-y-8 translate-x-8" />
-        <div className="relative">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-teal-400 text-xs font-semibold uppercase tracking-widest">Off Season</p>
-              <h2 className="text-2xl font-black text-white mt-1">{goalLabel}</h2>
-              <p className="text-gray-400 text-sm mt-1">{currentUser?.sport} · {currentUser?.weightClass}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-black text-white">W{currentWeekNum}</div>
-              <div className="text-xs text-gray-400">of {activeCamp.campWeeks}</div>
-              <div className="text-xs text-teal-400 mt-1">Cycle {cycle}</div>
-            </div>
-          </div>
-          {/* Phase badge + progress */}
-          <div className="mt-4 flex items-center gap-3">
-            {currentWeek?.phase && (
-              <span className={`badge border text-xs ${PHASE_COLORS[currentWeek.phase] ?? 'bg-dark-600 text-gray-400 border-dark-400'}`}>
-                {currentWeek.phase}
-              </span>
-            )}
-            <div className="flex-1 h-1.5 bg-teal-900/40 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-teal-500 rounded-full transition-all duration-700"
-                style={{ width: `${Math.min(100, Math.round((currentWeekNum / activeCamp.campWeeks) * 100))}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-400">
-              {Math.round((currentWeekNum / activeCamp.campWeeks) * 100)}%
-            </span>
-          </div>
-        </div>
+      {/* Same layout contract as the fight-camp dashboard's countdown card, so
+          moving between a camp and the block after it does not feel like
+          changing apps. This was a hand-rolled gradient card — the exact
+          pattern <FightCountdownCard> replaced on the other Home. */}
+      <div className="mt-4">
+        <OffSeasonHeroCard
+          goalLabel={goalLabel}
+          subtitle={[currentUser?.sport, currentUser?.weightClass].filter(Boolean).join(' · ')}
+          currentWeek={currentWeekNum}
+          totalWeeks={activeCamp.campWeeks}
+          cycle={cycle ?? 1}
+          phase={currentWeek?.phase}
+          phaseColor={currentWeek?.phase ? PHASE_COLORS[currentWeek.phase] : undefined}
+        />
       </div>
 
       <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
 
       {/* Streak Card */}
       <div className="mx-4">
-        <div className="card flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-            <Flame size={22} className="text-orange-400" />
+        <GlassSurface cornerRadius="md" className="flex items-center gap-4 p-4">
+          <div
+            className="w-12 h-12 flex items-center justify-center flex-shrink-0"
+            style={{
+              backgroundColor: tint('var(--accent-flame)', 0.16),
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--accent-flame)',
+            }}
+          >
+            <Flame size={22} />
           </div>
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Training Streak</p>
+          <div className="flex-1 min-w-0">
+            <p className="type-caption text-gray-450">Training Streak</p>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-2xl font-black text-white">{streak.current}</span>
-              <span className="text-sm text-gray-400">day{streak.current !== 1 ? 's' : ''} in a row</span>
+              <span className="text-2xl font-extrabold text-white tabular-nums">{streak.current}</span>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                day{streak.current !== 1 ? 's' : ''} in a row
+              </span>
             </div>
           </div>
           {streak.best > 0 && (
             <div className="text-right flex-shrink-0">
-              <p className="text-xs text-gray-450">Best</p>
-              <p className="text-lg font-black text-teal-400">{streak.best}</p>
+              <p className="type-caption text-gray-450">Best</p>
+              <p className="text-lg font-extrabold tabular-nums" style={{ color: 'var(--accent-teal)' }}>
+                {streak.best}
+              </p>
             </div>
           )}
-        </div>
+        </GlassSurface>
       </div>
 
       {/* This Week Summary */}
       <div className="mx-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">This Week</p>
+          <p className="type-caption text-gray-450">This Week</p>
           <span className="text-xs text-gray-450">Week {currentWeekNum}</span>
         </div>
-        <div className="card">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div>
-              <div className="text-lg font-black text-white">
-                {weekDone}<span className="text-gray-450 font-medium text-sm">/{weekPlanned}</span>
-              </div>
-              <div className="text-[11px] text-gray-400 mt-0.5">sessions</div>
-            </div>
-            <div>
-              <div className="text-lg font-black text-white">{weekMinutes || '—'}</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">minutes</div>
-            </div>
-            <div>
-              <div className="text-lg font-black text-white">{weekAvgRpe ?? '—'}</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">avg RPE</div>
-            </div>
-          </div>
-          {weekPlanned > 0 && (
-            <div className="mt-3">
-              <div className="h-1.5 bg-dark-500 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    weekDone >= weekPlanned ? 'bg-teal-500' :
-                    weekDone / weekPlanned >= 0.7 ? 'bg-teal-600' : 'bg-dark-300'
-                  }`}
-                  style={{ width: `${Math.min(100, Math.round((weekDone / weekPlanned) * 100))}%` }}
-                />
-              </div>
-            </div>
-          )}
+        <div className="grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+          <GlassMetricTile
+            label="Sessions"
+            value={<>{weekDone}<span className="text-base font-semibold text-gray-450">/{weekPlanned}</span></>}
+          />
+          <GlassMetricTile label="Minutes" value={weekMinutes || '—'} />
+          <GlassMetricTile label="Avg RPE" value={weekAvgRpe ?? '—'} />
         </div>
+        {weekPlanned > 0 && (
+          <div
+            className="mt-3 h-1.5 overflow-hidden"
+            style={{ background: 'var(--surface-3)', borderRadius: 'var(--radius-full)' }}
+            role="progressbar"
+            aria-valuenow={weekDone}
+            aria-valuemin={0}
+            aria-valuemax={weekPlanned}
+            aria-label={`Week adherence: ${weekDone} of ${weekPlanned} sessions done`}
+          >
+            {/* Adherence is a pace judgement, so it takes the pace scale rather
+                than the mode's teal — "am I keeping up" means the same thing
+                here as it does on the weight screen. */}
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${Math.min(100, Math.round((weekDone / weekPlanned) * 100))}%`,
+                borderRadius: 'var(--radius-full)',
+                background: PACE_COLORS[paceTier(weekDone / weekPlanned)],
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Training Variety */}
       {totalTyped > 0 && (
         <div className="mx-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">This Week's Sessions</p>
-          <div className="card">
+          <p className="type-caption text-gray-450 mb-2">This Week's Sessions</p>
+          <GlassSurface cornerRadius="md" className="p-4">
             {/* Stacked bar */}
-            <div className="h-2 rounded-full overflow-hidden flex gap-px mb-3">
-              {(Object.entries(typeCounts) as [string, number][]).map(([type, count]) => (
+            <div
+              className="h-2 overflow-hidden flex gap-px mb-3"
+              style={{ borderRadius: 'var(--radius-full)' }}
+            >
+              {(Object.entries(typeCounts) as [SessionType, number][]).map(([type, count]) => (
                 <div
                   key={type}
-                  className={`h-full ${SESSION_TYPE_COLORS[type] ?? 'bg-gray-500'} transition-all`}
-                  style={{ width: `${Math.round((count / totalTyped) * 100)}%` }}
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.round((count / totalTyped) * 100)}%`,
+                    backgroundColor: SESSION_COLORS[type] ?? 'var(--text-tertiary)',
+                  }}
                 />
               ))}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {(Object.entries(typeCounts) as [string, number][]).map(([type, count]) => (
+              {(Object.entries(typeCounts) as [SessionType, number][]).map(([type, count]) => (
                 <div key={type} className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${SESSION_TYPE_COLORS[type] ?? 'bg-gray-500'}`} />
-                  <span className="text-xs text-gray-400 capitalize">{type} <span className="text-gray-450">×{count}</span></span>
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: SESSION_COLORS[type] ?? 'var(--text-tertiary)' }}
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {SESSION_LABELS[type] ?? type} <span className="text-gray-450 tabular-nums">×{count}</span>
+                  </span>
                 </div>
               ))}
             </div>
-          </div>
+          </GlassSurface>
         </div>
       )}
 
@@ -231,19 +236,27 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
       {currentWeek?.weeklyGoals && currentWeek.weeklyGoals.length > 0 && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Week Goals</p>
-            <button onClick={() => onNavigate('planner')} className="text-teal-500 hover:text-teal-400 transition-colors">
+            <p className="type-caption text-gray-450">Week Goals</p>
+            <button
+              onClick={() => onNavigate('planner')}
+              aria-label="Open the weekly planner"
+              className="-m-2 p-2"
+              style={{ color: 'var(--accent-teal)' }}
+            >
               <ChevronRight size={16} />
             </button>
           </div>
-          <div className="card space-y-1.5">
+          <GlassSurface cornerRadius="md" className="p-4 space-y-1.5">
             {currentWeek.weeklyGoals.slice(0, 3).map((goal, i) => (
               <div key={i} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-teal-600 flex-shrink-0" />
-                <span className="text-xs text-gray-300">{goal}</span>
+                <div
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: 'var(--accent-teal)' }}
+                />
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{goal}</span>
               </div>
             ))}
-          </div>
+          </GlassSurface>
         </div>
       )}
 
@@ -251,51 +264,60 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
       {todaySessions && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today's Training</p>
-            <span className="text-xs text-gray-400">{format(today, 'EEEE, MMM d')}</span>
+            <p className="type-caption text-gray-450">Today's Training</p>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {format(today, 'EEEE, MMM d')}
+            </span>
           </div>
 
           {todaySessions.isRestDay ? (
-            <div className="card text-center py-6">
-              <div className="text-3xl mb-2">🧘</div>
-              <p className="text-white font-semibold">Rest Day</p>
-              <p className="text-sm text-gray-400 mt-1">Recovery is training too. Sleep well, eat well.</p>
-            </div>
+            <GlassSurface cornerRadius="md" className="text-center py-6 px-4">
+              <div className="text-3xl mb-2" aria-hidden="true">🧘</div>
+              <p className="type-card-title text-white">Rest Day</p>
+              <p className="type-body mt-1" style={{ color: 'var(--text-secondary)' }}>
+                Recovery is training too. Sleep well, eat well.
+              </p>
+            </GlassSurface>
           ) : (
             <div className="space-y-2">
-              {todaySessions.sessions.map((session, i) => (
-                <div key={i} className="card flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    session.type === 'conditioning' ? 'bg-orange-900/40' :
-                    session.type === 'sparring' ? 'bg-red-900/40' :
-                    session.type === 'skill' ? 'bg-blue-900/40' :
-                    session.type === 'strength' ? 'bg-yellow-900/40' :
-                    'bg-green-900/40'
-                  }`}>
-                    {session.type === 'conditioning' ? <Flame size={18} className="text-orange-400" /> :
-                     session.type === 'sparring' ? <Zap size={18} className="text-red-400" /> :
-                     session.type === 'skill' ? <Target size={18} className="text-blue-400" /> :
-                     session.type === 'strength' ? <Activity size={18} className="text-yellow-400" /> :
-                     <Clock size={18} className="text-green-400" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{session.title}</p>
-                    <p className="text-xs text-gray-400">{session.duration} min</p>
-                  </div>
-                  {session.type !== 'rest' && session.duration > 0 && (
-                    <button
-                      onClick={() => onNavigate('log', {
-                        sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                        title: session.title,
-                        duration: session.duration,
-                      })}
-                      className="text-xs text-teal-500 font-semibold hover:text-teal-400 transition-colors flex-shrink-0"
+              {todaySessions.sessions.map((session, i) => {
+                // Was the same five-way ternary chain the fight-camp dashboard
+                // carried, with its own copy of the colour mapping.
+                const accent = SESSION_COLORS[session.type];
+                const Icon = SESSION_ICONS[session.type];
+                return (
+                  <GlassSurface key={i} cornerRadius="md" className="flex items-center gap-3 p-4">
+                    <div
+                      className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+                      style={{
+                        backgroundColor: tint(accent, 0.16),
+                        borderRadius: 'var(--radius-sm)',
+                        color: accent,
+                      }}
                     >
-                      Log
-                    </button>
-                  )}
-                </div>
-              ))}
+                      <Icon size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{session.title}</p>
+                    </div>
+                    <DurationBadge minutes={session.duration} sessionType={session.type} />
+                    {session.type !== 'rest' && session.duration > 0 && (
+                      <button
+                        onClick={() => onNavigate('log', {
+                          sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                          title: session.title,
+                          duration: session.duration,
+                        })}
+                        aria-label={`Log ${session.title}`}
+                        className="text-xs font-semibold flex-shrink-0 -m-2 p-2"
+                        style={{ color: 'var(--accent-teal)' }}
+                      >
+                        Log
+                      </button>
+                    )}
+                  </GlassSurface>
+                );
+              })}
             </div>
           )}
         </div>
@@ -305,23 +327,40 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
       {recentLogs.length > 0 && (
         <div className="mx-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent Activity</p>
-            <button onClick={() => onNavigate('log')} className="text-xs text-teal-500 font-semibold">See all</button>
+            <p className="type-caption text-gray-450">Recent Activity</p>
+            <button
+              onClick={() => onNavigate('log')}
+              className="text-xs font-semibold -m-2 p-2"
+              style={{ color: 'var(--accent-teal)' }}
+            >
+              See all
+            </button>
           </div>
           <div className="space-y-2">
-            {recentLogs.map(log => (
-              <div key={log.id} className="card flex items-center gap-3">
-                <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Activity size={14} className="text-teal-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{log.title}</p>
-                  <p className="text-xs text-gray-400">
-                    {format(parseISO(log.date), 'MMM d')} · {log.duration}min · RPE {log.rpe}
-                  </p>
-                </div>
-              </div>
-            ))}
+            {recentLogs.map(log => {
+              const accent = SESSION_COLORS[log.sessionType] ?? 'var(--accent-teal)';
+              const Icon = SESSION_ICONS[log.sessionType] ?? Activity;
+              return (
+                <GlassSurface key={log.id} cornerRadius="md" className="flex items-center gap-3 p-4">
+                  <div
+                    className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                    style={{
+                      backgroundColor: tint(accent, 0.16),
+                      borderRadius: 'var(--radius-sm)',
+                      color: accent,
+                    }}
+                  >
+                    <Icon size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{log.title}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      {format(parseISO(log.date), 'MMM d')} · {log.duration}min · RPE {log.rpe}
+                    </p>
+                  </div>
+                </GlassSurface>
+              );
+            })}
           </div>
         </div>
       )}
@@ -329,22 +368,35 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
       {/* Weight Status */}
       <div className="mx-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Weight Status</p>
-          <button onClick={() => onNavigate('weight')} className="text-xs text-teal-500 font-semibold">Track</button>
+          <p className="type-caption text-gray-450">Weight Status</p>
+          <button
+            onClick={() => onNavigate('weight')}
+            className="text-xs font-semibold -m-2 p-2"
+            style={{ color: 'var(--accent-teal)' }}
+          >
+            Track
+          </button>
         </div>
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div className="text-center">
-              <div className="text-2xl font-black text-white">{toDisplayWeight(currentW, unit)}</div>
-              <div className="text-xs text-gray-400">current</div>
+        <GlassSurface cornerRadius="md" className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-center flex-shrink-0">
+              <div className="text-2xl font-extrabold text-white tabular-nums">
+                {toDisplayWeight(currentW, unit)}
+              </div>
+              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>current</div>
             </div>
-            <div className="flex-1 px-4">
+            <div className="flex-1 px-2 min-w-0">
               {currentW !== targetW ? (
                 <>
-                  <div className="h-2 bg-dark-500 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 overflow-hidden"
+                    style={{ background: 'var(--surface-3)', borderRadius: 'var(--radius-full)' }}
+                  >
                     <div
-                      className="h-full bg-gradient-to-r from-teal-700 to-teal-500 rounded-full"
+                      className="h-full"
                       style={{
+                        borderRadius: 'var(--radius-full)',
+                        background: 'linear-gradient(90deg, var(--accent-cyan), var(--accent-teal))',
                         width: `${Math.max(0, Math.min(100,
                           activeCamp.currentWeight !== targetW
                             ? ((activeCamp.currentWeight - currentW) / (activeCamp.currentWeight - targetW)) * 100
@@ -353,106 +405,83 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
                       }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-gray-450 mt-1">
+                  <div className="flex justify-between text-xs text-gray-450 mt-1 tabular-nums">
                     <span>{formatWeight(activeCamp.currentWeight, unit)}</span>
                     <span>{formatWeight(targetW, unit)}</span>
                   </div>
                 </>
               ) : (
-                <p className="text-center text-xs text-teal-400 font-semibold">At goal weight</p>
+                <p className="text-center text-xs font-semibold" style={{ color: 'var(--accent-teal)' }}>
+                  At goal weight
+                </p>
               )}
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-black text-teal-400">{toDisplayWeight(targetW, unit)}</div>
-              <div className="text-xs text-gray-400">goal</div>
+            <div className="text-center flex-shrink-0">
+              <div
+                className="text-2xl font-extrabold tabular-nums"
+                style={{ color: 'var(--accent-teal)' }}
+              >
+                {toDisplayWeight(targetW, unit)}
+              </div>
+              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>goal</div>
             </div>
           </div>
           {currentW !== targetW && (
-            <p className="text-center text-xs text-gray-400 mt-2">
+            <p className="text-center text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
               {formatWeightDelta(weightDiff, unit)} {weightDiff > 0 ? 'to lose' : 'to gain'} to reach goal
             </p>
           )}
-        </div>
+        </GlassSurface>
       </div>
 
       {/* Quick Tools */}
       <div className="mx-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tools</p>
-        <div className="grid grid-cols-2 gap-3">
-          <button
+        <p className="type-caption text-gray-450 mb-2">Tools</p>
+        <div className="grid grid-cols-2" style={{ gap: 'var(--space-3)' }}>
+          <ToolTile
+            icon={<Brain size={18} />}
+            accent="var(--accent-violet)"
+            title="AI Insights"
+            subtitle="Coach analysis"
             onClick={() => onNavigate('aiinsights')}
-            className="card flex items-center gap-3 hover:border-purple-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-              <Brain size={18} className="text-purple-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">AI Insights</p>
-              <p className="text-xs text-gray-400">Coach analysis</p>
-            </div>
-            {!pro && proChip}
-          </button>
-          <button
+            gated={!pro}
+          />
+          <ToolTile
+            icon={<Activity size={18} />}
+            accent="var(--accent-teal)"
+            title="Log Session"
+            subtitle="Record your work"
             onClick={() => onNavigate('log')}
-            className="card flex items-center gap-3 hover:border-teal-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
-              <Activity size={18} className="text-teal-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Log Session</p>
-              <p className="text-xs text-gray-400">Record your work</p>
-            </div>
-          </button>
-          <button
+          />
+          <ToolTile
+            icon={<Droplets size={18} />}
+            accent="var(--accent-blue)"
+            title="Nutrition"
+            subtitle="Water & meals"
             onClick={() => onNavigate('nutrition')}
-            className="card flex items-center gap-3 hover:border-blue-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-              <Droplets size={18} className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Nutrition</p>
-              <p className="text-xs text-gray-400">Water & meals</p>
-            </div>
-            {!pro && proChip}
-          </button>
-          <button
+            gated={!pro}
+          />
+          <ToolTile
+            icon={<Bluetooth size={18} />}
+            accent="var(--accent-cyan)"
+            title="Trackers"
+            subtitle="HR · HRV · Recovery"
             onClick={() => onNavigate('trackers')}
-            className="card flex items-center gap-3 hover:border-teal-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-teal-900/30 flex items-center justify-center flex-shrink-0">
-              <Bluetooth size={18} className="text-teal-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Trackers</p>
-              <p className="text-xs text-gray-400">HR · HRV · Recovery</p>
-            </div>
-          </button>
-          <button
+          />
+          <ToolTile
+            icon={<Dumbbell size={18} />}
+            accent="var(--accent-gold)"
+            title="Exercise Library"
+            subtitle="Drills & workouts"
             onClick={() => onNavigate('workout-library')}
-            className="card flex items-center gap-3 hover:border-yellow-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
-              <Dumbbell size={18} className="text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Exercise Library</p>
-              <p className="text-xs text-gray-400">Drills & workouts</p>
-            </div>
-          </button>
-          <button
+          />
+          <ToolTile
+            icon={<UtensilsCrossed size={18} />}
+            accent="var(--accent-green)"
+            title="Meal Library"
+            subtitle="Plans & generator"
             onClick={() => onNavigate('meal-library')}
-            className="card flex items-center gap-3 hover:border-green-800 transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-green-900/30 flex items-center justify-center flex-shrink-0">
-              <UtensilsCrossed size={18} className="text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Meal Library</p>
-              <p className="text-xs text-gray-400">Plans & generator</p>
-            </div>
-          </button>
+          />
         </div>
       </div>
     </div>
