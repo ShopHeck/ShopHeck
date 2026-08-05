@@ -129,9 +129,12 @@ export default function GlassSurface({
       {...(wantsPress ? pressProps : null)}
       {...rest}
     >
-      {/* The scrim is a ::before on .text-scrim and sits behind content, so
-          children need their own stacking context to stay above it. */}
-      <div className="relative">{children}</div>
+      {/* Children render directly. They used to sit inside a positioning div
+          that kept them above the scrim; that wrapper became the surface's
+          only child, so a caller's `flex`/`space-y-*`/`justify-between` applied
+          to it rather than to the content. The scrim now sits behind content
+          on its own (see .text-scrim in index.css) and no wrapper is needed. */}
+      {children}
     </Tag>
   );
 }

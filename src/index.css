@@ -188,12 +188,31 @@
   }
 
   /* Guarantees the §8.3 contrast floor regardless of what composites behind a
-     surface. Applied by <GlassSurface> to its own text layer, so a new card
-     cannot forget it. */
+     surface. Applied by <GlassSurface>, so a new card cannot forget it.
+
+     The scrim sits behind content via `z-index: -1` rather than by wrapping
+     the children in a positioning div. An absolutely-positioned ::before at
+     `z-index: auto` paints with the positioned descendants — i.e. ABOVE
+     normal-flow text — which is the problem this has to solve. Wrapping the
+     children solved it too, but it made the wrapper the surface's only child,
+     so any layout class a caller put on the surface (`flex`, `space-y-*`,
+     `justify-between`) applied to the wrapper instead of the content and
+     silently collapsed rows into stacks.
+
+     `isolation: isolate` is what makes the negative z-index safe: without a
+     stacking context here, `z-index: -1` escapes to the nearest ancestor that
+     has one and paints behind this element's own background. It creates a
+     stacking context only — not a containing block — so `position: fixed`
+     descendants are unaffected. */
+  .text-scrim {
+    isolation: isolate;
+  }
+
   .text-scrim::before {
     content: '';
     position: absolute;
     inset: 0;
+    z-index: -1;
     background: var(--text-scrim);
     border-radius: inherit;
     pointer-events: none;
