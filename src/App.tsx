@@ -190,11 +190,17 @@ function AppShell() {
   const { title, subtitle } = VIEW_TITLES[view];
 
   const camp = state.activeCamp;
-  const dashSubtitle = camp
-    ? (camp.isOffSeason
-        ? `Off Season · ${state.currentUser.name}`
-        : `${state.currentUser.name} · ${camp.weightClass}`)
-    : state.currentUser.name;
+  // The Dashboard tab is two different screens depending on who is signed in —
+  // a fighter's camp Home, or a coach's team triage — so it needs two titles.
+  // With both coach tabs rendering the same header, "Fight Camp · <weight
+  // class>" sat above a roster table and named nothing on it.
+  const dashSubtitle = isCoach
+    ? `${state.currentUser.name} · Coach`
+    : camp
+      ? (camp.isOffSeason
+          ? `Off Season · ${state.currentUser.name}`
+          : `${state.currentUser.name} · ${camp.weightClass}`)
+      : state.currentUser.name;
 
   function navigateToLog(prefill?: LogPrefill) {
     if (prefill) setLogPrefill(prefill);
@@ -216,7 +222,7 @@ function AppShell() {
       <FlashOverlay />
       <CelebrationToast />
       <Header
-        title={view === 'dashboard' ? 'Fight Camp' : title}
+        title={view === 'dashboard' ? (isCoach ? 'Team' : 'Fight Camp') : title}
         subtitle={view === 'dashboard' ? dashSubtitle : subtitle}
         showBack={canGoBack}
         onBack={goBack}
@@ -281,7 +287,9 @@ function AppShell() {
                 </button>
               </div>
             )}
-            {view === 'dashboard' && isCoach && <CoachDashboard />}
+            {view === 'dashboard' && isCoach && (
+              <CoachDashboard mode="overview" onNavigate={v => navigate(v as View)} />
+            )}
             {view === 'planner' && (
               camp ? <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} /> : <NoCampState feature="The weekly plan" onSetUp={() => navigate('dashboard')} />
             )}
@@ -339,7 +347,7 @@ function AppShell() {
                 onFinish={() => navigate('fight-log', { replace: true })}
               />
             )}
-            {view === 'fighters'        && <CoachDashboard />}
+            {view === 'fighters'        && <CoachDashboard mode="roster" />}
             {view === 'achievements'    && <ProgressScreen />}
             {view === 'settings'        && (
               <Settings onNewCamp={() => requestNewCamp(false)} onNavigate={v => navigate(v as View)} />
