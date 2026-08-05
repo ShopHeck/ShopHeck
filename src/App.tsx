@@ -166,7 +166,9 @@ function AppShell() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-    StatusBar.setBackgroundColor({ color: '#0a0a0a' }).catch(() => {});
+    // Matches --bg-obsidian. The native bridge takes a literal, so this is the
+    // one place the token's value is restated — keep the two in step.
+    StatusBar.setBackgroundColor({ color: '#0B0D12' }).catch(() => {});
     SplashScreen.hide().catch(() => {});
   }, []);
 

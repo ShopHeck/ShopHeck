@@ -6,6 +6,7 @@ import { format, parseISO, subDays, differenceInDays } from 'date-fns';
 import type { NutritionLog, MacroEntry } from '../types';
 import Modal from './shared/Modal';
 import ConfirmDialog from './shared/ConfirmDialog';
+import { MACRO_COLORS, PACE_COLORS } from '../utils/designTokens';
 
 type MealRating = 'good' | 'ok' | 'poor';
 type Meal = 'breakfast' | 'lunch' | 'dinner';
@@ -35,7 +36,13 @@ function MacroBar({ label, actual, target, color }: {
   label: string; actual: number; target: number; color: string;
 }) {
   const pct = target > 0 ? Math.min(130, Math.round((actual / target) * 100)) : 0;
-  const barColor = pct > 115 ? '#ef4444' : pct > 100 ? '#eab308' : color;
+  // Overshooting a macro target is a pace judgement, not a macro identity, so
+  // the bar switches from the macro's own color onto the pace scale — caution
+  // past target, critical well past it.
+  const barColor =
+    pct > 115 ? PACE_COLORS.critical :
+    pct > 100 ? PACE_COLORS.behind :
+    color;
   const unit = label === 'Calories' ? 'kcal' : 'g';
   return (
     <div>
@@ -325,10 +332,12 @@ export default function NutritionTracker() {
         <div className="card space-y-3">
           {currentUser?.macroTargets ? (
             <>
-              <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color="#f97316" />
-              <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color="#22c55e" />
-              <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color="#3b82f6" />
-              <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color="#a855f7" />
+              {/* Macro colors are their own locked system (§2.6), separate from
+                  status semantics — green here means protein, not "good". */}
+              <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color={MACRO_COLORS.calories} />
+              <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color={MACRO_COLORS.protein} />
+              <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color={MACRO_COLORS.carbs} />
+              <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color={MACRO_COLORS.fat} />
             </>
           ) : (
             <p className="text-sm text-gray-400 text-center py-2">Set targets to track your macros</p>

@@ -1,6 +1,7 @@
 import { useApp } from '../../context/AppContext';
 import { tabsFor } from './navTabs';
 import { triggerHaptic, HAPTIC } from '../../hooks/useHaptics';
+import PressableButton from './PressableButton';
 
 interface Props {
   active: string;
@@ -14,17 +15,23 @@ export default function BottomNav({ active, onChange }: Props) {
   const items = tabsFor(isCoach);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-dark-800 border-t border-dark-500 z-50 safe-area-bottom">
+    /* The app's second and last live-blur surface — fixed, so outside the
+       scroll container. Six tabs, matching the real navigation. */
+    <nav
+      className="fixed bottom-0 left-0 right-0 glass-live border-t border-surface-2 z-50 safe-area-bottom"
+      style={{ borderRadius: 0 }}
+    >
       <div className="max-w-lg mx-auto flex items-center justify-around px-1 py-1">
         {items.map(({ id, icon: Icon, label }) => (
-          <button
+          <PressableButton
             key={id}
             onClick={() => { triggerHaptic(HAPTIC.tick); onChange(id); }}
             className={`nav-item ${active === id ? 'active' : ''}`}
+            aria-current={active === id ? 'page' : undefined}
           >
             <Icon size={20} strokeWidth={active === id ? 2.5 : 1.8} />
             <span>{label}</span>
-          </button>
+          </PressableButton>
         ))}
       </div>
     </nav>

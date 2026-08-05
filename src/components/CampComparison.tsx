@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, Trophy, XCircle, Minus, History, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { CHART_SERIES } from '../utils/designTokens';
 import { isPro } from '../utils/subscription';
 import UpgradeModal from './shared/UpgradeModal';
 import { format, parseISO } from 'date-fns';
@@ -91,17 +92,17 @@ export default function CampComparison({ onOpenFight }: Props) {
           <div role="img" aria-label="Grouped bar chart comparing key performance indicators across past fights.">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -25 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: '#888', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#888', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-3)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: 'var(--text-tertiary)', fontSize: 11 }} />
+              <YAxis tick={{ fill: 'var(--text-tertiary)', fontSize: 11 }} />
               <Tooltip
-                contentStyle={{ background: '#1f1f1f', border: '1px solid #333', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#fff' }}
+                contentStyle={{ background: 'var(--surface-2)', border: '1px solid var(--surface-3)', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+                labelStyle={{ color: 'var(--text-primary)' }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Sparring" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Adherence" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Readiness" fill="#a855f7" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Sparring" fill={CHART_SERIES[0]} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Adherence" fill={CHART_SERIES[1]} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Readiness" fill={CHART_SERIES[2]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           </div>

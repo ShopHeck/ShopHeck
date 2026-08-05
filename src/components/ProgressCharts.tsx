@@ -1,5 +1,6 @@
 import { BarChart3, TrendingUp, Activity, Zap, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { CHART_SERIES, resolveToken } from '../utils/designTokens';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { weeklyAdherenceSeries } from '../utils/adherence';
@@ -15,7 +16,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const CHART_COLORS = ['#f97316', '#60a5fa', '#a78bfa', '#34d399', '#f87171'];
+const CHART_COLORS = CHART_SERIES;
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -48,38 +49,48 @@ function shareStats(opts: {
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
+  // Canvas 2D cannot parse `var()` — it fails silently and paints black — so
+  // the share image resolves the tokens to their computed values at draw time.
+  // The alternative is a second hand-maintained palette, which is how an
+  // exported image ends up off-brand from the screen it was exported from.
+  const flame = resolveToken('var(--accent-flame)');
+  const obsidian = resolveToken('var(--bg-obsidian)');
+  const dim = resolveToken('var(--text-tertiary)');
+  const secondary = resolveToken('var(--text-secondary)');
+  const track = resolveToken('var(--surface-3)');
+
   // Background
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#0a0a0a');
-  bg.addColorStop(1, '#1a0a00');
+  bg.addColorStop(0, obsidian);
+  bg.addColorStop(1, resolveToken('var(--bg-ambient-warm)'));
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Orange accent bar
-  ctx.fillStyle = '#f97316';
+  // Flame accent bar
+  ctx.fillStyle = flame;
   ctx.fillRect(0, 0, W, 5);
 
   // App name
-  ctx.fillStyle = '#f97316';
+  ctx.fillStyle = flame;
   ctx.font = 'bold 18px system-ui, sans-serif';
   ctx.fillText('FIGHT CAMP', 40, 48);
 
   // Fighter name
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = resolveToken('var(--text-primary)');
   ctx.font = 'bold 40px system-ui, sans-serif';
   ctx.fillText(opts.name, 40, 100);
 
   // Tags
   ctx.font = '14px system-ui, sans-serif';
-  ctx.fillStyle = '#9ca3af';
+  ctx.fillStyle = secondary;
   ctx.fillText(`${opts.sport} · ${opts.weightClass}`, 40, 128);
   if (opts.opponent) {
-    ctx.fillStyle = '#f97316';
+    ctx.fillStyle = flame;
     ctx.fillText(`vs ${opts.opponent}`, 40, 150);
   }
 
   // Divider
-  ctx.strokeStyle = '#2a2a2a';
+  ctx.strokeStyle = track;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(40, 170); ctx.lineTo(W - 40, 170);
@@ -87,12 +98,12 @@ function shareStats(opts: {
 
   // Stats grid
   const stats = [
-    { label: 'SESSIONS', value: String(opts.sessions), color: '#f97316' },
-    { label: 'TRAINING HRS', value: `${opts.hours}h`, color: '#a78bfa' },
-    { label: 'SPAR ROUNDS', value: String(opts.sparringRounds), color: '#facc15' },
-    { label: 'AVG RPE', value: opts.avgRpe, color: '#34d399' },
-    { label: 'ADHERENCE', value: `${opts.adherence}%`, color: '#60a5fa' },
-    { label: 'DAYS OUT', value: String(opts.daysOut), color: '#f87171' },
+    { label: 'SESSIONS', value: String(opts.sessions), color: flame },
+    { label: 'TRAINING HRS', value: `${opts.hours}h`, color: resolveToken('var(--accent-violet)') },
+    { label: 'SPAR ROUNDS', value: String(opts.sparringRounds), color: resolveToken('var(--accent-gold)') },
+    { label: 'AVG RPE', value: opts.avgRpe, color: resolveToken('var(--accent-green)') },
+    { label: 'ADHERENCE', value: `${opts.adherence}%`, color: resolveToken('var(--accent-blue)') },
+    { label: 'DAYS OUT', value: String(opts.daysOut), color: resolveToken('var(--accent-crimson)') },
   ];
 
   const colW = (W - 80) / 3;
@@ -106,31 +117,31 @@ function shareStats(opts: {
     ctx.font = 'bold 36px system-ui, sans-serif';
     ctx.fillText(s.value, x, y + 40);
 
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = dim;
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText(s.label, x, y + 60);
   });
 
   // Progress bar
   const barY = H - 60;
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = track;
   ctx.beginPath();
   ctx.roundRect(40, barY, W - 80, 12, 6);
   ctx.fill();
 
   const grad = ctx.createLinearGradient(40, 0, W - 40, 0);
-  grad.addColorStop(0, '#b45309'); grad.addColorStop(1, '#f97316');
+  grad.addColorStop(0, resolveToken('var(--accent-crimson)')); grad.addColorStop(1, flame);
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.roundRect(40, barY, (W - 80) * (opts.progress / 100), 12, 6);
   ctx.fill();
 
-  ctx.fillStyle = '#6b7280';
+  ctx.fillStyle = dim;
   ctx.font = '12px system-ui, sans-serif';
   ctx.fillText(`Camp Progress: ${opts.progress}%`, 40, H - 20);
 
   // Brand watermark — the shared image is the app's only outbound artifact.
-  ctx.fillStyle = '#4b5563';
+  ctx.fillStyle = dim;
   ctx.textAlign = 'right';
   ctx.fillText('fightcamp.netlify.app', W - 40, H - 20);
   ctx.textAlign = 'left';
@@ -316,9 +327,9 @@ export default function ProgressCharts() {
           <div role="img" aria-label="Bar chart of planned sessions completed each week of the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weeklyAdherence} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="week" tick={{ fill: '#666', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                <XAxis dataKey="week" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
@@ -337,7 +348,7 @@ export default function ProgressCharts() {
                   radius={[4, 4, 0, 0]}
                   maxBarSize={30}
                   name="Adherence %"
-                  fill="#f97316"
+                  fill="var(--accent-flame)"
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -352,12 +363,12 @@ export default function ProgressCharts() {
           <div role="img" aria-label="Bar chart of training minutes logged each week of the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={weeklyVolume} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="week" tick={{ fill: '#666', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                <XAxis dataKey="week" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="sessions" fill="#f97316" radius={[4, 4, 0, 0]} name="Sessions" maxBarSize={30} />
-                <Bar dataKey="sparringRounds" fill="#60a5fa" radius={[4, 4, 0, 0]} name="Spar Rounds" maxBarSize={30} />
+                <Bar dataKey="sessions" fill="var(--accent-flame)" radius={[4, 4, 0, 0]} name="Sessions" maxBarSize={30} />
+                <Bar dataKey="sparringRounds" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} name="Spar Rounds" maxBarSize={30} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -371,11 +382,11 @@ export default function ProgressCharts() {
           <div role="img" aria-label="Line chart of session intensity, rated 1 to 10, over the camp." className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={rpeTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="date" tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 10]} tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                <XAxis dataKey="date" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 10]} tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Line type="monotone" dataKey="rpe" stroke="#f97316" strokeWidth={2.5} dot={{ fill: '#f97316', r: 3 }} name="RPE" />
+                <Line type="monotone" dataKey="rpe" stroke="var(--accent-flame)" strokeWidth={2.5} dot={{ fill: 'var(--accent-flame)', r: 3 }} name="RPE" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -419,9 +430,9 @@ export default function ProgressCharts() {
                   >
                   <ResponsiveContainer width="100%" height={100}>
                     <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                      <XAxis dataKey="date" tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                      <XAxis dataKey="date" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                       <Tooltip content={<ChartTooltip />} />
                       <Line
                         type="monotone"
@@ -448,11 +459,11 @@ export default function ProgressCharts() {
           <div role="img" aria-label="Line chart of self-rated sparring performance, 1 to 5, per session." className="card p-2">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={sparringPerf} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="date" tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis domain={[1, 5]} tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                <XAxis dataKey="date" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis domain={[1, 5]} tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Line type="monotone" dataKey="performance" stroke="#a78bfa" strokeWidth={2.5} dot={{ fill: '#a78bfa', r: 4 }} name="Performance" />
+                <Line type="monotone" dataKey="performance" stroke="var(--accent-violet)" strokeWidth={2.5} dot={{ fill: 'var(--accent-violet)', r: 4 }} name="Performance" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -469,11 +480,11 @@ export default function ProgressCharts() {
           <div role="img" aria-label="Bar chart of average session intensity per week." className="card p-2">
             <ResponsiveContainer width="100%" height={140}>
               <LineChart data={weeklyVolume.filter(w => w.avgRpe > 0)} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="week" tick={{ fill: '#666', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 10]} tick={{ fill: '#666', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
+                <XAxis dataKey="week" tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickFormatter={v => `W${v}`} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 10]} tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Line type="monotone" dataKey="avgRpe" stroke="#34d399" strokeWidth={2.5} dot={{ fill: '#34d399', r: 4 }} name="Avg RPE" />
+                <Line type="monotone" dataKey="avgRpe" stroke="var(--accent-green)" strokeWidth={2.5} dot={{ fill: 'var(--accent-green)', r: 4 }} name="Avg RPE" />
               </LineChart>
             </ResponsiveContainer>
           </div>

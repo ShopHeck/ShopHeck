@@ -73,8 +73,12 @@ const DEFAULTS: Partial<TimerSave> = {
   voiceEnabled: false,
   hapticEnabled: true,
   reactionMode: false,
-  workColor: '#22c55e',
-  restColor: '#ef4444',
+  // Design-system green / crimson, written out rather than tokenised: these two
+  // values are handed to the Live Activity and the watch app across the
+  // Capacitor bridge, which cannot resolve `var()`. Defaults only — the fighter
+  // picks from six swatches per phase in the timer settings (§3.4).
+  workColor: '#00E676',
+  restColor: '#FF2A00',
 };
 
 function saveTimer(s: TimerSave) {
@@ -302,8 +306,8 @@ export function useRoundTimer() {
   const [voiceEnabled,  setVoiceEnabled]  = useState(false);
   const [hapticEnabled, setHapticEnabled] = useState(true);
   const [reactionMode,  setReactionMode]  = useState(false);
-  const [workColor, setWorkColor] = useState('#22c55e');
-  const [restColor, setRestColor] = useState('#ef4444');
+  const [workColor, setWorkColor] = useState('#00E676');
+  const [restColor, setRestColor] = useState('#FF2A00');
   const [bgAlerts, setBgAlertsState] = useState(roundAlertsEnabled());
 
   // Timer engine state

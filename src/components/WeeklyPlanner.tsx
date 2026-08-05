@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Flame, Target, Zap, Activity, Clock, Star, CheckCircle2, Circle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { sessionKey as buildSessionKey, weekAdherence } from '../utils/adherence';
@@ -7,27 +7,40 @@ import { format, parseISO, addDays } from 'date-fns';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import type { SessionType } from '../types';
 import type { LogPrefill } from '../App';
+import DurationBadge from './shared/DurationBadge';
+import { SESSION_COLORS, SESSION_LABELS } from '../utils/sessionVisuals';
+import { tint } from '../utils/designTokens';
 
-const SESSION_CONFIG: Record<SessionType, { color: string; doneColor: string; icon: React.FC<{ size: number; className?: string }>; label: string }> = {
-  conditioning: { color: 'bg-orange-900/50 border-orange-800/50 text-orange-400', doneColor: 'bg-orange-950/30 border-orange-900/30 text-orange-600', icon: ({ size, className }) => <Flame size={size} className={className} />, label: 'Conditioning' },
-  skill:        { color: 'bg-blue-900/50 border-blue-800/50 text-blue-400',   doneColor: 'bg-blue-950/30 border-blue-900/30 text-blue-600',   icon: ({ size, className }) => <Target size={size} className={className} />,   label: 'Skill' },
-  sparring:     { color: 'bg-red-900/50 border-red-800/50 text-red-400',     doneColor: 'bg-red-950/30 border-red-900/30 text-red-700',       icon: ({ size, className }) => <Zap size={size} className={className} />,      label: 'Sparring' },
-  strength:     { color: 'bg-yellow-900/50 border-yellow-800/50 text-yellow-400', doneColor: 'bg-yellow-950/30 border-yellow-900/30 text-yellow-700', icon: ({ size, className }) => <Activity size={size} className={className} />, label: 'Strength' },
-  recovery:     { color: 'bg-green-900/50 border-green-800/50 text-green-400', doneColor: 'bg-green-950/30 border-green-900/30 text-green-700', icon: ({ size, className }) => <Clock size={size} className={className} />,    label: 'Recovery' },
-  rest:         { color: 'bg-gray-900/50 border-gray-700/50 text-gray-400',   doneColor: 'bg-gray-900/30 border-gray-800/30 text-gray-700',   icon: ({ size, className }) => <Star size={size} className={className} />,      label: 'Rest' },
-};
+/**
+ * Session card styling, derived from the one session→color mapping rather than
+ * restating it. The literal record this replaces was the third copy of that
+ * mapping in the app, and it had already drifted — it used a different icon for
+ * `recovery` than the dashboard did.
+ *
+ * The done state is the same hue at lower intensity, not a separate palette:
+ * a completed sparring session should still read as sparring.
+ */
+function sessionStyles(type: SessionType, done: boolean) {
+  const accent = SESSION_COLORS[type];
+  return {
+    accent,
+    background: tint(accent, done ? 0.06 : 0.14),
+    borderColor: tint(accent, done ? 0.18 : 0.4),
+    color: accent,
+  };
+}
 
 const PHASE_COLORS: Record<string, string> = {
-  'Base Building': 'text-blue-400',
-  'Strength & Conditioning': 'text-yellow-400',
-  'Fight Specific': 'text-orange-400',
-  'Peak': 'text-red-400',
-  'Taper': 'text-green-400',
-  // Off-season phases
-  'Foundation':       'text-indigo-400',
-  'Development':      'text-teal-400',
-  'Performance':      'text-purple-400',
-  'Active Recovery':  'text-green-400',
+  'Base Building': 'var(--accent-blue)',
+  'Strength & Conditioning': 'var(--accent-gold)',
+  'Fight Specific': 'var(--accent-flame)',
+  'Peak': 'var(--accent-crimson)',
+  'Taper': 'var(--accent-green)',
+  // Off-season phases run the same cool→hot ramp over a longer cycle.
+  'Foundation': 'var(--accent-blue)',
+  'Development': 'var(--accent-cyan)',
+  'Performance': 'var(--accent-violet)',
+  'Active Recovery': 'var(--accent-green)',
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -129,7 +142,12 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
         <div className="bg-dark-700 border border-dark-500 rounded-xl p-3 mt-2">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <span className={`text-sm font-bold ${PHASE_COLORS[week.phase] || 'text-white'}`}>{week.phase}</span>
+              <span
+                className="text-sm font-bold"
+                style={{ color: PHASE_COLORS[week.phase] ?? 'var(--text-primary)' }}
+              >
+                {week.phase}
+              </span>
               <p className="text-xs text-gray-400 mt-0.5 leading-tight">{week.focus}</p>
             </div>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
@@ -264,7 +282,7 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
           ) : (
             <div className="space-y-3">
               {selectedDayData.sessions.map((session, i) => {
-                const config = SESSION_CONFIG[session.type];
+                const style = sessionStyles(session.type, !!completedSessions[sessionKey(selectedDay, i)]);
                 const key = sessionKey(selectedDay, i);
                 const isDone = !!completedSessions[key];
                 const matchingLog = isDone ? workoutLogs.find(l =>
@@ -277,7 +295,12 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                 return (
                   <div
                     key={i}
-                    className={`rounded-xl border p-4 transition-all duration-200 ${isDone ? config.doneColor : config.color}`}
+                    className="border p-4 transition-all duration-200"
+                    style={{
+                      borderRadius: 'var(--radius-md)',
+                      background: style.background,
+                      borderColor: style.borderColor,
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       {/* Completion toggle */}
@@ -297,12 +320,21 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                           <span className={`text-sm font-bold transition-all ${isDone ? 'line-through text-gray-400' : 'text-white'}`}>
                             {session.title}
                           </span>
-                          <span className="badge bg-black/20 text-xs">{config.label}</span>
-                          {isDone && <span className="badge bg-green-900/50 text-green-400 text-xs">Done ✓</span>}
-                          {matchingLog && <span className="badge bg-dark-500 text-gray-400 text-xs">RPE {matchingLog.rpe}</span>}
+                          <span className="badge bg-black/25 text-xs" style={{ color: style.color }}>
+                            {SESSION_LABELS[session.type]}
+                          </span>
+                          {isDone && (
+                            <span
+                              className="badge text-xs"
+                              style={{ background: tint('var(--pace-ahead)', 0.18), color: 'var(--pace-ahead)' }}
+                            >
+                              Done ✓
+                            </span>
+                          )}
+                          {matchingLog && <span className="badge bg-surface-2 text-gray-400 text-xs">RPE {matchingLog.rpe}</span>}
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-gray-400">{session.duration} min</span>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <DurationBadge minutes={session.duration} sessionType={session.type} />
                           {matchingLog && <span className="text-xs text-gray-400">{matchingLog.duration} min logged</span>}
                         </div>
                         {!isDone && (
@@ -363,13 +395,21 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                     <span className="text-xs text-gray-450 italic">Rest Day</span>
                   ) : (
                     <div className="flex gap-1.5 flex-wrap flex-1">
+                      {/* The canonical <DurationBadge> case (§3.5): solid
+                          session-type color, duration only, in a list built for
+                          scanning. Completed sessions drop to 45% rather than
+                          switching to a green "done" palette — at this size the
+                          week's shape is the information, and recoloring half
+                          the pills destroys it. */}
                       {day.sessions.map((s, i) => {
-                        const config = SESSION_CONFIG[s.type];
                         const done = !!completedSessions[`${activeCamp.id}-${selectedWeek}-${day.dayOfWeek}-${i}`];
                         return (
-                          <span key={i} className={`badge text-xs border ${done ? 'bg-green-900/30 border-green-900/30 text-green-600 line-through' : config.color}`}>
-                            {s.duration}m
-                          </span>
+                          <DurationBadge
+                            key={i}
+                            minutes={s.duration}
+                            sessionType={s.type}
+                            className={done ? 'opacity-45 line-through' : ''}
+                          />
                         );
                       })}
                     </div>

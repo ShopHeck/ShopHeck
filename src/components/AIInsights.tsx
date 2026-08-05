@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Brain, RefreshCw, AlertCircle, Sparkles, User, Zap } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import GlassSurface from './shared/GlassSurface';
+import { tint } from '../utils/designTokens';
 import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { scheduleAdherence } from '../utils/adherence';
@@ -228,29 +230,52 @@ export default function AIInsights() {
   return (
     <div className="space-y-4 pb-6">
       {/* Header card */}
-      <div className="mx-4 mt-4 bg-gradient-to-br from-purple-900/30 to-dark-700 rounded-2xl border border-purple-900/40 p-4">
+      {/* Violet is correct here and nowhere else: this IS the AI Coach
+          Insights feature, which is the one thing violet brands (§2.6). The
+          other AI-generated surfaces — Cut Coach, Macro Generator, Generate
+          Meal — stay flame with a sparkle icon as the "AI made this" signal. */}
+      <GlassSurface
+        cornerRadius="lg"
+        elevated
+        accentGlow={loading ? 'rgb(var(--accent-violet-rgb) / 0.4)' : undefined}
+        className="mx-4 mt-4 p-4"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-900/40 flex items-center justify-center flex-shrink-0">
-            <Brain size={20} className="text-purple-400" />
+          <div
+            className="w-10 h-10 flex items-center justify-center flex-shrink-0"
+            style={{
+              backgroundColor: tint('var(--accent-violet)', 0.18),
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--accent-violet)',
+            }}
+          >
+            <Brain size={20} />
           </div>
           <div className="flex-1">
-            <p className="text-white font-bold">AI Coach Insights</p>
-            <p className="text-xs text-gray-400">Included with Pro — no setup needed</p>
+            <p className="type-card-title text-white">AI Coach Insights</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Included with Pro — no setup needed
+            </p>
           </div>
-          <Sparkles size={16} className="text-purple-400" />
+          <Sparkles size={16} style={{ color: 'var(--accent-violet)' }} />
         </div>
-      </div>
+      </GlassSurface>
 
       {/* Generate button */}
       <div className="mx-4">
         <button
           onClick={generate}
           disabled={loading}
-          className={`w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-98 ${
+          className={`w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-sm pressable ${loading ? 'ai-pulse cursor-not-allowed' : ''}`}
+          style={
             loading
-              ? 'bg-purple-900/40 border border-purple-800 text-purple-300 cursor-not-allowed'
-              : 'bg-purple-700 hover:bg-purple-600 text-white'
-          }`}
+              ? {
+                  backgroundColor: tint('var(--accent-violet)', 0.2),
+                  border: '1px solid ' + tint('var(--accent-violet)', 0.5),
+                  color: 'var(--accent-violet)',
+                }
+              : { backgroundColor: 'var(--accent-violet)', color: 'var(--text-primary)' }
+          }
         >
           {loading ? (
             <>
@@ -269,10 +294,12 @@ export default function AIInsights() {
       {/* Error + routed action */}
       {error && (
         <div className="mx-4 space-y-2">
-          <div className="flex items-start gap-3 bg-red-900/20 border border-red-900/40 rounded-xl p-3">
-            <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-300">{error}</p>
-          </div>
+          {/* §4.2: a failed request is a retry prompt, not a danger state, so
+              the crimson stays on the icon rather than recolouring the card. */}
+          <GlassSurface cornerRadius="md" className="flex items-start gap-3 p-3">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent-crimson)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{error}</p>
+          </GlassSurface>
           {errorCode === 'signin_required' && (
             <button onClick={() => setShowAuth(true)} className="btn-primary w-full text-sm flex items-center justify-center gap-2">
               <User size={14} /> Sign in
@@ -290,7 +317,7 @@ export default function AIInsights() {
       {(insights || loading) && (
         <div className="mx-4 card">
           {loading && !insights && (
-            <div className="flex items-center gap-2 text-purple-400 text-sm">
+            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--accent-violet)' }}>
               <RefreshCw size={14} className="animate-spin" />
               Your AI coach is analyzing the training data…
             </div>
@@ -298,7 +325,7 @@ export default function AIInsights() {
           <div className="space-y-0.5">
             {renderInsights(insights)}
             {loading && insights && (
-              <span className="inline-block w-2 h-4 bg-purple-400 ml-1 animate-pulse rounded-sm" />
+              <span className="inline-block w-2 h-4 ml-1 animate-pulse rounded-sm" style={{ backgroundColor: 'var(--accent-violet)' }} />
             )}
           </div>
           {/* Dates a restored analysis, so a week-old read isn't mistaken for a

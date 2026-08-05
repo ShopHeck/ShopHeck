@@ -15,13 +15,22 @@ export interface HRState {
   connectError: string | null;
 }
 
+/**
+ * Heart-rate zones — a six-step intensity ramp, and its own system rather than
+ * a reuse of the status palette. Zone 5 being crimson does not mean something
+ * is wrong; it means the fighter is working, which is often the point.
+ *
+ * Token references, so the ramp tracks the palette. Anywhere these are tinted,
+ * use `tint()` from designTokens — string-concatenating an alpha suffix onto a
+ * `var()` produces garbage rather than a translucent color.
+ */
 export const ZONE_COLORS: Record<HRZone, string> = {
-  0: '#6b7280',
-  1: '#3b82f6',
-  2: '#22c55e',
-  3: '#eab308',
-  4: '#f97316',
-  5: '#ef4444',
+  0: 'var(--text-tertiary)',
+  1: 'var(--accent-blue)',
+  2: 'var(--accent-green)',
+  3: 'var(--accent-gold)',
+  4: 'var(--accent-flame)',
+  5: 'var(--accent-crimson)',
 };
 
 export const ZONE_LABELS: Record<HRZone, string> = {
