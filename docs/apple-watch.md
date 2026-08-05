@@ -7,14 +7,21 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** The Swift in `ios/App/WatchApp/` and
-> `ios/App/App/WatchBridgePlugin.swift` has **not been compiled**. It was written
-> against the WatchConnectivity / HealthKit / SwiftUI APIs but there is no Swift
-> toolchain in the environment it was authored in, and the Xcode target it needs
-> does not exist yet (see *Adding the target* below). Treat it as reviewed source
-> awaiting its first build, not as shipped code. The TypeScript side **is**
-> verified — it typechecks, lints, and falls back cleanly everywhere the bridge
-> is absent.
+> **Build status.** None of the Swift here has been compiled — there is no Swift
+> toolchain in the environment it was authored in. Treat it as reviewed source
+> awaiting its first build. The TypeScript side **is** verified: it typechecks,
+> lints, and falls back cleanly everywhere the bridge is absent.
+>
+> Two different things are in play, and only one is wired up:
+>
+> - **`App/WatchBridgePlugin.swift` IS in the App target.** It had to be:
+>   `AppDelegate.swift` registers it, so leaving the file out of the target's
+>   Sources phase would have been a "cannot find 'WatchBridgePlugin' in scope"
+>   compile error breaking the iOS build and the TestFlight pipeline. Adding one
+>   file to an existing target is four contained pbxproj entries, mirroring
+>   `HealthKitPlugin.swift` exactly.
+> - **The watch app target does NOT exist.** `ios/App/WatchApp/*.swift` is not
+>   compiled by anything yet. See *Adding the target* below.
 
 ---
 
@@ -79,12 +86,16 @@ heart rate would attribute one sensor's data to another.
 
 ## Adding the target
 
-This has **not** been done — `ios/App/App.xcodeproj/project.pbxproj` is
-unchanged. It is deliberately left as an Xcode step rather than hand-written:
-a watchOS app is a full second app bundle with its own Info.plist,
-`WKCompanionAppBundleIdentifier`, and an *Embed Watch Content* build phase, and
-a malformed pbxproj breaks the iOS build — and therefore the TestFlight
-pipeline — for everyone.
+This has **not** been done. The only pbxproj change made so far is adding
+`WatchBridgePlugin.swift` to the existing App target (see *Build status*); no
+watch target exists.
+
+The watch target is deliberately left as an Xcode step rather than hand-written.
+A watchOS app is a full second app bundle with its own Info.plist,
+`WKCompanionAppBundleIdentifier`, and an *Embed Watch Content* build phase — an
+order of magnitude more pbxproj surgery than adding a source file, and a
+malformed pbxproj breaks the iOS build, and therefore the TestFlight pipeline,
+for everyone.
 
 1. **File → New → Target → watchOS → App.**
    - Product name: `FightCampWatch`

@@ -79,14 +79,17 @@ tables) plus push/pull wiring — see `src/lib/sync.ts`.
 
 ### Apple Watch target is not in the Xcode project
 
-The watch app's Swift exists and is reviewed, but `project.pbxproj` is
-unchanged and **none of the Swift has been compiled**. See
-[`apple-watch.md`](./apple-watch.md) for the target setup and why it was left as
-an Xcode step.
+The watch app's Swift exists and is reviewed, but nothing compiles it yet, and
+**none of the Swift in this feature has been compiled at all**.
 
 ```sh
-grep -c WatchApp ios/App/App.xcodeproj/project.pbxproj   # 0
+grep -c WatchApp ios/App/App.xcodeproj/project.pbxproj      # 0 — no watch target
+grep -c WatchBridgePlugin ios/App/App.xcodeproj/project.pbxproj  # 4 — phone side IS wired
 ```
+
+The phone-side plugin had to be added to the App target because `AppDelegate`
+registers it; without it the iOS build would not compile. The watch target
+itself is left as an Xcode step — see [`apple-watch.md`](./apple-watch.md).
 
 ---
 
