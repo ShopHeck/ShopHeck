@@ -7,6 +7,44 @@ default_platform(:ios)
 
 APP_IDENTIFIER = "app.fightcamptraining".freeze
 TEAM_ID = "WV4L598A44".freeze
+
+# Every bundle in the archive that gets signed on its own.
+#
+# An embedded extension is a separate bundle with its own App ID, and Xcode
+# signs it separately from the app — so it needs its own entry in the Developer
+# Portal, its own provisioning profile, and its own code signing settings. None
+# of that is inherited from the host app. Adding the TimerLiveActivity widget
+# (Live Activities / Dynamic Island) without adding it here failed the archive
+# with
+#
+#   No profiles for 'app.fightcamptraining.timerliveactivity' were found
+#
+# which arrives after the app target has signed cleanly and so reads like an
+# app-level signing fault rather than a missing extension profile.
+#
+# Add a row here whenever a new extension target is added to the project.
+SIGNED_BUNDLES = [
+  {
+    target: "App",
+    identifier: APP_IDENTIFIER,
+    name: "FightCamp Training"
+  },
+  {
+    target: "TimerLiveActivity",
+    identifier: "#{APP_IDENTIFIER}.timerliveactivity",
+    name: "FightCamp Training Timer Live Activity"
+  }
+].freeze
+
+SIGNED_IDENTIFIERS = SIGNED_BUNDLES.map { |bundle| bundle[:identifier] }.freeze
+
+# match names the profiles it stores after the bundle they belong to; both
+# update_code_signing_settings and gym's export options have to use the same
+# name or the archive signs against a profile that isn't the one installed.
+def match_profile_name(identifier)
+  "match AppStore #{identifier}"
+end
+
 # Where we drop the App Store Connect .p8 so xcodebuild can authenticate during
 # archive (gitignored; only ever written on the runner / dev machine). Anchored
 # to this Fastfile's directory so it resolves regardless of fastlane's cwd.
@@ -317,30 +355,33 @@ platform :ios do
       )
     else
       # ── Shared signing via fastlane match ────────────────────────────────
-      # One distribution cert + profile, stored encrypted in MATCH_GIT_URL and
-      # reused by every build — no per-run certificate churn. Read-only here;
-      # run the `certs` lane once to create/refresh what's in storage.
-      match(
-        type: "appstore",
-        app_identifier: APP_IDENTIFIER,
-        git_url: match_git_url,
-        readonly: true
-      )
+      # One distribution cert + a profile per signed bundle, stored encrypted in
+      # MATCH_GIT_URL and reused by every build — no per-run certificate churn.
+      sync_match_profiles(git_url: match_git_url)
 
       # Flip the Release config to manual signing with the match cert/profile.
       # Without this the archive step still runs Xcode automatic signing, which
       # insists on a per-machine development cert (the exact churn match avoids)
       # and rejects any manually specified distribution identity.
-      update_code_signing_settings(
-        path: "App/App.xcodeproj",
-        targets: ["App"],
-        build_configurations: ["Release"],
-        use_automatic_signing: false,
-        team_id: TEAM_ID,
-        bundle_identifier: APP_IDENTIFIER,
-        code_sign_identity: "Apple Distribution",
-        profile_name: "match AppStore #{APP_IDENTIFIER}"
-      )
+      #
+      # One call per target: the action takes a single bundle_identifier and
+      # profile_name, and each bundle has its own.
+      SIGNED_BUNDLES.each do |bundle|
+        update_code_signing_settings(
+          path: "App/App.xcodeproj",
+          targets: [bundle[:target]],
+          build_configurations: ["Release"],
+          use_automatic_signing: false,
+          team_id: TEAM_ID,
+          bundle_identifier: bundle[:identifier],
+          code_sign_identity: "Apple Distribution",
+          profile_name: match_profile_name(bundle[:identifier])
+        )
+      end
+
+      export_profiles = SIGNED_IDENTIFIERS.each_with_object({}) do |identifier, mapping|
+        mapping[identifier] = match_profile_name(identifier)
+      end
 
       build_app(
         scheme: "App",
@@ -354,23 +395,109 @@ platform :ios do
         export_options: {
           signingStyle: "manual",
           teamID: TEAM_ID,
-          provisioningProfiles: {
-            APP_IDENTIFIER => "match AppStore #{APP_IDENTIFIER}"
-          }
+          # Export needs a profile for the extension too, or the re-sign step
+          # after a successful archive fails with "no profile for ...".
+          provisioningProfiles: export_profiles
         }
       )
     end
   end
 
-  # Create or refresh the shared signing cert + profile in match storage.
+  # Install the shared cert plus one App Store profile per signed bundle.
+  #
+  # readonly is the right default for a build lane: it cannot mint a
+  # certificate, so no amount of CI churn can walk the account into Apple's
+  # certificate cap. But readonly also cannot create a profile that was never
+  # stored — and that is exactly the state the certs repo is in the first time
+  # a new embedded bundle appears in the project. The TimerLiveActivity
+  # extension put it there, and every build failed until the profile existed.
+  #
+  # So: try readonly, and if the only thing missing is a profile, generate the
+  # missing ones and push them to the certs repo (which the documented deploy
+  # key already has write access to for the `certs` lane). This never creates a
+  # certificate — match reuses whatever is in storage — so the property that
+  # made readonly worth having is preserved. Any other match failure, an
+  # expired or absent certificate above all, still stops the build: silently
+  # re-issuing one is how the cap gets hit.
+  private_lane :sync_match_profiles do |options|
+    git_url = options[:git_url]
+
+    begin
+      match(
+        type: "appstore",
+        app_identifier: SIGNED_IDENTIFIERS,
+        git_url: git_url,
+        readonly: true
+      )
+    rescue => e
+      raise unless e.message.match?(/provisioning profile/i)
+
+      UI.important(
+        "match has no stored App Store profile for one of #{SIGNED_IDENTIFIERS.join(', ')} — " \
+        "generating the missing profile(s) and pushing them to the certs repo. " \
+        "The shared signing certificate is reused, not reissued."
+      )
+
+      SIGNED_BUNDLES.each do |bundle|
+        register_app_identifier(identifier: bundle[:identifier], name: bundle[:name])
+      end
+
+      match(
+        type: "appstore",
+        app_identifier: SIGNED_IDENTIFIERS,
+        git_url: git_url,
+        readonly: false
+      )
+    end
+  end
+
+  # Register a bundle ID on the Developer Portal, if it isn't already.
+  #
+  # A profile can only be cut for an App ID that already exists, and match does
+  # not create one — it fails inside sigh with "Could not find App with App
+  # Identifier", which names neither the extension nor the fix.
+  #
+  # This talks to App Store Connect directly rather than through the `produce`
+  # action: produce still authenticates with `Spaceship.login(username, ...)`,
+  # an Apple ID and password, and this pipeline has only the App Store Connect
+  # API key. `Spaceship::ConnectAPI.token` is already set by the
+  # app_store_connect_api_key call in before_all, so these two calls are
+  # authenticated by the same key everything else uses.
+  #
+  # An extension gets a Developer Portal identifier only — it is not a separate
+  # App Store listing, so nothing is created on the store side.
+  private_lane :register_app_identifier do |options|
+    require "spaceship"
+
+    identifier = options[:identifier]
+    if Spaceship::ConnectAPI::BundleId.find(identifier)
+      UI.message("App ID #{identifier} already registered.")
+      next
+    end
+
+    UI.important("Registering App ID #{identifier} on the Developer Portal.")
+    Spaceship::ConnectAPI::BundleId.create(
+      name: options[:name],
+      identifier: identifier,
+      platform: Spaceship::ConnectAPI::Platform::IOS,
+      seed_id: TEAM_ID
+    )
+  end
+
+  # Create or refresh the shared signing cert + profiles in match storage.
   # Run ONCE after setting the MATCH_* secrets: Actions → iOS Build → Run
   # workflow → lane: certs.
   desc "Bootstrap/refresh the shared match signing certificate"
   lane :certs do
     UI.user_error!("MATCH_GIT_URL must be set to use match") if ENV["MATCH_GIT_URL"].to_s.empty?
+
+    SIGNED_BUNDLES.each do |bundle|
+      register_app_identifier(identifier: bundle[:identifier], name: bundle[:name])
+    end
+
     match(
       type: "appstore",
-      app_identifier: APP_IDENTIFIER,
+      app_identifier: SIGNED_IDENTIFIERS,
       git_url: ENV.fetch("MATCH_GIT_URL"),
       readonly: false
     )
