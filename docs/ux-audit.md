@@ -107,7 +107,9 @@ document's life, which is what prompted moving live tracking to
 
 **Genuinely still open after this pass:** Coach IA (Dashboard and Fighters
 render the same component), made-weight hiding rather than replacing Cut Coach,
-and palette tinting. All three are tracked in `open-work.md`.
+and palette tinting. *(Written August 2026 and since closed — the first two on
+2026-08-05, see [`submission-summary.md`](./submission-summary.md). This is a
+dated snapshot; `open-work.md` is the tracker.)*
 
 ---
 
