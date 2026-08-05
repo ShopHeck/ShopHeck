@@ -7,21 +7,17 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** None of the Swift here has been compiled — there is no Swift
-> toolchain in the environment it was authored in. Treat it as reviewed source
-> awaiting its first build. The TypeScript side **is** verified: it typechecks,
+> **Build status.** The `FightCampWatch` target now exists and every file here
+> is a member of it, so the Swift is compiled by any build of the project —
+> which it was not before. What that does **not** mean is that it has been seen
+> to compile: there is still no Swift toolchain in the environment this was
+> authored in, so the first `xcodebuild` is the first time any of it is type
+> checked. Expect to fix compile errors on that run; the target existing is what
+> makes them findable at all. The TypeScript side **is** verified: it typechecks,
 > lints, and falls back cleanly everywhere the bridge is absent.
 >
-> Two different things are in play, and only one is wired up:
->
-> - **`App/WatchBridgePlugin.swift` IS in the App target.** It had to be:
->   `AppDelegate.swift` registers it, so leaving the file out of the target's
->   Sources phase would have been a "cannot find 'WatchBridgePlugin' in scope"
->   compile error breaking the iOS build and the TestFlight pipeline. Adding one
->   file to an existing target is four contained pbxproj entries, mirroring
->   `HealthKitPlugin.swift` exactly.
-> - **The watch app target does NOT exist.** `ios/App/WatchApp/*.swift` is not
->   compiled by anything yet. See *Adding the target* below.
+> Two things outside this repo are still required before the watch app can be
+> installed, and neither is a file edit — see *Remaining setup* below.
 
 ---
 
@@ -40,10 +36,19 @@ through a different pipe, so the whole HR half of the app lights up for them.
 | `src/plugins/WatchBridge.ts` | web | Capacitor plugin interface |
 | `src/hooks/useWatchHeartRate.ts` | web | Watch samples → HR state |
 
-`WatchMessages.swift` must be a member of **both** targets. WatchConnectivity
+`WatchMessages.swift` is a member of **both** targets. WatchConnectivity
 payloads are untyped `[String: Any]` dictionaries, so a key renamed on one side
 and not the other fails silently at runtime, on a device, mid-session. One
 shared file is the only thing that turns that into a compile error.
+
+Shared membership is necessary but was not sufficient: `WatchBridgePlugin.swift`
+used to spell the keys out as string literals (`"kind"`, `"bpm"`), so the phone
+side never referenced the shared constants and renaming one would still have
+compiled. It now builds its payload through `WatchSessionConfig` and reads
+through `WatchMessage.Key`, which is what makes the shared file do its job — and
+gets the config clamping for free. The JS event names (`heartRate`,
+`watchCommand`) stay literals on purpose: those are the plugin's contract with
+`src/plugins/WatchBridge.ts`, not part of the phone↔watch wire format.
 
 ---
 
@@ -84,49 +89,66 @@ heart rate would attribute one sensor's data to another.
 
 ---
 
-## Adding the target
+## The target
 
-This has **not** been done. The only pbxproj change made so far is adding
-`WatchBridgePlugin.swift` to the existing App target (see *Build status*); no
-watch target exists.
+`FightCampWatch` is in `ios/App/App.xcodeproj`, added by
+[`scripts/add-watch-target.py`](../scripts/add-watch-target.py) rather than by
+hand. `project.pbxproj` is an OpenStep plist with 24-hex object ids and
+cross-references in six directions, and a malformed one breaks the iOS build —
+and the TestFlight pipeline — for everyone. The script runs the change through a
+real parser and serializer, so the result is structurally valid by construction
+instead of by proofreading. It is idempotent, and it is committed so the target
+can be rebuilt identically rather than from memory.
 
-The watch target is deliberately left as an Xcode step rather than hand-written.
-A watchOS app is a full second app bundle with its own Info.plist,
-`WKCompanionAppBundleIdentifier`, and an *Embed Watch Content* build phase — an
-order of magnitude more pbxproj surgery than adding a source file, and a
-malformed pbxproj breaks the iOS build, and therefore the TestFlight pipeline,
-for everyone.
+| Setting | Value | Why |
+|---|---|---|
+| `PRODUCT_BUNDLE_IDENTIFIER` | `app.fightcamptraining.watchkitapp` | Must be the host id plus a suffix. A mismatch is not a build error — it is a watch app that silently never installs. |
+| `SDKROOT` | `watchos` | |
+| `TARGETED_DEVICE_FAMILY` | `4` | Apple Watch. The phone targets are `1,2`. |
+| `WATCHOS_DEPLOYMENT_TARGET` | `9.0` | Floor for the SwiftUI and `HKWorkoutSession` APIs used here. |
+| `SKIP_INSTALL` | `YES` | The watch app ships inside the host archive, not as a product of its own. |
+| `INFOPLIST_FILE` | `WatchApp/Info.plist` | Checked in rather than generated: `WKBackgroundModes` is an array with no `INFOPLIST_KEY_` equivalent, and the companion bundle id has to be exact. |
+| `CODE_SIGN_ENTITLEMENTS` | `WatchApp/FightCampWatch.entitlements` | HealthKit only. WatchConnectivity needs no entitlement. |
 
-1. **File → New → Target → watchOS → App.**
-   - Product name: `FightCampWatch`
-   - Bundle id: `app.fightcamptraining.watchkitapp`
-     (it **must** be the host id plus a suffix, or the pairing is rejected)
-   - Interface: SwiftUI · Language: Swift
-   - Uncheck "Include Notification Scene"
-2. **Delete the generated `ContentView.swift` and `…App.swift`**, then add the
-   files from `ios/App/WatchApp/` to the new target.
-3. **Add `WatchMessages.swift` to the App target too** (File Inspector → Target
-   Membership → tick both).
-4. **Watch target capabilities:** add HealthKit, and tick *Background Modes →
-   Workout processing*.
-5. **Watch `Info.plist`:** add `NSHealthShareUsageDescription` —
-   *"Fight Camp reads your heart rate during a round session to show live
-   training zones."*
-6. **App target `Info.plist`:** no change. WatchConnectivity needs no
-   entitlement or usage string.
-7. **Signing:** the watch app needs its own App ID and provisioning profile.
-   `ios/fastlane/Fastfile` already special-cases the `TimerLiveActivity`
-   extension for signing and version syncing — the watch app and its extension
-   need the same treatment (`sync_extension_versions` anchors versions to the
-   host app; `verify_embedded_bundles` will flag the new bundle until it is
-   listed).
+Also wired:
+
+- **`Embed Watch Content`** on the App target — a copy-files phase into
+  `$(CONTENTS_FOLDER_PATH)/Watch`, plus a target dependency. Both are required:
+  the dependency orders the build, the copy phase is what actually puts the
+  `.app` inside the host bundle. A watch app that builds but is not embedded
+  ships an iOS app with no watch app in it, and the failure is invisible until a
+  device tries to install it.
+- **`WatchMessages.swift` in both targets' Sources phases** (see above).
+- **`Assets.xcassets`** with an `AppIcon` — a watchOS app without one fails App
+  Store validation, so the catalog is a build input rather than a nicety.
+- **A shared `FightCampWatch` scheme**, so `xcodebuild -scheme FightCampWatch`
+  and the Xcode run destination work without Xcode autocreating an unshared one.
+- **`SIGNED_BUNDLES` in `ios/fastlane/Fastfile`** — the watch app is a separately
+  signed bundle with its own App ID and profile, none of it inherited from the
+  host. Missing this is what failed the archive when the Live Activity extension
+  was added, with an error that reads like an app-level signing fault.
+  `sync_extension_versions` needed no change: it already pins every non-App
+  target to the app's versions, which a watch bundle needs too — Apple rejects an
+  upload whose embedded bundle version differs from its host's.
+
+## Remaining setup
+
+Two steps that need an Apple Developer account rather than a file edit:
+
+1. **Register `app.fightcamptraining.watchkitapp`** on the Developer Portal and
+   **enable HealthKit on it**. The Fastfile's `register_app_identifier` creates
+   the identifier automatically on first archive, but it does *not* set
+   capabilities — so without this the entitlement fails to sign.
+2. **Let `match` cut the profile.** `sync_match_profiles` already generates a
+   missing App Store profile and pushes it to the certs repo on first run, which
+   is the path the Live Activity extension took.
 
 ### Verifying
 
-- Run the watch scheme on a paired device (the Simulator has no heart-rate
-  sensor, so HR will stay `—` there; the timer and bells work).
-- Start a session on the phone → the wrist should adopt the same rounds/work/rest
-  within a few seconds of the watch app next being foregrounded.
+- Run the `FightCampWatch` scheme on a paired device (the Simulator has no
+  heart-rate sensor, so HR stays `—` there; the timer and bells work).
+- Start a session on the phone → the wrist should adopt the same
+  rounds/work/rest within a few seconds of the watch app next being foregrounded.
 - Start a session on the wrist with the phone in a pocket → the phone's
   Settings → *Bluetooth & Devices* should show **Apple Watch · Streaming**.
 - Connect a chest strap while the watch is streaming → the phone should switch to

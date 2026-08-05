@@ -33,6 +33,20 @@ SIGNED_BUNDLES = [
     target: "TimerLiveActivity",
     identifier: "#{APP_IDENTIFIER}.timerliveactivity",
     name: "FightCamp Training Timer Live Activity"
+  },
+  # The watchOS companion. Not an extension but the same signing problem: a
+  # separate bundle with its own App ID and its own profile, none of it
+  # inherited. The identifier is the host id plus `.watchkitapp` and is not
+  # free to change — Apple requires the watch bundle id to be the host id plus
+  # a suffix, and a mismatch is rejected at install rather than at build.
+  #
+  # Its App ID also needs the HealthKit capability, which register_app_identifier
+  # below does NOT set — it creates the identifier only. Enable it once in the
+  # Developer Portal; see docs/apple-watch.md.
+  {
+    target: "FightCampWatch",
+    identifier: "#{APP_IDENTIFIER}.watchkitapp",
+    name: "FightCamp Training Watch App"
   }
 ].freeze
 
