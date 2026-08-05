@@ -72,6 +72,22 @@ generates and pushes just the missing profile. The shared certificate is reused,
 never reissued, so this cannot contribute to the certificate cap. Running the
 `certs` lane by hand does the same thing up front.
 
+### Two things Apple checks that signing does not
+
+Both of these reject the **upload**, minutes after a green archive:
+
+- **`CFBundleDisplayName`** is required on an extension (`90360`). Set it as
+  `INFOPLIST_KEY_CFBundleDisplayName` in the target's build settings — the
+  extension uses `GENERATE_INFOPLIST_FILE = YES`, so that is the key that
+  actually reaches the built bundle.
+- **Version numbers must match the containing app exactly** (`90057`).
+  `increment_build_number` shells out to `agvtool new-version -all`, and `-all`
+  only reaches targets whose `VERSIONING_SYSTEM` is `apple-generic` — the App
+  target's is, a stock extension target's is not. `sync_extension_versions` in
+  the Fastfile copies the app's `CURRENT_PROJECT_VERSION` and
+  `MARKETING_VERSION` onto every other target before the archive, so a new
+  extension is covered without needing to remember this.
+
 ### Why a deploy key rather than a token
 
 A personal access token works, but it expires. When it lapses the build fails at
