@@ -1,6 +1,7 @@
 import { useState, useMemo, useId } from 'react';
-import { ChevronLeft, ChevronRight, Trophy, XCircle, Minus, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trophy, XCircle, Minus, Check, Swords } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { activeCornerSession, cornerRoundsToFightRounds, hasScoredRounds } from '../utils/cornerMode';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import { endOfDay, format, isValid, parseISO } from 'date-fns';
 import { todayISO, isFutureISODate } from '../utils/dates';
@@ -49,6 +50,12 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const existing = state.fightResults.find(r => r.id === existingId);
 
+  // Corner Mode's live scoring, when this camp has an unconsumed session.
+  // Only ever used to seed a NEW result — editing an existing one must keep
+  // what the fighter saved, not silently reapply what the corner tapped.
+  const corner = existing ? null : activeCornerSession(state, camp.id);
+  const cornerRounds = corner && hasScoredRounds(corner) ? cornerRoundsToFightRounds(corner) : null;
+
   const [step, setStep] = useState(0);
   const [outcome, setOutcome] = useState<FightOutcome>(existing?.outcome ?? 'win');
   const [method, setMethod] = useState<FightMethod>(existing?.method ?? 'Unanimous Decision');
@@ -57,7 +64,19 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
   const [opponent, setOpponent] = useState(existing?.opponent ?? camp.opponent ?? '');
   const [fightDate, setFightDate] = useState(existing?.fightDate ?? camp.fightDate ?? format(new Date(), 'yyyy-MM-dd'));
   const [rounds, setRounds] = useState<FightRound[]>(
-    existing?.rounds ?? Array.from({ length: camp.rounds }, (_, i) => emptyRound(i + 1)),
+    existing?.rounds
+      // The corner's rounds, when there are any — this is the payoff for
+      // scoring live. They only cover the rounds actually fought, so the rest
+      // of the card is padded out with blanks the fighter can still fill in.
+      ?? (cornerRounds
+        ? [
+            ...cornerRounds,
+            ...Array.from(
+              { length: Math.max(0, camp.rounds - cornerRounds.length) },
+              (_, i) => emptyRound(cornerRounds.length + i + 1),
+            ),
+          ]
+        : Array.from({ length: camp.rounds }, (_, i) => emptyRound(i + 1))),
   );
   const [weighInWeight, setWeighInWeight] = useState<string>(existing?.weighInWeight != null ? String(toDisplayWeight(existing.weighInWeight, unit)) : '');
   const [fightNightWeight, setFightNightWeight] = useState<string>(existing?.fightNightWeight != null ? String(toDisplayWeight(existing.fightNightWeight, unit)) : '');
@@ -142,6 +161,11 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
     } else {
       const fresh = buildFightResult(base);
       dispatch({ type: 'LOG_FIGHT_RESULT', payload: fresh });
+      // The corner session has now done its job. Marked consumed rather than
+      // deleted — it stays as the record of what the corner saw live, which is
+      // a different (and more reliable) thing than what the fighter later
+      // decided it meant. Consuming it also stops it seeding the next result.
+      if (corner) dispatch({ type: 'CONSUME_CORNER_SESSION', payload: corner.id });
       onDone(fresh.id);
     }
   }
@@ -166,6 +190,18 @@ export default function FightResultForm({ camp, existingId, onDone, onCancel }: 
           <div key={i} className={`flex-1 h-1.5 rounded-full ${i <= step ? 'bg-brand-500' : 'bg-dark-500'}`} />
         ))}
       </div>
+
+      {/* Says the round scores were pre-filled. Without this the fighter has no
+          way to tell a corner-scored round from a default one, and would
+          reasonably assume the form ignored everything they tapped. */}
+      {cornerRounds && (
+        <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl border border-brand-800/50 bg-brand-900/20 px-3 py-2">
+          <Swords size={14} className="text-brand-400 flex-shrink-0" />
+          <p className="text-xs text-gray-300">
+            {cornerRounds.length} round{cornerRounds.length === 1 ? '' : 's'} pre-filled from Corner Mode. Edit anything that reads wrong.
+          </p>
+        </div>
+      )}
 
       {/* Step 0 — Outcome */}
       {step === 0 && (

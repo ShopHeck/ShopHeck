@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History } from 'lucide-react';
+import { Flame, Target, TrendingDown, Activity, Clock, ChevronRight, Zap, Shield, Droplets, Brain, Bluetooth, MessageSquare, Dumbbell, UtensilsCrossed, Trophy, History, Swords } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
@@ -9,6 +9,7 @@ import { weekAdherence } from '../utils/adherence';
 import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
+import AdaptationCard from './AdaptationCard';
 
 const PHASE_COLORS: Record<string, string> = {
   'Base Building': 'bg-blue-900/40 text-blue-400 border-blue-800',
@@ -116,6 +117,15 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
     && !campFightResult;
   const hasLoggedFight = !!campFightResult;
 
+  // Corner Mode CTA: fight week, fight not yet logged. `daysUntil` is already
+  // clamped at 0 by getDaysUntilFight, so a fight date that has passed reads as
+  // 0 here — the post-fight CTA below takes over on the following day, and the
+  // two are mutually exclusive because both require no logged result.
+  const showCornerCta = !!activeCamp.fightDate
+    && !campFightResult
+    && !showPostFightCta
+    && daysUntil <= 7;
+
   const latestCoachNote = coachNotes
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
@@ -162,6 +172,29 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       </div>
 
       <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
+
+      {/* Corner Mode — fight week only, and only until a result exists. The
+          whole value is being one tap away on the night; buried in a menu it
+          would never be found with gloves already on. */}
+      {showCornerCta && (
+        <div className="mx-4">
+          <button
+            onClick={() => onNavigate('corner')}
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-red-900/40 to-dark-700 border border-red-800/60 rounded-2xl p-4 text-left hover:border-red-600 transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-red-900/50 flex items-center justify-center flex-shrink-0">
+              <Swords size={22} className="text-red-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold">Corner Mode</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {daysUntil === 0 ? 'Fight day' : `${daysUntil} days out`} · game plan between rounds, score as you go
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-red-300 flex-shrink-0" />
+          </button>
+        </div>
+      )}
 
       {/* Post-fight CTA — shows after fight date until a result is logged. */}
       {showPostFightCta && (
@@ -251,6 +284,10 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
       )}
 
       {/* Coach Note Banner */}
+      {/* Adaptive Camp — renders nothing unless the signals genuinely warrant
+          a change, so it sits above the coach note without competing with it. */}
+      <AdaptationCard />
+
       {latestCoachNote && (
         <div className="mx-4">
           <div className="bg-gradient-to-r from-purple-900/40 to-dark-700 border border-purple-800/50 rounded-xl p-4 flex items-start gap-3">

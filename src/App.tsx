@@ -40,6 +40,7 @@ const FitnessTrackerHub = lazy(() => import('./components/FitnessTrackerHub'));
 const WorkoutLibrary   = lazy(() => import('./components/WorkoutLibrary'));
 const MealLibrary      = lazy(() => import('./components/MealLibrary'));
 const FightResultForm  = lazy(() => import('./components/FightResultForm'));
+const CornerMode       = lazy(() => import('./components/CornerMode'));
 const FightBreakdown   = lazy(() => import('./components/FightBreakdown'));
 const CampComparison   = lazy(() => import('./components/CampComparison'));
 const ProgressScreen   = lazy(() => import('./components/gamification/ProgressScreen'));
@@ -64,7 +65,7 @@ function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => voi
   );
 }
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements';
+type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements' | 'corner';
 
 export interface LogPrefill {
   sessionType: SessionType;
@@ -93,6 +94,11 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   'fight-breakdown': { title: 'Fight Breakdown',    subtitle: 'KPIs & Analysis' },
   'camp-history':   { title: 'Camp History',        subtitle: 'Compare Past Camps' },
   achievements:     { title: 'Achievements',        subtitle: 'Belt · Streaks · PRs' },
+  // Corner Mode renders its own full-screen surface over the shell, so this
+  // title is never actually visible. It exists because VIEW_TITLES is a
+  // Record<View, …> — which is exactly what caught this view being added
+  // without one.
+  corner:           { title: 'Corner Mode',         subtitle: 'Fight Night' },
 };
 
 function FlashOverlay() {
@@ -318,6 +324,15 @@ function AppShell() {
                 fightId={activeFightId}
                 onBack={goBack}
                 onEdit={(id) => { setEditingFightId(id); navigate('fight-log'); }}
+              />
+            )}
+            {view === 'corner' && (
+              <CornerMode
+                onClose={goBack}
+                // Replace, not push: the fight is over, and backing out of the
+                // result form must not drop the user into a finished corner
+                // session that would offer to start round 1 again.
+                onFinish={() => navigate('fight-log', { replace: true })}
               />
             )}
             {view === 'fighters'        && <CoachDashboard />}

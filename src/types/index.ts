@@ -422,6 +422,100 @@ export interface GamificationState {
   lastEvaluatedAt: string | null;
 }
 
+// ─── Corner Mode ──────────────────────────────────────────────────────────
+
+/**
+ * One round as scored live from the corner.
+ *
+ * Every field is optional, unlike `FightRound`. A corner has sixty seconds
+ * between rounds, a mouthpiece in one hand and a water bottle in the other —
+ * whatever gets tapped is a bonus, and a partly-scored round must never block
+ * saving the fight. `cornerRoundsToFightRounds` fills the gaps with the same
+ * neutral defaults the post-fight form uses.
+ */
+export interface CornerRound {
+  roundNumber: number;
+  selfScore?: 1 | 2 | 3 | 4 | 5;
+  opponentPressure?: 1 | 2 | 3 | 4 | 5;
+  cardio?: 1 | 2 | 3 | 4 | 5;
+  damageDealt?: DamageLevel;
+  damageTaken?: DamageLevel;
+  /** What the corner called for going into the next round. */
+  cornerAdjustment?: string;
+}
+
+/**
+ * A live fight scored from the corner.
+ *
+ * The point of capturing this at all is that `FightResult` is currently filled
+ * in from memory, hours or days later — and the per-round damage, pressure and
+ * cardio numbers are exactly the ones memory is worst at. `factorTuner` learns
+ * the fighter's readiness weights from those numbers, so improving them
+ * improves every future camp.
+ *
+ * Local-only, like the other post-Phase-4 slices: `pushState` enumerates the
+ * columns it sends. A session is short-lived — it exists to be handed to the
+ * post-fight form and then kept as the record of what the corner saw.
+ */
+export interface CornerSession {
+  id: string;
+  campId: string;
+  startedAt: string;
+  /** Scheduled rounds. The fight can stop early; `rounds` records what happened. */
+  totalRounds: number;
+  roundSeconds: number;
+  restSeconds: number;
+  rounds: CornerRound[];
+  /** Set when the corner ends the fight, by stoppage or by the final bell. */
+  completedAt?: string;
+  /** True once its data has been carried into a saved FightResult. */
+  consumed?: boolean;
+}
+
+// ─── Adaptive camp ────────────────────────────────────────────────────────
+
+/**
+ * How an accepted adaptation changes a week.
+ *
+ * - `recovery` — hard sessions become technical/aerobic work. The week keeps
+ *   every slot; only what happens in them changes.
+ * - `deload`   — the same sessions at reduced volume.
+ * - `intensify`— more volume, when readiness and HRV both say there is room.
+ */
+export type AdaptationKind = 'recovery' | 'deload' | 'intensify';
+
+/**
+ * An adaptation the fighter or their coach accepted.
+ *
+ * Stored rather than derived: recomputing the plan from today's readiness would
+ * make the schedule flicker as data arrives, and would re-score finished camps
+ * against a plan that never existed. See `utils/adaptiveCamp.ts`.
+ *
+ * Local-only for now — `pushState` enumerates the columns it sends, so this
+ * does not reach the cloud, and a linked coach sees the unadapted plan. The
+ * fighter's adherence is unaffected either way, because an adaptation never
+ * changes the number of sessions in a week.
+ */
+export interface CampAdaptation {
+  id: string;
+  campId: string;
+  /** The camp week this applies to. One adaptation applies per week. */
+  weekNumber: number;
+  kind: AdaptationKind;
+  /** Why it was offered, in the words the fighter was shown. */
+  reasons: string[];
+  /** The signal values at the moment it was accepted, for the audit trail. */
+  signals: {
+    readiness: number | null;
+    readinessConfidence: 'low' | 'medium' | 'high';
+    hrvDeltaPct: number | null;
+    weekAdherencePct: number | null;
+    avgRpe7d: number | null;
+    sessions7d: number;
+  };
+  createdAt: string;
+}
+
 // ─── Saved AI analyses ────────────────────────────────────────────────────
 
 /** Which generator produced an analysis. */
@@ -476,4 +570,10 @@ export interface AppState {
   dashboardPrefs?: DashboardPrefs;
   /** Saved AI analyses, keyed by `${kind}:${subjectId}`. Local-only. */
   aiAnalyses?: AiAnalyses;
+  /** Accepted schedule adaptations. Local-only — see CampAdaptation. */
+  campAdaptations?: CampAdaptation[];
+  /** Adaptation keys the fighter dismissed, so the same card cannot re-nag. */
+  dismissedAdaptations?: string[];
+  /** Fights scored live from the corner. Local-only — see CornerSession. */
+  cornerSessions?: CornerSession[];
 }

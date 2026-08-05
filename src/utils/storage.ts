@@ -1,6 +1,7 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 import { defaultGamificationState } from './gamification';
+import { upsertCornerRound } from './cornerMode';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -28,7 +29,115 @@ export function createDefaultState(): AppState {
     gamification: defaultGamificationState(),
     dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false },
     aiAnalyses: {},
+    campAdaptations: [],
+    dismissedAdaptations: [],
+    cornerSessions: [],
   };
+}
+
+/**
+ * Record an accepted schedule adaptation.
+ *
+ * Replaces any previous adaptation for the same camp week rather than stacking:
+ * two deloads applied to one week would compound into a week with almost no
+ * training in it, and `applyAdaptations` deliberately only reads the newest per
+ * week anyway. Dropping the old row here keeps the store honest about that.
+ */
+export function acceptAdaptation(
+  state: AppState,
+  adaptation: Omit<CampAdaptation, 'id' | 'createdAt'>,
+): AppState {
+  const row: CampAdaptation = {
+    ...adaptation,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
+  const others = (state.campAdaptations ?? []).filter(
+    a => !(a.campId === row.campId && a.weekNumber === row.weekNumber),
+  );
+  return { ...state, campAdaptations: [...others, row] };
+}
+
+/** Undo an accepted adaptation, returning the week to its generated form. */
+export function revertAdaptation(state: AppState, id: string): AppState {
+  return { ...state, campAdaptations: (state.campAdaptations ?? []).filter(a => a.id !== id) };
+}
+
+/** Remember that a proposal was declined, so it is not offered again. */
+export function dismissAdaptation(state: AppState, key: string): AppState {
+  const seen = state.dismissedAdaptations ?? [];
+  if (seen.includes(key)) return state;
+  return { ...state, dismissedAdaptations: [...seen, key] };
+}
+
+// ─── Corner Mode ─────────────────────────────────────────────────────────────
+
+/**
+ * Open a corner session, replacing any unconsumed one for the same camp.
+ *
+ * Replacing rather than appending is deliberate: a fighter who backs out of
+ * Corner Mode and re-enters means "start again", and leaving the abandoned
+ * session behind would make `activeCornerSession` a coin flip between them.
+ */
+export function startCornerSession(
+  state: AppState,
+  session: Omit<CornerSession, 'id' | 'startedAt' | 'rounds'>,
+): AppState {
+  const row: CornerSession = {
+    ...session,
+    id: generateId(),
+    startedAt: new Date().toISOString(),
+    rounds: [],
+  };
+  const others = (state.cornerSessions ?? []).filter(
+    s => !(s.campId === row.campId && !s.consumed),
+  );
+  return { ...state, cornerSessions: [...others, row] };
+}
+
+/** Score (or re-score) a round in an open session. */
+export function scoreCornerRound(
+  state: AppState,
+  sessionId: string,
+  round: CornerRound,
+): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? upsertCornerRound(s, round) : s,
+    ),
+  };
+}
+
+/** Stamp a session finished — final bell, or a stoppage the corner called. */
+export function completeCornerSession(state: AppState, sessionId: string): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? { ...s, completedAt: s.completedAt ?? new Date().toISOString() } : s,
+    ),
+  };
+}
+
+/**
+ * Mark a session's data as carried into a saved fight result.
+ *
+ * Kept rather than deleted: the session is the record of what the corner
+ * actually saw live, and the fight result is what the fighter later decided it
+ * meant. Those are different things, and the first is the more reliable one.
+ */
+export function consumeCornerSession(state: AppState, sessionId: string): AppState {
+  return {
+    ...state,
+    cornerSessions: (state.cornerSessions ?? []).map(s =>
+      s.id === sessionId ? { ...s, consumed: true } : s,
+    ),
+  };
+}
+
+/** Discard a session outright — the corner opened it by mistake. */
+export function discardCornerSession(state: AppState, sessionId: string): AppState {
+  return { ...state, cornerSessions: (state.cornerSessions ?? []).filter(s => s.id !== sessionId) };
 }
 
 /** Key for a saved AI analysis. One analysis per generator per subject. */
@@ -342,6 +451,11 @@ export function deleteCamp(state: AppState, campId: string): AppState {
     completedSessions: withoutCampKeys(state.completedSessions),
     dayOverrides: withoutCampKeys(state.dayOverrides),
     aiAnalyses,
+    // Adaptations are camp-scoped; the dismissal keys are prefixed with the
+    // camp id (see adaptationKey) so they cascade on the same rule.
+    campAdaptations: (state.campAdaptations ?? []).filter(a => a.campId !== campId),
+    dismissedAdaptations: (state.dismissedAdaptations ?? []).filter(k => !k.startsWith(`${campId}:`)),
+    cornerSessions: (state.cornerSessions ?? []).filter(s => s.campId !== campId),
   };
 }
 
