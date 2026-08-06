@@ -120,9 +120,9 @@ on the App ID — a few cannot be set through the App Store Connect API and have
 to be ticked once by hand under Identifiers in the Developer Portal. The lane
 says so by name and stops before the archive.
 
-### Two things Apple checks that signing does not
+### Three things Apple checks that signing does not
 
-Both of these reject the **upload**, minutes after a green archive:
+All of these reject the **upload**, minutes after a green archive:
 
 - **`CFBundleDisplayName`** is required on an extension (`90360`). Set it as
   `INFOPLIST_KEY_CFBundleDisplayName` in the target's build settings — the
@@ -135,6 +135,20 @@ Both of these reject the **upload**, minutes after a green archive:
   the Fastfile copies the app's `CURRENT_PROJECT_VERSION` and
   `MARKETING_VERSION` onto every other target before the archive, so a new
   extension is covered without needing to remember this.
+- **Every purpose string an entitlement implies must be present, in the bundle
+  that carries the entitlement** (`90683`). The check is on the entitlement, not
+  on what the code calls: a bundle with `com.apple.developer.healthkit` needs
+  *both* `NSHealthShareUsageDescription` and `NSHealthUpdateUsageDescription`
+  even if it only ever reads. The watch app shipped with just the share string —
+  correct about its own behaviour, wrong about the rule — and the upload was
+  rejected with "The Info.plist file for the `App.app/Watch/FightCampWatch.app`
+  bundle should contain a NSHealthUpdateUsageDescription key". Apple's own error
+  text spells the rule out: *"While your app might not use these APIs, a purpose
+  string is still required."*
+
+  Note this is per embedded bundle. The host app had both strings all along,
+  which is why it passed and the watch did not. A new bundle inherits neither
+  the entitlements nor the purpose strings of its host.
 
 ### Why a deploy key rather than a token
 
