@@ -7,7 +7,7 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** This target now **builds, signs and ships to TestFlight**
+> **Build status.** This target now **builds, signs and uploads**
 > ([run 31068591596](https://github.com/ShopHeck/ShopHeck/actions/runs/31068591596)).
 > Getting there took three rounds, each one uncovering the next because the
 > previous failure had been masking it:
@@ -26,9 +26,12 @@ through a different pipe, so the whole HR half of the app lights up for them.
 >    `NSHealthUpdateUsageDescription` even when it only reads. Added, and the
 >    next run uploaded cleanly.
 >
-> What is still unproven is *running*. Nothing here has executed on a wrist. A
-> green upload means Apple accepted the bundle's shape — signatures, plists,
-> versions — and says nothing about whether the timer keeps time, the bells
+> Two things that still does not establish. **Processing:** the `beta` lane
+> passes `skip_waiting_for_build_processing: true`, so a green run means the
+> upload transmitted, not that App Store Connect accepted what it received —
+> Apple can reject during asynchronous processing without CI ever hearing.
+> **Running:** nothing here has executed on a wrist, and a compiler agreeing the
+> types are sound says nothing about whether the timer keeps time, the bells
 > ring, or the heart rate arrives. Every claim in the sections below is
 > reasoning about code that has been type checked and never run. See
 > *Verifying*, and treat the first wrist session as the real test.

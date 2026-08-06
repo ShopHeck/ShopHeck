@@ -63,12 +63,19 @@ Configuration → Redirect URLs**.
 
 ### Run the watch app once, on a wrist
 
-The watch app now compiles and ships — it is in the TestFlight build. What it
-has never done is *run*. Every line of `ios/App/WatchApp/` has been type checked
-and none of it has been executed: the bells, the phone link, the heart-rate
-stream and the clock are all reasoning rather than observation.
+The archive now builds, signs and uploads with the watch app inside it. Two
+things that does *not* establish, in order:
 
-Pair a watch, install the TestFlight build, and work through
+1. **That a build exists to install.** The `beta` lane passes
+   `skip_waiting_for_build_processing: true`, so the workflow goes green the
+   moment the upload transmits — not when App Store Connect finishes with it.
+   Apple can reject a binary during asynchronous processing and CI never hears
+   about it. Confirm the build actually appears in TestFlight first.
+2. **That any of it runs.** Every line of `ios/App/WatchApp/` has been type
+   checked and none of it has been executed: the bells, the phone link, the
+   heart-rate stream and the clock are all reasoning rather than observation.
+
+Then pair a watch, install it, and work through
 [`apple-watch.md`](./apple-watch.md) § Verifying. Expect to find things; a
 compiler agrees a `Timer` is well typed, not that it fires when the wrist drops.
 
