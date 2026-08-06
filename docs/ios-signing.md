@@ -94,12 +94,20 @@ handled automatically, on every archive:
 - **`sync_app_capabilities`** reads each signed target's `CODE_SIGN_ENTITLEMENTS`
   plist out of the Xcode project, maps each key through `ENTITLEMENT_CAPABILITIES`
   in the Fastfile, and enables anything the App ID is missing.
-- **`sync_match_profiles`** then parses the profile match installed for each
+- **`renew_stale_profiles`** then parses the profile match installed for each
   bundle and re-issues any that does not carry the entitlements its target
   ships. That covers a capability enabled a moment earlier *and* one enabled by
   hand in the portal — neither reaches back into a profile already in storage.
   Only the profile is re-cut; the shared certificate is reused, so this cannot
-  contribute to the certificate cap either.
+  contribute to the certificate cap either. Both the archive
+  (`sync_match_profiles`) and the `certs` bootstrap lane run it.
+
+  match does repair some of this itself, but only when it is *not* read-only: a
+  non-read-only run asks the portal whether each stored profile is still valid,
+  and enabling a capability invalidates that App ID's profiles. Every archive
+  runs read-only, which skips the question — and "Apple marked it invalid" and
+  "it carries the entitlements this target ships" are different claims anyway.
+  Only the second is what the archive checks, so that is what gets checked here.
 
 **Adding an entitlement is one edit**: put it in the target's `.entitlements`
 file. If `ENTITLEMENT_CAPABILITIES` has no row for the key, the build stops

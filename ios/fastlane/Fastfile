@@ -675,11 +675,24 @@ platform :ios do
     end
 
     # Every profile is on disk now, so they can be read rather than assumed.
-    # Anything cut before a capability was enabled gets re-issued — the ones
-    # enabled just above, and equally any enabled by hand in the portal, since
-    # neither reaches back into a profile already in storage. Re-issuing is
-    # profile-only; match reuses the stored certificate, so this cannot walk the
-    # account towards Apple's certificate cap.
+    renew_stale_profiles(git_url: git_url)
+  end
+
+  # Re-issue any installed profile that does not carry the entitlements its
+  # target ships, then prove the result.
+  #
+  # match repairs some of this itself, but only when it is not read-only: with a
+  # spaceship session it asks the portal whether each stored profile is still
+  # valid, and enabling a capability invalidates that App ID's profiles, so a
+  # `readonly: false` run deletes and regenerates them. Every archive runs
+  # read-only, which skips that check entirely — and the check that does run is
+  # about Apple's *status* for a profile, not about whether the profile matches
+  # the entitlements a target actually ships. Reading the profile settles both
+  # without depending on Apple having invalidated anything.
+  #
+  # Re-issuing is profile-only; match reuses the stored certificate, so this
+  # cannot walk the account towards Apple's certificate cap.
+  private_lane :renew_stale_profiles do |options|
     stale = stale_profile_identifiers
     next if stale.empty?
 
@@ -691,7 +704,7 @@ platform :ios do
     match(
       type: "appstore",
       app_identifier: stale,
-      git_url: git_url,
+      git_url: options[:git_url],
       readonly: false,
       force: true
     )
@@ -711,12 +724,12 @@ platform :ios do
         the identifier above
 
       A few capabilities cannot be turned on through the App Store Connect API and
-      have to be ticked there once by hand. Do that, then re-run this workflow: the
-      profile is re-cut automatically on the next build.
+      have to be ticked there once by hand. Do that, then re-run: the profile is
+      re-cut automatically on the next run.
 
-      Stopping here rather than archiving, because the archive would fail ~20 minutes
-      from now with "doesn't include the ... entitlement" — the same fact, reported
-      later and without naming the App ID as the thing to fix.
+      Failing here rather than letting this pass as a success: the next archive would
+      fail ~20 minutes in with "doesn't include the ... entitlement" — the same fact,
+      reported later and without naming the App ID as the thing to fix.
     MSG
   end
 
@@ -797,5 +810,13 @@ platform :ios do
       git_url: ENV.fetch("MATCH_GIT_URL"),
       readonly: false
     )
+
+    # This lane advertises itself as a refresh, so it has to leave storage in a
+    # state the next archive can sign against. The match call above repairs a
+    # profile the portal reports as invalid, which is what a capability enabled a
+    # moment ago normally produces — but "Apple invalidated it" and "it carries
+    # the entitlements this target ships" are not the same claim, and only the
+    # second one is what the archive checks.
+    renew_stale_profiles(git_url: ENV.fetch("MATCH_GIT_URL"))
   end
 end
