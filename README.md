@@ -29,7 +29,7 @@ you need; each block documents what it turns on.
 | Command | What it does |
 |---|---|
 | `npm run quality` | The gate CI runs. Nothing merges red. |
-| `npm test` | Vitest, 234 tests |
+| `npm test` | Vitest, 281 tests |
 | `npm run cap:ios` | Build, sync, open Xcode |
 | `npm run screenshots` | Regenerate all 14 App Store captures |
 | `npm run verify:appstore` | Check the App Store asset set |
