@@ -16,8 +16,9 @@ through a different pipe, so the whole HR half of the app lights up for them.
 > makes them findable at all. The TypeScript side **is** verified: it typechecks,
 > lints, and falls back cleanly everywhere the bridge is absent.
 >
-> Two things outside this repo are still required before the watch app can be
-> installed, and neither is a file edit — see *Remaining setup* below.
+> The Developer Portal side — the watch App ID and the HealthKit capability on
+> it — is provisioned by the pipeline rather than by hand; see *Signing setup*
+> below for what it does and why the first archive failed without it.
 
 ---
 
@@ -131,17 +132,31 @@ Also wired:
   target to the app's versions, which a watch bundle needs too — Apple rejects an
   upload whose embedded bundle version differs from its host's.
 
-## Remaining setup
+## Signing setup
 
-Two steps that need an Apple Developer account rather than a file edit:
+Handled by the pipeline, not by hand — but worth knowing about, because the
+first attempt failed on exactly this and the error named none of it:
 
-1. **Register `app.fightcamptraining.watchkitapp`** on the Developer Portal and
-   **enable HealthKit on it**. The Fastfile's `register_app_identifier` creates
-   the identifier automatically on first archive, but it does *not* set
-   capabilities — so without this the entitlement fails to sign.
-2. **Let `match` cut the profile.** `sync_match_profiles` already generates a
-   missing App Store profile and pushes it to the certs repo on first run, which
-   is the path the Live Activity extension took.
+```
+Provisioning profile "match AppStore app.fightcamptraining.watchkitapp"
+doesn't include the com.apple.developer.healthkit and
+com.apple.developer.healthkit.access entitlements.
+```
+
+`FightCampWatch.entitlements` asks for HealthKit, but an entitlement is only
+half of the arrangement. The other half is the **HealthKit capability on the
+App ID**, and Apple writes an App ID's capabilities into a provisioning profile
+at the moment the profile is cut — so a profile issued before the capability
+existed never gains it. Registering the identifier is not enough; the watch
+App ID was created and its first profile cut in the same run, both before
+anything had enabled HealthKit on it.
+
+`sync_app_capabilities` in `ios/fastlane/Fastfile` now reads each signed
+target's entitlements straight out of the Xcode project and enables whatever
+capabilities they imply, and `sync_match_profiles` re-issues any stored profile
+that turns out not to carry them. Both run on every archive, so adding an
+entitlement to a target is a single edit — see *Entitlements and capabilities*
+in [`docs/ios-signing.md`](./ios-signing.md).
 
 ### Verifying
 

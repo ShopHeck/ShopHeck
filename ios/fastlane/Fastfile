@@ -40,9 +40,8 @@ SIGNED_BUNDLES = [
   # free to change — Apple requires the watch bundle id to be the host id plus
   # a suffix, and a mismatch is rejected at install rather than at build.
   #
-  # Its App ID also needs the HealthKit capability, which register_app_identifier
-  # below does NOT set — it creates the identifier only. Enable it once in the
-  # Developer Portal; see docs/apple-watch.md.
+  # Its App ID also needs the HealthKit capability; sync_app_capabilities below
+  # reads that off the target's entitlements file and enables it.
   {
     target: "FightCampWatch",
     identifier: "#{APP_IDENTIFIER}.watchkitapp",
@@ -51,6 +50,48 @@ SIGNED_BUNDLES = [
 ].freeze
 
 SIGNED_IDENTIFIERS = SIGNED_BUNDLES.map { |bundle| bundle[:identifier] }.freeze
+
+# Entitlement key → the App ID capability that has to be enabled on the
+# Developer Portal before a profile can carry it.
+#
+# An entitlement in a target's .entitlements file is only half of the
+# arrangement. The other half is a capability on the App ID, and Apple writes an
+# App ID's capabilities into a provisioning profile at the moment the profile is
+# cut — so a profile issued before a capability was enabled never gains it, no
+# matter how many times it is downloaded. Xcode compares the two at archive time
+# and stops:
+#
+#   Provisioning profile "match AppStore app.fightcamptraining.watchkitapp"
+#   doesn't include the com.apple.developer.healthkit and
+#   com.apple.developer.healthkit.access entitlements.
+#
+# That arrives ~20 minutes into a macOS run, and names neither of the two things
+# that are actually wrong. sync_app_capabilities closes the portal half of the
+# gap and sync_match_profiles closes the profile half.
+#
+# A nil capability means the entitlement needs no capability of its own — Apple
+# grants it alongside another one, or Xcode derives it. An entitlement missing
+# from this table is an error rather than an assumed nil: guessing reproduces
+# exactly the archive failure the table exists to prevent, later and elsewhere.
+ENTITLEMENT_CAPABILITIES = {
+  "com.apple.developer.associated-domains" => { capability: "ASSOCIATED_DOMAINS" },
+  "com.apple.developer.applesignin" => {
+    capability: "APPLE_ID_AUTH",
+    # Apple refuses Sign in with Apple without a consent setting. "Primary"
+    # means this app owns the consent, which is what a first-party app that is
+    # not grouped with others wants.
+    settings: [{ key: "APPLE_ID_AUTH_APP_CONSENT", options: [{ key: "PRIMARY_APP_CONSENT" }] }]
+  },
+  "com.apple.developer.healthkit" => { capability: "HEALTHKIT" },
+  # Granted by HEALTHKIT rather than being a capability of its own — but it does
+  # land in the profile, and Xcode checks the profile for it by name.
+  "com.apple.developer.healthkit.access" => { capability: nil },
+  "aps-environment" => { capability: "PUSH_NOTIFICATIONS" },
+  "com.apple.security.application-groups" => { capability: "APP_GROUPS" },
+  # Derived by Xcode from the team prefix. Not a portal capability, and not
+  # something the profile has to spell out.
+  "keychain-access-groups" => { capability: nil, in_profile: false }
+}.freeze
 
 # match names the profiles it stores after the bundle they belong to; both
 # update_code_signing_settings and gym's export options have to use the same
@@ -149,6 +190,107 @@ def sanitize_match_env!
     ENV.delete("MATCH_GIT_URL")
   else
     ENV["MATCH_GIT_URL"] = url
+  end
+end
+
+# The entitlement keys a target actually ships, read out of the project rather
+# than restated here. A hand-kept list beside the real one is a second place to
+# remember, and forgetting is the exact failure this whole path exists to remove.
+def target_entitlement_keys(target_name)
+  require "xcodeproj"
+  require "plist"
+
+  project = Xcodeproj::Project.open(XCODEPROJ_PATH)
+  target = project.targets.find { |candidate| candidate.name == target_name }
+  UI.user_error!("No '#{target_name}' target in #{XCODEPROJ_PATH}") if target.nil?
+
+  release = target.build_configurations.find { |config| config.name == "Release" }
+  relative = release&.build_settings&.[]("CODE_SIGN_ENTITLEMENTS").to_s
+  # A target with no entitlements file signs against any profile for its App ID.
+  # TimerLiveActivity is one.
+  return [] if relative.empty?
+
+  # CODE_SIGN_ENTITLEMENTS is relative to the directory holding the .xcodeproj.
+  path = File.expand_path(relative, File.dirname(XCODEPROJ_PATH))
+  unless File.exist?(path)
+    UI.user_error!("#{target_name} sets CODE_SIGN_ENTITLEMENTS to #{relative}, which does not exist")
+  end
+
+  Plist.parse_xml(path).keys
+end
+
+# What ENTITLEMENT_CAPABILITIES says about one entitlement, or a directed error.
+def entitlement_rule(key, target_name)
+  ENTITLEMENT_CAPABILITIES.fetch(key) do
+    UI.user_error!(<<~MSG)
+      The #{target_name} target declares the entitlement
+
+        #{key}
+
+      which ENTITLEMENT_CAPABILITIES in ios/fastlane/Fastfile does not know about, so
+      this build cannot tell whether its App ID needs a capability enabling first.
+
+      Add a row for it: the App Store Connect capability type it requires (the names
+      are in Spaceship::ConnectAPI::BundleIdCapability::Type), or `capability: nil`
+      if Apple grants it without one. Currently known:
+
+      #{ENTITLEMENT_CAPABILITIES.keys.map { |known| "  #{known}" }.join("\n")}
+
+      Stopping here rather than archiving: an entitlement whose capability is off is
+      not a build error, it is a signing error twenty minutes from now.
+    MSG
+  end
+end
+
+# The capabilities a target's App ID has to have enabled, with the settings
+# Apple requires to enable each one.
+def required_capabilities(target_name)
+  target_entitlement_keys(target_name).filter_map do |key|
+    rule = entitlement_rule(key, target_name)
+    next if rule[:capability].nil?
+
+    { type: rule[:capability], settings: rule.fetch(:settings, []) }
+  end.uniq { |capability| capability[:type] }
+end
+
+# The entitlements that have to appear in the profile a target signs against.
+def profile_entitlement_keys(target_name)
+  target_entitlement_keys(target_name).select do |key|
+    entitlement_rule(key, target_name).fetch(:in_profile, true)
+  end
+end
+
+# Where match leaves the profile it installed for a bundle. match publishes one
+# of these per app identifier it processes — it is how it hands the profile to
+# xcodebuild, so it is a stable interface rather than an internal detail.
+def match_profile_path_env_key(identifier)
+  "sigh_#{identifier}_appstore_profile-path"
+end
+
+# Signed identifiers whose installed profile is missing an entitlement that its
+# target ships — the archive failure, found in a second instead of twenty
+# minutes, and found however the profile went stale. Enabling a capability by
+# hand in the Developer Portal leaves every already-issued profile behind
+# without touching this repo at all, and looks identical from here.
+def stale_profile_identifiers
+  require "fastlane_core"
+
+  SIGNED_BUNDLES.filter_map do |bundle|
+    wanted = profile_entitlement_keys(bundle[:target])
+    next if wanted.empty?
+
+    path = ENV[match_profile_path_env_key(bundle[:identifier])].to_s
+    if path.empty? || !File.exist?(path)
+      UI.important("No installed profile for #{bundle[:identifier]} to check entitlements against.")
+      next
+    end
+
+    carried = FastlaneCore::ProvisioningProfile.parse(path)["Entitlements"] || {}
+    missing = wanted.reject { |key| carried.key?(key) }
+    next if missing.empty?
+
+    UI.important("#{match_profile_name(bundle[:identifier])} does not carry #{missing.join(', ')}.")
+    bundle[:identifier]
   end
 end
 
@@ -406,6 +548,12 @@ platform :ios do
       # Simple, but it creates a NEW certificate on each fresh machine, so a
       # busy CI can eventually hit Apple's certificate cap. Set the MATCH_*
       # secrets (see docs/ios-signing.md) to switch to the shared cert below.
+      #
+      # The App IDs still need their capabilities set: whether a profile is cut
+      # by Xcode or by match, Apple only puts into it what the App ID has
+      # enabled at that moment.
+      sync_app_capabilities
+
       signing_args = [
         "-allowProvisioningUpdates",
         "-authenticationKeyPath #{ASC_KEY_PATH}",
@@ -496,6 +644,12 @@ platform :ios do
   private_lane :sync_match_profiles do |options|
     git_url = options[:git_url]
 
+    # The Developer Portal comes first. A profile records its App ID's
+    # capabilities as they stood when it was cut, so a capability enabled
+    # afterwards reaches nothing that already exists — doing this before any
+    # profile is fetched or created is what keeps the re-issue below rare.
+    sync_app_capabilities
+
     begin
       match(
         type: "appstore",
@@ -512,16 +666,95 @@ platform :ios do
         "The shared signing certificate is reused, not reissued."
       )
 
-      SIGNED_BUNDLES.each do |bundle|
-        register_app_identifier(identifier: bundle[:identifier], name: bundle[:name])
-      end
-
       match(
         type: "appstore",
         app_identifier: SIGNED_IDENTIFIERS,
         git_url: git_url,
         readonly: false
       )
+    end
+
+    # Every profile is on disk now, so they can be read rather than assumed.
+    renew_stale_profiles(git_url: git_url)
+  end
+
+  # Re-issue any installed profile that does not carry the entitlements its
+  # target ships, then prove the result.
+  #
+  # match repairs some of this itself, but only when it is not read-only: with a
+  # spaceship session it asks the portal whether each stored profile is still
+  # valid, and enabling a capability invalidates that App ID's profiles, so a
+  # `readonly: false` run deletes and regenerates them. Every archive runs
+  # read-only, which skips that check entirely — and the check that does run is
+  # about Apple's *status* for a profile, not about whether the profile matches
+  # the entitlements a target actually ships. Reading the profile settles both
+  # without depending on Apple having invalidated anything.
+  #
+  # Re-issuing is profile-only; match reuses the stored certificate, so this
+  # cannot walk the account towards Apple's certificate cap.
+  private_lane :renew_stale_profiles do |options|
+    stale = stale_profile_identifiers
+    next if stale.empty?
+
+    UI.important(
+      "Re-issuing the App Store profile for #{stale.join(', ')}: the stored one predates " \
+      "a capability its target now needs. The shared certificate is reused, not reissued."
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: stale,
+      git_url: options[:git_url],
+      readonly: false,
+      force: true
+    )
+
+    still_stale = stale_profile_identifiers
+    next if still_stale.empty?
+
+    UI.user_error!(<<~MSG)
+      Re-cut the App Store profile for #{still_stale.join(', ')} and it still does not
+      carry the entitlements that target ships.
+
+      Apple writes an App ID's *enabled* capabilities into a profile as it is issued,
+      so a brand-new profile that is still missing one means the capability is not
+      actually on the App ID. Check it directly:
+
+        Developer Portal → Certificates, Identifiers & Profiles → Identifiers →
+        the identifier above
+
+      A few capabilities cannot be turned on through the App Store Connect API and
+      have to be ticked there once by hand. Do that, then re-run: the profile is
+      re-cut automatically on the next run.
+
+      Failing here rather than letting this pass as a success: the next archive would
+      fail ~20 minutes in with "doesn't include the ... entitlement" — the same fact,
+      reported later and without naming the App ID as the thing to fix.
+    MSG
+  end
+
+  # Make sure every signed App ID exists and has the capabilities its target's
+  # entitlements require.
+  #
+  # An App ID is not implied by a bundle identifier and its capabilities are not
+  # implied by an entitlements file; both are account state, and both have to be
+  # put there. Doing it from the entitlements the targets actually ship means
+  # adding an entitlement is one edit rather than an edit plus a visit to the
+  # portal that nothing reminds you to make.
+  private_lane :sync_app_capabilities do
+    SIGNED_BUNDLES.each do |bundle|
+      app_id = register_app_identifier(identifier: bundle[:identifier], name: bundle[:name])
+
+      wanted = required_capabilities(bundle[:target])
+      next if wanted.empty?
+
+      enabled = app_id.get_capabilities
+      wanted.each do |capability|
+        next if enabled.any? { |existing| existing.is_type?(capability[:type]) }
+
+        UI.important("Enabling #{capability[:type]} on #{bundle[:identifier]} — its entitlements need it.")
+        app_id.create_capability(capability[:type], settings: capability[:settings])
+      end
     end
   end
 
@@ -540,13 +773,17 @@ platform :ios do
   #
   # An extension gets a Developer Portal identifier only — it is not a separate
   # App Store listing, so nothing is created on the store side.
+  #
+  # Returns the App ID either way, so the caller can go on to read or set its
+  # capabilities without looking it up a second time.
   private_lane :register_app_identifier do |options|
     require "spaceship"
 
     identifier = options[:identifier]
-    if Spaceship::ConnectAPI::BundleId.find(identifier)
+    existing = Spaceship::ConnectAPI::BundleId.find(identifier)
+    if existing
       UI.message("App ID #{identifier} already registered.")
-      next
+      next existing
     end
 
     UI.important("Registering App ID #{identifier} on the Developer Portal.")
@@ -565,9 +802,7 @@ platform :ios do
   lane :certs do
     UI.user_error!("MATCH_GIT_URL must be set to use match") if ENV["MATCH_GIT_URL"].to_s.empty?
 
-    SIGNED_BUNDLES.each do |bundle|
-      register_app_identifier(identifier: bundle[:identifier], name: bundle[:name])
-    end
+    sync_app_capabilities
 
     match(
       type: "appstore",
@@ -575,5 +810,13 @@ platform :ios do
       git_url: ENV.fetch("MATCH_GIT_URL"),
       readonly: false
     )
+
+    # This lane advertises itself as a refresh, so it has to leave storage in a
+    # state the next archive can sign against. The match call above repairs a
+    # profile the portal reports as invalid, which is what a capability enabled a
+    # moment ago normally produces — but "Apple invalidated it" and "it carries
+    # the entitlements this target ships" are not the same claim, and only the
+    # second one is what the archive checks.
+    renew_stale_profiles(git_url: ENV.fetch("MATCH_GIT_URL"))
   end
 end
