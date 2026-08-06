@@ -7,14 +7,17 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** The `FightCampWatch` target now exists and every file here
-> is a member of it, so the Swift is compiled by any build of the project —
-> which it was not before. What that does **not** mean is that it has been seen
-> to compile: there is still no Swift toolchain in the environment this was
-> authored in, so the first `xcodebuild` is the first time any of it is type
-> checked. Expect to fix compile errors on that run; the target existing is what
-> makes them findable at all. The TypeScript side **is** verified: it typechecks,
-> lints, and falls back cleanly everywhere the bridge is absent.
+> **Build status.** The first `xcodebuild` to reach this target has now run, and
+> it was the first time any of the Swift here was type checked. It found exactly
+> one error — `WKExtendedRuntimeSession.shared`, which is not a member of that
+> type — in `TimerModel.start()`. Fixed by deleting the call: the
+> `HKWorkoutSession` started on the next line already provides the background
+> runtime it was reaching for, and the call was `invalidate()`, which would have
+> *ended* a session rather than kept the screen alive. Everything else in the
+> target type checked on the first attempt.
+>
+> Type checking is not running, though. Nothing here has executed on a wrist —
+> see *Verifying* below for what to check on a paired device.
 >
 > The Developer Portal side — the watch App ID and the HealthKit capability on
 > it — is provisioned by the pipeline rather than by hand; see *Signing setup*
@@ -180,3 +183,10 @@ in [`docs/ios-signing.md`](./ios-signing.md).
 - **The watch cannot start a camp session that logs to a specific planned
   slot.** A wrist-started session sends a `start` command, but the phone still
   owns which planned session it counts as.
+- **Background runtime rides on the workout session.** `HKWorkoutSession` is
+  what keeps the timer counting with the wrist down, so a fighter who declines
+  the Health prompt — or is on a watch with no Health data available — gets a
+  timer that can be suspended mid-round, not just a missing BPM. There is no
+  fallback: `WKExtendedRuntimeSession` needs a background mode this bundle does
+  not declare and does not combine with a workout session. Fixing it properly
+  means deciding whether an HR-less session should declare a different mode.

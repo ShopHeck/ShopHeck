@@ -55,11 +55,17 @@ final class TimerModel: ObservableObject {
         guard !isRunning else { return }
         startedAt = Date().addingTimeInterval(-pausedElapsed)
         isRunning = true
-        // Keeps the wrist awake through the session rather than dimming after
-        // the default couple of seconds — a fighter glancing down mid-round
-        // should see the clock, not a black screen.
-        WKExtendedRuntimeSession.shared?.invalidate()
         startTicking()
+        // The HKWorkoutSession started here is also what earns the background
+        // runtime: it keeps the app alive through a wrist-down and makes watchOS
+        // return to the workout on a wrist-raise instead of dimming away after a
+        // couple of seconds.
+        //
+        // Deliberately not WKExtendedRuntimeSession. That is the mechanism for
+        // apps with no workout to run — it needs one of the self-care /
+        // mindfulness / physical-therapy / alarm background modes, and this
+        // bundle declares workout-processing (see WatchApp/Info.plist), so
+        // starting one here would fail at runtime even if it were wanted.
         Task { await heartRate.start() }
         connectivity.send(command: .start)
     }
