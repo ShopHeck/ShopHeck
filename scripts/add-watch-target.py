@@ -17,10 +17,11 @@ recreate would), this rebuilds it identically instead of from memory.
     pip install pbxproj openstep_parser
     python3 scripts/add-watch-target.py
 
-Everything it configures is documented in docs/apple-watch.md § Adding the
-target. The two things it deliberately does NOT do are the two that need an
-Apple Developer account rather than a file edit: registering the watch App ID
-(`app.fightcamptraining.watchkitapp`) and its provisioning profile.
+Everything it configures is documented in docs/apple-watch.md § The target. The
+two things it deliberately does NOT do are the two that need an Apple Developer
+account rather than a file edit: registering the watch App ID
+(`app.fightcamptraining.watchkitapp`) with the HealthKit capability, and its
+provisioning profile. Both are in that doc's § Remaining setup.
 """
 
 import os
