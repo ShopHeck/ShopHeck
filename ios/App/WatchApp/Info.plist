@@ -41,11 +41,30 @@
 		<string>workout-processing</string>
 	</array>
 
-	<!-- Read only, deliberately. WorkoutHeartRate requests `toShare: []` and
-	     never saves the workout — the phone app owns writing to Health. An
-	     NSHealthUpdateUsageDescription here would be a usage string for a
-	     permission this bundle never asks for, which is its own rejection risk. -->
+	<!-- Both strings are required, and the second one is not optional however
+	     read-only the code is. Apple's check is on the ENTITLEMENT, not on what
+	     the bundle actually calls: any bundle carrying com.apple.developer.healthkit
+	     must ship both, and the upload is rejected without them —
+
+	       Missing purpose string in Info.plist ... The Info.plist file for the
+	       "App.app/Watch/FightCampWatch.app" bundle should contain a
+	       NSHealthUpdateUsageDescription key (90683)
+
+	     which lands after a green ~20-minute archive, at upload. This file
+	     previously carried only the share string, on the reasoning that
+	     WorkoutHeartRate requests `toShare: []` and so should not ask for a
+	     permission it never uses. True of the code, but not the rule the
+	     validator applies; the error text says as much ("While your app might
+	     not use these APIs, a purpose string is still required").
+
+	     The write string is honest about the fact that this bundle does not
+	     write: an HKWorkoutSession is capable of saving a workout, and the
+	     wording says who actually does it rather than claiming a behaviour the
+	     watch does not have. WorkoutHeartRate still calls discardWorkout() and
+	     the phone app owns writing to Health. -->
 	<key>NSHealthShareUsageDescription</key>
 	<string>Fight Camp reads your heart rate during a round session to show live training zones.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Fight Camp does not save workouts from your watch — your iPhone writes completed sessions to Apple Health when you log them.</string>
 </dict>
 </plist>

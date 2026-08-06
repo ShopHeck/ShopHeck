@@ -7,17 +7,30 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** The first `xcodebuild` to reach this target has now run, and
-> it was the first time any of the Swift here was type checked. It found exactly
-> one error — `WKExtendedRuntimeSession.shared`, which is not a member of that
-> type — in `TimerModel.start()`. Fixed by deleting the call: the
-> `HKWorkoutSession` started on the next line already provides the background
-> runtime it was reaching for, and the call was `invalidate()`, which would have
-> *ended* a session rather than kept the screen alive. Everything else in the
-> target type checked on the first attempt.
+> **Build status.** This target now **compiles and archives**. Getting there
+> took three rounds, each one uncovering the next because the previous failure
+> had been masking it:
 >
-> Type checking is not running, though. Nothing here has executed on a wrist —
-> see *Verifying* below for what to check on a paired device.
+> 1. **Signing.** The watch App ID had no HealthKit capability, so its profile
+>    was cut without the entitlement and the archive refused to sign. Fixed in
+>    the Fastfile — see [`ios-signing.md`](./ios-signing.md).
+> 2. **Compiling.** With signing clean, the Swift here was type checked for the
+>    first time ever. Exactly one error: `WKExtendedRuntimeSession.shared`, which
+>    is not a member of that type. Deleted — the `HKWorkoutSession` started on
+>    the next line already provides the runtime it reached for, and the call was
+>    `invalidate()`, which would have *ended* a session rather than kept the
+>    screen alive. Everything else type checked first time.
+> 3. **Uploading — still open.** `build_app` then went green (212s), and Apple
+>    rejected the upload instead: a bundle carrying the HealthKit entitlement
+>    must ship `NSHealthUpdateUsageDescription` even when it only reads. The key
+>    is added, which is the documented fix, but **no upload has succeeded yet**.
+>    Apple validates in stages, so a further complaint behind this one is
+>    possible. The next post-merge run is what settles it.
+>
+> Two things are unproven, then. Whether Apple accepts the bundle — see above.
+> And whether any of this *runs*: nothing here has executed on a wrist, and a
+> compiler checking types says nothing about whether the timer keeps time or the
+> bells ring. See *Verifying* below.
 >
 > The Developer Portal side — the watch App ID and the HealthKit capability on
 > it — is provisioned by the pipeline rather than by hand; see *Signing setup*
