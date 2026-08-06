@@ -20,13 +20,17 @@ through a different pipe, so the whole HR half of the app lights up for them.
 >    the next line already provides the runtime it reached for, and the call was
 >    `invalidate()`, which would have *ended* a session rather than kept the
 >    screen alive. Everything else type checked first time.
-> 3. **Uploading.** `build_app` then went green (212s) and Apple rejected the
->    upload: a bundle carrying the HealthKit entitlement must ship
->    `NSHealthUpdateUsageDescription` even when it only reads. Added.
+> 3. **Uploading — still open.** `build_app` then went green (212s), and Apple
+>    rejected the upload instead: a bundle carrying the HealthKit entitlement
+>    must ship `NSHealthUpdateUsageDescription` even when it only reads. The key
+>    is added, which is the documented fix, but **no upload has succeeded yet**.
+>    Apple validates in stages, so a further complaint behind this one is
+>    possible. The next post-merge run is what settles it.
 >
-> What is still unproven is *running*. Nothing here has executed on a wrist —
-> the compiler has checked the types and Apple has accepted the bundle, neither
-> of which says the timer keeps time or the bells ring. See *Verifying* below.
+> Two things are unproven, then. Whether Apple accepts the bundle — see above.
+> And whether any of this *runs*: nothing here has executed on a wrist, and a
+> compiler checking types says nothing about whether the timer keeps time or the
+> bells ring. See *Verifying* below.
 >
 > The Developer Portal side — the watch App ID and the HealthKit capability on
 > it — is provisioned by the pipeline rather than by hand; see *Signing setup*
