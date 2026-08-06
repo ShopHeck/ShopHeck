@@ -17,7 +17,7 @@ const PHASE_COPY: Record<CutPhase, { title: string; blurb: string; cta: string }
   },
   hold: {
     title: 'AI Cut Coach',
-    blurb: 'You are on weight with time to spare. Guidance on holding it there without stalling your training.',
+    blurb: 'You are at or under target. Guidance on holding it there without stalling your training — tick "official weigh-in" when you log the real one and this switches to rehydration.',
     cta: 'Get Hold Plan',
   },
   rehydrate: {
@@ -101,7 +101,7 @@ function buildRehydratePrompt(camp: FightCamp, user: FighterProfile | null, proj
 - ${user?.name ?? 'Athlete'} | ${camp.sport} | ${camp.weightClass} | ${user?.experienceLevel ?? 'unknown level'}
 - Fight format: ${camp.rounds} × ${camp.roundDuration} min rounds
 
-## Cut just completed
+## Cut just completed (fighter has confirmed the official weigh-in)
 - ${formatWeight(proj.startWeight, unit)} → ${formatWeight(proj.targetWeight, unit)} over the camp (${formatWeightDelta(cutSize, unit)} total)
 - On the scale now at ${formatWeight(proj.currentWeight, unit)}
 - Fight ${camp.fightDate ? format(parseISO(camp.fightDate), 'MMM d') : 'n/a'} · ${proj.daysRemaining} day${proj.daysRemaining === 1 ? '' : 's'} out

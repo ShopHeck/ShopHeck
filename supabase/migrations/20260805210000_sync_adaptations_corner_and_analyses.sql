@@ -42,3 +42,15 @@ alter table public.user_state
 
 comment on column public.user_state.ai_analyses is
   'AiAnalyses map, keyed "${kind}:${cloud subject uuid}" so the subject id survives a pull onto another device.';
+
+-- Whether a weigh-in is the fight's OFFICIAL one, as opposed to a training
+-- weigh-in. The fighter marks it; nothing infers it.
+--
+-- Load-bearing rather than descriptive: the AI cut panel switches from "make
+-- weight" to "rehydrate" on this flag alone. It used to switch on being at
+-- target inside the last seven days, which reads a fighter holding weight four
+-- days out as one who has finished their cut — and then tells them how much to
+-- put back on before the bell. Being wrong in that direction misses weight, so
+-- the app asks instead of guessing, and without an answer stays on hold advice.
+alter table public.weight_entries
+  add column if not exists official_weigh_in boolean not null default false;

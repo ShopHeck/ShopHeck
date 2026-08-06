@@ -58,6 +58,7 @@ export default function WeightTracker() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
+  const [officialWeighIn, setOfficialWeighIn] = useState(false);
 
   if (!activeCamp) return null;
 
@@ -153,11 +154,13 @@ export default function WeightTracker() {
         date,
         weight: parsedWeight,
         notes,
+        officialWeighIn: officialWeighIn || undefined,
       },
     });
     void writeWeightToHealth({ date, weight: parsedWeight });
     setWeight('');
     setNotes('');
+    setOfficialWeighIn(false);
     setShowModal(false);
   }
 
@@ -476,6 +479,33 @@ export default function WeightTracker() {
                 </p>
               </div>
             )}
+            {/* The one fact the app cannot work out for itself: whether the
+                fighter has actually been on the official scale. Being at target
+                four days out is a fighter holding weight, not one who has
+                weighed in, and the difference decides whether the AI panel
+                talks about holding or about refuelling — advice that is
+                actively wrong if given early. Shown only once a fight is close
+                enough for the question to be real. */}
+            {daysUntilFight !== null && daysUntilFight <= 14 && (
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 w-5 h-5 flex-shrink-0 accent-[var(--accent-flame)]"
+                  checked={officialWeighIn}
+                  onChange={e => setOfficialWeighIn(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-white">
+                    This is my official weigh-in
+                  </span>
+                  <span className="block text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    Tick this once you're off the promotion's scale. It switches
+                    your AI coach from making weight to rehydrating.
+                  </span>
+                </span>
+              </label>
+            )}
+
             <div>
               <label className="block">
                 <span className="label">Notes (optional)</span>

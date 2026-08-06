@@ -115,6 +115,15 @@ export interface WeightEntry {
   weight: number;
   notes: string;
   createdAt: string;
+  /**
+   * This entry is the fight's official weigh-in, not a training weigh-in.
+   *
+   * The fighter tells us; nothing infers it. Whether the cut is *over* cannot be
+   * derived from the number and the calendar — being at target four days out is
+   * a fighter holding weight, and treating it as a completed cut is how the app
+   * would come to recommend refuelling before the scale. See `cutPhase`.
+   */
+  officialWeighIn?: boolean;
 }
 
 export interface MacroEntry {

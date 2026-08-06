@@ -181,6 +181,11 @@ create table if not exists public.weight_entries (
   date          date not null,
   weight        numeric not null,
   notes         text default '',
+  -- The fight's official weigh-in, as opposed to a training one. Marked by the
+  -- fighter, never inferred — the AI cut panel switches from "make weight" to
+  -- "rehydrate" on this alone, and guessing it from the calendar is how the app
+  -- would recommend refuelling before the scale.
+  official_weigh_in boolean not null default false,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   deleted_at    timestamptz

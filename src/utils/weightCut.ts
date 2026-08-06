@@ -43,6 +43,13 @@ export interface CutProjection {
    * weigh-ins" hint instead of presenting those as a prediction.
    */
   trendEstablished: boolean;
+  /**
+   * The fighter has marked a weigh-in for this camp as the official one.
+   *
+   * Recorded, never inferred — see `cutPhase` for why the calendar cannot
+   * answer this.
+   */
+  weighedIn: boolean;
 }
 
 /**
@@ -118,6 +125,7 @@ export function computeCutProjection(
     projectedMiss: toGo,
     daysEarlyAtRate: null,
     trendEstablished: false,
+    weighedIn: campEntries.some(e => e.officialWeighIn),
   };
 
   // Off-season / no scheduled weigh-in → nothing to project against.
@@ -130,10 +138,9 @@ export function computeCutProjection(
   const daysRemaining = Math.max(0, differenceInCalendarDays(fight, now));
 
   // Already at or under target. The calendar fields are filled in rather than
-  // left at the `base` zeros: a made cut still has a fight date, and how far
-  // away it is decides whether the fighter is holding weight or refuelling
-  // (see cutPhase). Reporting 0 days remaining here said every made cut was
-  // weigh-in day.
+  // left at the `base` zeros: a made cut still has a fight date, and both the
+  // UI and the AI prompts report how far away it is. Reporting 0 days remaining
+  // here said every made cut was weigh-in day.
   if (currentWeight <= targetWeight) {
     return { ...base, trackable: true, status: 'made', totalDays, daysElapsed, daysRemaining };
   }
@@ -214,10 +221,22 @@ export function computeCutProjection(
  * Which question the AI cut panel should be answering.
  *
  * A made cut is not the end of the weight problem, it is the middle of it: the
- * fighter still has to hold the weight if the fight is weeks out, and refuel if
- * it is days out. The panel used to be hidden outright on `made`, which removed
- * the feature at the moment it is worth the most — two rounds of a bad refuel
- * cost more than a slow cut does.
+ * fighter still has to hold the weight until the scale, and refuel after it. The
+ * panel used to be hidden outright on `made`, which removed the feature at the
+ * moment it is worth the most — two rounds of a bad refuel cost more than a slow
+ * cut does.
+ *
+ * REHYDRATION REQUIRES A RECORDED WEIGH-IN, NOT A DATE. An earlier version read
+ * "at or under target, and inside the last seven days" as "the cut is done",
+ * which is wrong in the dangerous direction: a fighter who hits target four days
+ * out is holding weight, and would have been told how much to put back on
+ * before the bell — advice that, followed, misses weight. Nothing about the
+ * number or the calendar says the fighter has been on the official scale, so the
+ * fighter marks the entry (`WeightEntry.officialWeighIn`) and until they do, at
+ * or under target means `hold`, whatever the countdown says.
+ *
+ * `made` is still required alongside it. A fighter who weighed in OVER target
+ * has hours to re-cut, not a refuel to plan, so they stay in `cut`.
  *
  * Lives here rather than in the component so the phase is derived from the
  * projection by the same module that produces it, and so it is testable without
@@ -225,10 +244,7 @@ export function computeCutProjection(
  */
 export type CutPhase = 'cut' | 'hold' | 'rehydrate';
 
-/** Days out at which "made weight" stops meaning hold and starts meaning refuel. */
-export const REHYDRATION_WINDOW_DAYS = 7;
-
 export function cutPhase(proj: CutProjection): CutPhase {
   if (proj.status !== 'made') return 'cut';
-  return proj.daysRemaining <= REHYDRATION_WINDOW_DAYS ? 'rehydrate' : 'hold';
+  return proj.weighedIn ? 'rehydrate' : 'hold';
 }

@@ -763,6 +763,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           notes: string | null
+          official_weigh_in: boolean
           updated_at: string
           user_id: string
           weight: number
@@ -774,6 +775,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           notes?: string | null
+          official_weigh_in?: boolean
           updated_at?: string
           user_id: string
           weight: number
@@ -785,6 +787,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           notes?: string | null
+          official_weigh_in?: boolean
           updated_at?: string
           user_id?: string
           weight?: number

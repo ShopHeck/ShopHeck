@@ -746,3 +746,105 @@ describe('mergeCloud — adaptations, corner sessions and analyses', () => {
     expect(Object.keys(merged.aiAnalyses ?? {})).toEqual(['post-fight:f-1']);
   });
 });
+
+// ── The embedded-record sync ledger ─────────────────────────────────────────
+//
+// mergeCloud decides "deleted here" vs "never seen" from `previouslySynced`,
+// which pullState snapshots from the id map's keys. Adaptations and corner
+// sessions never go through `uuidFor` — they live inside a camp's jsonb — so
+// they were absent from that map, and reverting one offline then reopening
+// online restored it from the stale cloud copy.
+//
+// The merge tests above seed `previouslySynced` directly, which is the right
+// way to test mergeCloud's contract but says nothing about whether anything
+// ever populates it for these ids. This is that missing half.
+
+// Async, and deliberately so: the first version restored the global in a
+// synchronous `finally`, which ran the instant `fn()` handed back its promise —
+// so pullState did its work with localStorage already torn down.
+async function withLocalStorage<T>(fn: () => Promise<T>): Promise<T> {
+  const store = new Map<string, string>();
+  const stub = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+  };
+  const original = (globalThis as { localStorage?: unknown }).localStorage;
+  Object.defineProperty(globalThis, 'localStorage', { value: stub, configurable: true });
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(globalThis, 'localStorage', { value: original, configurable: true });
+  }
+}
+
+function idMap(): Record<string, string> {
+  return JSON.parse(localStorage.getItem('fightcamp_sync_idmap') ?? '{}');
+}
+
+/** A minimal cloud camp row carrying one embedded adaptation and session. */
+function campRow() {
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    user_id: 'user-1',
+    fight_date: '2026-09-05',
+    opponent: null,
+    weight_class: 'Lightweight',
+    current_weight: 168,
+    target_weight: 155,
+    rounds: 3,
+    round_duration: 3,
+    sport: 'Boxing',
+    experience: 'Amateur',
+    camp_weeks: 8,
+    start_date: '2026-07-11',
+    is_off_season: false,
+    off_season_goal: null,
+    game_plan: null,
+    completed_sessions: null,
+    day_overrides: null,
+    adaptations: [{ id: 'adapt-1', weekNumber: 3, kind: 'deload', reasons: [], signals: {}, createdAt: '2026-08-01T00:00:00.000Z' }],
+    dismissed_adaptations: [],
+    corner_sessions: [{ id: 'corner-1', startedAt: '2026-08-01T20:00:00.000Z', totalRounds: 3, roundSeconds: 180, restSeconds: 60, rounds: [] }],
+    created_at: '2026-07-11T00:00:00.000Z',
+    updated_at: '2026-08-01T00:00:00.000Z',
+    deleted_at: null,
+  };
+}
+
+describe('pullState — embedded record ledger', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(mock.rowsByTable)) delete mock.rowsByTable[k];
+  });
+
+  it('records embedded adaptation and corner-session ids as synced', async () => {
+    mock.rowsByTable.camps = [campRow()];
+
+    const seen = await withLocalStorage(async () => {
+      const res = await pullState('user-1');
+      expect(res.ok).toBe(true);
+      // Not previously synced on THIS pull — that is what lets a first restore
+      // bring them down at all.
+      expect(res.snapshot!.previouslySynced.has('adapt-1')).toBe(false);
+      return idMap();
+    });
+
+    // …but they are in the ledger afterwards, so the NEXT pull knows a local
+    // absence is a delete rather than a record it has never met.
+    expect(seen['adapt-1']).toBe('adapt-1');
+    expect(seen['corner-1']).toBe('corner-1');
+  });
+
+  it('carries them into previouslySynced on the following pull', async () => {
+    mock.rowsByTable.camps = [campRow()];
+
+    const second = await withLocalStorage(async () => {
+      await pullState('user-1');
+      const res = await pullState('user-1');
+      return res.snapshot!;
+    });
+
+    expect(second.previouslySynced.has('adapt-1')).toBe(true);
+    expect(second.previouslySynced.has('corner-1')).toBe(true);
+  });
+});

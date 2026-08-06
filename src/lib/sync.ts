@@ -133,6 +133,27 @@ function hashRow(row: unknown): string {
   return (h >>> 0).toString(36);
 }
 
+/**
+ * Record an embedded record's id in the sync ledger.
+ *
+ * Adaptations and corner sessions live inside a camp's jsonb, so they never go
+ * through `uuidFor` — their id IS their cloud id, stored verbatim. That left
+ * them out of the id map, and the id map is not only a translation table: its
+ * keys are this device's "I have synced this" ledger, which `pullState`
+ * snapshots into `previouslySynced` so `mergeCloud` can tell a locally-deleted
+ * record from one it has never seen.
+ *
+ * Without this, reverting an adaptation or discarding a corner session offline
+ * and then reopening online restored it: the pull saw an id it had no record
+ * of, called it new, and merged the stale cloud copy back in.
+ *
+ * Mapping the id to itself is not a placeholder — for an embedded record the
+ * local id and the cloud id are genuinely the same string.
+ */
+function recordEmbedded(map: Record<string, string>, ids: Iterable<string>): void {
+  for (const id of ids) map[id] = id;
+}
+
 /** Stable uuid for a local id, minted once and persisted. */
 function makeUuidFor(map: Record<string, string>) {
   return (localId: string): string => {
@@ -341,6 +362,10 @@ export async function pushState(
       const dismissed = (state.dismissedAdaptations ?? [])
         .filter(k => k.startsWith(dismissedPrefix))
         .map(k => k.slice(dismissedPrefix.length));
+      // Ledger them as synced, so a later revert or discard reads as a delete
+      // rather than as a record the next pull has never seen.
+      recordEmbedded(map, adaptations.map(a => a.id));
+      recordEmbedded(map, cornerSessions.map(s => s.id));
       return {
         id: uuidFor(c.id),
         user_id: userId,
@@ -400,7 +425,8 @@ export async function pushState(
 
     const err4 = await run('weight_entries', (state.weightEntries ?? []).filter(e => childOf(e.campId)).map(e => ({
       id: uuidFor(e.id), user_id: userId, camp_id: uuidFor(e.campId),
-      date: e.date, weight: e.weight, notes: e.notes ?? '', created_at: ts(e, now),
+      date: e.date, weight: e.weight, notes: e.notes ?? '',
+      official_weigh_in: e.officialWeighIn ?? false, created_at: ts(e, now),
     })), 'id', true);
     if (err4) return fail(err4);
 
@@ -708,12 +734,19 @@ export async function pullState(userId: string): Promise<PullResult> {
       if (gp) gamePlans[campLocalId] = { ...gp, campId: campLocalId };
       for (const a of (c.adaptations ?? []) as Omit<CampAdaptation, 'campId'>[]) {
         campAdaptations.push({ ...a, campId: campLocalId });
+        // Same ledger entry the top-level rows get from `lid()`.
+        // `previouslySynced` was snapshotted before this loop, so an id recorded
+        // here still counts as new on THIS pull — which is what makes restore
+        // work — and as previously-seen on the next one, which is what makes a
+        // later revert stick instead of being undone by the stale cloud copy.
+        recordEmbedded(map, [a.id]);
       }
       for (const rel of (c.dismissed_adaptations ?? []) as string[]) {
         dismissedAdaptations.push(`${campLocalId}:${rel}`);
       }
       for (const s of (c.corner_sessions ?? []) as unknown as Omit<CornerSession, 'campId'>[]) {
         cornerSessions.push({ ...s, campId: campLocalId });
+        recordEmbedded(map, [s.id]);
       }
       return {
         id: campLocalId,
@@ -796,6 +829,10 @@ export async function pullState(userId: string): Promise<PullResult> {
       weightEntries: live(weightQ.data as Row<'weight_entries'>[] | null).map((e: Row<'weight_entries'>) => ({
         id: lid(e.id), campId: lid(e.camp_id), date: e.date, weight: e.weight,
         notes: e.notes ?? '', createdAt: e.created_at,
+        // Undefined rather than false when unset, matching how the flag is
+        // written locally — an entry that is not the official weigh-in simply
+        // does not carry the key.
+        officialWeighIn: e.official_weigh_in || undefined,
       })),
       nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) => ({
         id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,

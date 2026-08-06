@@ -5,7 +5,8 @@ work at the moment it was written and is not maintained afterwards. The live
 tracker is [`open-work.md`](./open-work.md); the procedure is
 [`app-store-submission.md`](./app-store-submission.md).
 
-Six commits (`fbeb1aa..6566e1e`). Every engineering item that was open in
+Eight commits (`fbeb1aa..HEAD`), two of them responses to review on PR #94.
+Every engineering item that was open in
 `open-work.md` is closed, plus a redesign of the first screen a new user sees.
 Everything still outstanding needs an account or a device rather than a code
 change, and is listed at the bottom.
@@ -30,8 +31,9 @@ team table sorted by who needs you first); Fighters is the roster.
 
 **The AI cut panel no longer disappears at the finish line.** It was hidden the
 moment a fighter hit their target weight — removing the feature at the point
-fight-week rehydration is the most consequential thing they do. It now changes
-its question instead: cut, hold, or rehydrate.
+rehydration is the most consequential thing they do. It now changes its question
+instead: cut, hold, or rehydrate. Which one is decided by the fighter marking
+their official weigh-in, never by the calendar; see below.
 
 **Password reset opens the app.** A fighter who resets from the iOS app used to
 set their new password in Safari and come back to sign in. The reset link is now
@@ -84,7 +86,19 @@ and a coach who is simply signed out should not be shown a paywall.
 is asking. All three run through the same `cut` feature server-side, so the
 Fighter Pro gate, token budget and safety framing are unchanged.
 
-This surfaced a latent bug worth noting on its own: `computeCutProjection`
+**Rehydration requires a recorded weigh-in, not a date.** The first version of
+this read "at or under target, inside the last seven days" as "the cut is done",
+which is wrong in the dangerous direction: a fighter who hits target four days
+out is *holding* weight, and would have been shown how much to put back on
+before the bell — advice that, followed, misses weight. Nothing about the number
+or the calendar says a fighter has been on the official scale, so the fighter
+marks it (`WeightEntry.officialWeighIn`, a checkbox in the log-weight sheet
+inside the last fortnight) and until they do, at or under target means *hold*
+whatever the countdown says. A fighter who weighed in *over* target stays in
+`cut`: they have hours to re-cut, not a refuel to plan. Caught in review on
+PR #94.
+
+This also surfaced a latent bug worth noting on its own: `computeCutProjection`
 returned the zeroed default projection for a made cut, so `daysRemaining` was 0
 for **every fighter who hit their target** — the model said each of them was on
 weigh-in day. Fixed, with tests (`tests/cutPhase.test.ts`).
@@ -130,8 +144,20 @@ exception to both — a post-fight analysis hangs off a fight result rather than
 camp, and a coach must not read one, so they live on `user_state`, the fighter's
 own row.
 
-Seven new merge tests (`tests/sync.test.ts`) pin the delete semantics, which are
-where this class of change goes wrong.
+Deleting an embedded record needed its own wiring, and the first version did not
+have it. `mergeCloud` tells "deleted here" from "never seen" using
+`previouslySynced`, which is the key set of the local↔cloud id map — and embedded
+records never enter that map, because their id *is* their cloud id. So reverting
+an adaptation or discarding a corner session offline, then reopening online,
+restored it from the stale cloud copy. Both push and pull now ledger these ids
+(mapped to themselves, which is simply true for an embedded record). Caught in
+review on PR #94.
+
+Nine merge tests plus two ledger tests (`tests/sync.test.ts`) pin the delete
+semantics, which are where this class of change goes wrong. The ledger pair
+covers what the merge tests structurally cannot: they seed `previouslySynced`
+directly, so they prove `mergeCloud`'s contract while saying nothing about
+whether anything ever populates it.
 
 ### 6. Apple Watch target
 
@@ -161,8 +187,9 @@ file exists to prevent.
 npm run quality   # lint · 276 tests · security regression · functions tsc · build
 ```
 
-Green as of this commit. Coverage added this pass: 5 tests for the cut-phase
-derivation, 7 for the new merge paths.
+Green as of this commit. Coverage added this pass: 8 tests for the cut-phase
+derivation, 9 for the new merge paths, 2 for the embedded-id ledger. The ledger
+pair was mutation-checked — stubbing out `recordEmbedded` fails both.
 
 The onboarding flow was also driven end to end in a real browser (profile →
 camp → review → Pro offer → finish, plus the off-season variant) and each screen

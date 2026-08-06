@@ -40,9 +40,10 @@ submission hits them.
 
 ### Apply the sync migration in Supabase
 
-Adaptations, corner sessions and saved AI analyses now push to columns that do
-not exist until the migration runs. `pushState` will fail on `user_state` and
-the sync banner will show an error.
+Adaptations, corner sessions, saved AI analyses and the official-weigh-in flag
+now push to columns that do not exist until the migration runs. `pushState` will
+fail on `user_state` and `weight_entries`, and the sync banner will show an
+error.
 
 ```sh
 # Supabase Dashboard → SQL Editor → run:
