@@ -17,6 +17,7 @@ import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import { tabViewIds } from './components/shared/navTabs';
 import { nextHistory, popHistory, type NavigateOptions } from './utils/navigation';
+import type { TimerPrefill } from './utils/timerSession';
 import Header from './components/shared/Header';
 import AdBanner from './components/shared/AdBanner';
 import ProGate from './components/shared/ProGate';
@@ -49,21 +50,41 @@ const ProgressScreen   = lazy(() => import('./components/gamification/ProgressSc
 
 import CelebrationToast from './components/gamification/CelebrationToast';
 
-// Camp-dependent tabs used to render a bare blank under the header when no
-// camp existed (their components return null) — a dead end with no cue. One
-// shared state; the button lands on the dashboard's mode chooser. Module-level
-// so its identity is stable across App re-renders.
-function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => void }) {
+/**
+ * The one shape every "this view has nothing to show" case renders.
+ *
+ * Views used to render a bare blank under the header when their precondition
+ * was unmet — a dead end whose only exit was the tab bar, and which looked
+ * identical to a crash. Every `view === …` branch below now has an else, so a
+ * view that renders nothing is no longer expressible. Module-level so its
+ * identity is stable across App re-renders.
+ */
+function EmptyState({ title, body, actionLabel, onAction }: {
+  title: string;
+  body: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
   return (
     <div className="mx-4 mt-10 card text-center py-12">
-      <p className="text-gray-400 font-semibold">No active camp</p>
-      <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">
-        {feature} works inside a fight camp or off-season block.
-      </p>
-      <button onClick={onSetUp} className="btn-primary mt-4 mx-auto text-sm py-2 px-4">
-        Set up training
+      <p className="text-gray-400 font-semibold">{title}</p>
+      <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">{body}</p>
+      <button onClick={onAction} className="btn-primary mt-4 mx-auto text-sm py-2 px-4">
+        {actionLabel}
       </button>
     </div>
+  );
+}
+
+/** Camp-dependent views. The button lands on the dashboard's mode chooser. */
+function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => void }) {
+  return (
+    <EmptyState
+      title="No active camp"
+      body={`${feature} works inside a fight camp or off-season block.`}
+      actionLabel="Set up training"
+      onAction={onSetUp}
+    />
   );
 }
 
@@ -157,6 +178,7 @@ function AppShell() {
   const [showNewOffSeason, setShowNewOffSeason] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [logPrefill, setLogPrefill] = useState<LogPrefill | null>(null);
+  const [timerPrefill, setTimerPrefill] = useState<TimerPrefill | null>(null);
   /** Fight being viewed in the breakdown screen. */
   const [activeFightId, setActiveFightId] = useState<string | null>(null);
   /** When editing an existing fight result, pass the id into the form. */
@@ -205,6 +227,12 @@ function AppShell() {
   function navigateToLog(prefill?: LogPrefill) {
     if (prefill) setLogPrefill(prefill);
     navigate('log');
+  }
+
+  /** Open the round timer already set up for a session on the plan. */
+  function navigateToTimer(prefill: TimerPrefill) {
+    setTimerPrefill(prefill);
+    navigate('timer');
   }
 
   // Free tier is capped at a single camp; creating another requires Fighter Pro.
@@ -291,7 +319,12 @@ function AppShell() {
               <CoachDashboard mode="overview" onNavigate={v => navigate(v as View)} />
             )}
             {view === 'planner' && (
-              camp ? <WeeklyPlanner onLogSession={(prefill) => navigateToLog(prefill)} /> : <NoCampState feature="The weekly plan" onSetUp={() => navigate('dashboard')} />
+              camp ? (
+                <WeeklyPlanner
+                  onLogSession={(prefill) => navigateToLog(prefill)}
+                  onStartTimer={navigateToTimer}
+                />
+              ) : <NoCampState feature="The weekly plan" onSetUp={() => navigate('dashboard')} />
             )}
             {view === 'log' && (
               camp ? (
@@ -301,7 +334,12 @@ function AppShell() {
                 />
               ) : <NoCampState feature="Training logging" onSetUp={() => navigate('dashboard')} />
             )}
-            {view === 'timer'           && <RoundTimer />}
+            {view === 'timer'           && (
+              <RoundTimer
+                prefill={timerPrefill}
+                onPrefillConsumed={() => setTimerPrefill(null)}
+              />
+            )}
             {view === 'weight'          && (camp ? <WeightTracker /> : <NoCampState feature="Weight tracking" onSetUp={() => navigate('dashboard')} />)}
             {view === 'nutrition'       && <ProGate required="fighter_pro" page feature="Nutrition Tracker" featureDescription="Log meals, water and macros through your camp, with targets that adjust as you cut." bullets={['One-tap hydration & meal-quality tracking', 'Macro targets auto-suggested from your camp', 'Seven-day history at a glance']}><NutritionTracker /></ProGate>}
             {view === 'progress'        && <ProgressCharts />}
@@ -317,26 +355,40 @@ function AppShell() {
                 onOpenFight={(id) => { setActiveFightId(id); navigate('fight-breakdown'); }}
               />
             )}
-            {view === 'fight-log' && camp && (
-              <FightResultForm
-                camp={camp}
-                existingId={editingFightId ?? undefined}
-                onDone={(id) => {
-                  setEditingFightId(null);
-                  setActiveFightId(id);
-                  // Replace, not push: backing out of the breakdown must not
-                  // land on a freshly mounted (and now blank) result form.
-                  navigate('fight-breakdown', { replace: true });
-                }}
-                onCancel={() => { setEditingFightId(null); goBack(); }}
-              />
+            {view === 'fight-log' && (
+              camp ? (
+                <FightResultForm
+                  camp={camp}
+                  existingId={editingFightId ?? undefined}
+                  onDone={(id) => {
+                    setEditingFightId(null);
+                    setActiveFightId(id);
+                    // Replace, not push: backing out of the breakdown must not
+                    // land on a freshly mounted (and now blank) result form.
+                    navigate('fight-breakdown', { replace: true });
+                  }}
+                  onCancel={() => { setEditingFightId(null); goBack(); }}
+                />
+              ) : <NoCampState feature="Logging a fight result" onSetUp={() => navigate('dashboard')} />
             )}
-            {view === 'fight-breakdown' && activeFightId && (
-              <FightBreakdown
-                fightId={activeFightId}
-                onBack={goBack}
-                onEdit={(id) => { setEditingFightId(id); navigate('fight-log'); }}
-              />
+            {view === 'fight-breakdown' && (
+              activeFightId ? (
+                <FightBreakdown
+                  fightId={activeFightId}
+                  onBack={goBack}
+                  onEdit={(id) => { setEditingFightId(id); navigate('fight-log'); }}
+                />
+              ) : (
+                // FightBreakdown carries its own "result not found" state, but
+                // it needs an id to render at all — with none, the branch used
+                // to collapse to nothing and the guard never got to fire.
+                <EmptyState
+                  title="No fight selected"
+                  body="Open a fight from your camp history to see its breakdown."
+                  actionLabel="Camp history"
+                  onAction={() => navigate('camp-history')}
+                />
+              )
             )}
             {view === 'corner' && (
               <CornerMode

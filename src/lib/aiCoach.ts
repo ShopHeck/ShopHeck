@@ -6,7 +6,7 @@
 // showing a raw message.
 
 import { Capacitor } from '@capacitor/core';
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 
 export type AiFeature = 'insights' | 'cut' | 'postfight';
 
@@ -45,6 +45,7 @@ export async function streamAiCoach(
   prompt: string,
   onDelta: (text: string) => void,
 ): Promise<string> {
+  const supabase = await getSupabase();
   if (!supabase) throw new AiCoachError('signin_required', SIGNIN_MESSAGE);
 
   const { data } = await supabase.auth.getSession();

@@ -5,13 +5,13 @@ import {
   Plus, X, Bluetooth, BluetoothOff, Bell, SkipForward
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRoundTimer, PRESETS, fmt } from '../hooks/useRoundTimer';
+import { useRoundTimer, PRESETS, fmt, hasLiveTimerSession } from '../hooks/useRoundTimer';
 import { loadCustomPresets, saveCustomPresets, generateId } from '../utils/storage';
 import { useApp } from '../context/AppContext';
 import { isPro as hasProAccess } from '../utils/subscription';
 import { writeWorkoutToHealth } from '../utils/healthSync';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
-import { timerSessionMinutes } from '../utils/timerSession';
+import { timerSessionMinutes, type TimerPrefill } from '../utils/timerSession';
 import type { CustomTimerPreset } from '../types';
 import ProGate from './shared/ProGate';
 import { useDialog } from '../hooks/useDialog';
@@ -121,7 +121,18 @@ function PresetModal({ onSave, onClose }: PresetModalProps) {
 
 // ─── Main Component ────────────────────────────────────────────────────────
 
-export default function RoundTimer() {
+interface RoundTimerProps {
+  /** Settings handed over from a session on the plan. See `timerPrefillForSession`. */
+  prefill?: TimerPrefill | null;
+  /** Called once the prefill has been applied (or deliberately declined). */
+  onPrefillConsumed?: () => void;
+}
+
+/** The built-in 'Custom' chip — looked up rather than hard-coded at 4 so
+ *  reordering PRESETS cannot silently point this at 'HIIT'. */
+const CUSTOM_PRESET_INDEX = PRESETS.findIndex(p => p.label === 'Custom');
+
+export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerProps = {}) {
   const { state, dispatch } = useApp();
   const timer = useRoundTimer();
   const {
@@ -154,6 +165,42 @@ export default function RoundTimer() {
     if (!new URLSearchParams(window.location.search).has('shot')) return;
     (window as unknown as { __timerStartPause?: () => void }).__timerStartPause = onStartPause;
   }, [onStartPause]);
+
+  /** What the current settings were loaded from, when they came from the plan. */
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
+
+  /**
+   * Apply settings handed over from the weekly plan.
+   *
+   * Applied through the hook's own setters (which keep the clock's refs in
+   * step) and via `selectPreset(Custom)` first, so the chip row cannot claim
+   * "Boxing" while showing numbers Boxing does not have — `selectPreset` also
+   * clears any finished session back to idle.
+   *
+   * Declined outright when a session is on the clock. A prefill arriving
+   * mid-round would rewrite the round count and length under a fighter who is
+   * three rounds into using them; the running session is worth more than the
+   * handover, so it wins and the prefill is dropped.
+   *
+   * `hasLiveTimerSession()` is the load-bearing half of that guard, not a
+   * belt-and-braces extra. This view unmounts when the fighter goes back to the
+   * plan, so on the remount that *delivers* the prefill, `phase` and
+   * `isRunning` are still their initial idle values — the hook's restore effect
+   * has not landed yet. Reading state alone let a second tap rewrite a running
+   * session's rounds out from under it.
+   */
+  useEffect(() => {
+    if (!prefill) return;
+    const busy = isRunning || (phase !== 'idle' && phase !== 'done') || hasLiveTimerSession();
+    if (!busy) {
+      if (CUSTOM_PRESET_INDEX >= 0) selectPreset(CUSTOM_PRESET_INDEX);
+      setRounds(prefill.rounds);
+      setWorkSec(prefill.workSec);
+      setRestSec(prefill.restSec);
+      setPlanLabel(prefill.label);
+    }
+    onPrefillConsumed?.();
+  }, [prefill, isRunning, phase, selectPreset, setRounds, setWorkSec, setRestSec, onPrefillConsumed]);
 
   // Simple absolute-value adjuster for settings rows
   const adj = (setter: (v: number) => void, current: number, delta: number, min: number, max: number) => {
@@ -393,7 +440,7 @@ export default function RoundTimer() {
         {PRESETS.map((p, i) => (
           <button
             key={p.label}
-            onClick={() => selectPreset(i)}
+            onClick={() => { setPlanLabel(null); selectPreset(i); }}
             disabled={isRunning}
             className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               selectedPreset === i
@@ -410,6 +457,7 @@ export default function RoundTimer() {
               onClick={() => {
                 const idx = PRESETS.length + i;
                 const preset = customPresets[i];
+                setPlanLabel(null);
                 setRounds(preset.rounds);
                 setWorkSec(preset.workSec);
                 setRestSec(preset.restSec);
@@ -453,6 +501,14 @@ export default function RoundTimer() {
           </ProGate>
         )}
       </div>
+
+      {/* Where these settings came from, when they came from the plan. Without
+          it the timer just silently holds different numbers than last time. */}
+      {planLabel && (
+        <p className="mx-4 mt-2 text-[11px] text-gray-450">
+          Set up from your plan · <span className="text-brand-400 font-semibold">{planLabel}</span>
+        </p>
+      )}
 
       {/* Main Timer Display */}
       <div className="mx-4 mt-6 flex flex-col items-center">

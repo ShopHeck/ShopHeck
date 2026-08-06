@@ -59,10 +59,20 @@ export default defineConfig({
         // code preloaded for users who may never open a chart. Left unnamed,
         // Rollup keeps recharts inside the async chunks that actually use it,
         // and date-fns/lucide-react tree-shake into whatever imports them.
+        //
+        // `supabase: ['@supabase/supabase-js']` left for the same reason once
+        // `lib/supabase.ts` stopped importing the SDK statically (see
+        // `getSupabase`). Naming it would have re-promoted the 203 kB SDK to a
+        // preloaded static import of the entry and undone the deferral.
+        //
+        // Sentry stays named and stays static: `main.tsx` renders
+        // `SentryReact.ErrorBoundary` as the app's crash boundary, so deferring
+        // it would leave a window on every cold start where a crash is caught
+        // by nothing and reported to nobody. 11 kB gzipped is the right price
+        // for that.
         manualChunks: {
           vendor: ['react', 'react-dom'],
           sentry: ['@sentry/capacitor', '@sentry/react'],
-          supabase: ['@supabase/supabase-js'],
         },
       },
     },
