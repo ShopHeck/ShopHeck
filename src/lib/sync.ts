@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 import { generateId } from '../utils/storage';
 import type { Database } from './database.types';
 import type {
@@ -200,6 +200,7 @@ export async function pushState(
   state: AppState,
   opts: PushOptions = {},
 ): Promise<PushResult> {
+  const supabase = await getSupabase();
   if (!supabase) return { ok: false, pushed: 0, pruned: 0, error: 'Cloud sync is not configured.' };
 
   const map = loadIdMap();
@@ -605,6 +606,7 @@ async function selectAll<T>(
 }
 
 export async function pullState(userId: string): Promise<PullResult> {
+  const supabase = await getSupabase();
   if (!supabase) return { ok: false, error: 'Cloud sync is not configured.' };
   // Non-null local: TypeScript cannot keep the module-level nullable import
   // narrowed inside the paging closures below (same pattern as AuthContext).
@@ -1072,6 +1074,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
  *     active, so the caller can downgrade a previously server-verified user.
  */
 export async function fetchServerSubscription(userId: string): Promise<SubscriptionState | null> {
+  const supabase = await getSupabase();
   if (!supabase) return null;
   try {
     const [stripeQ, rcQ] = await Promise.all([

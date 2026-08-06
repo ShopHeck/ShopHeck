@@ -44,7 +44,13 @@ const mock = vi.hoisted(() => {
   return { orders, ranges, rowsByTable, client };
 });
 
-vi.mock('../src/lib/supabase', () => ({ supabase: mock.client }));
+// `lib/supabase` hands out the client through an async accessor: the SDK is a
+// dynamic import so it stays off the first-paint path (see `getSupabase`), and
+// the mock matches that contract rather than the module-level binding it
+// replaced.
+vi.mock('../src/lib/supabase', () => ({
+  getSupabase: () => Promise.resolve(mock.client),
+}));
 
 import { mergeCloud, pullState, type CloudSnapshot } from '../src/lib/sync';
 import { createDefaultState } from '../src/utils/storage';

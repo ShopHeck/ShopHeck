@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { supabase, isSupabaseConfigured, supabaseConfigError, supabaseHost, supabaseUrl } from '../lib/supabase';
+import { getSupabase, isSupabaseConfigured, supabaseConfigError, supabaseHost, supabaseUrl } from '../lib/supabase';
+import type { Database } from '../lib/database.types';
 import {
   notifyLocalDataCleared,
   reconcileLocalAccount,
@@ -98,6 +99,58 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/** Supabase's own auth copy ("Invalid login credentials") reads fine, but
+ *  transport failures surface as raw fetch errors — translate those.
+ *
+ *  WKWebView words a failed fetch as "Load failed", which users reasonably
+ *  read as an app bug rather than a connection problem. Naming the host we
+ *  couldn't reach also makes a wrong-project build self-evident from a
+ *  screenshot, which is otherwise only visible by unpacking the .ipa. */
+function friendlyAuthError(message: string): string {
+  if (/failed to fetch|network|fetch failed|load failed/i.test(message)) {
+    return supabaseHost
+      ? `Can't reach ${supabaseHost} — check your connection and try again.`
+      : "Can't reach the server — check your connection and try again.";
+  }
+  return message;
+}
+
+/** Why sign-in is unavailable. A build carrying broken credentials is a
+ *  different problem from one deliberately built without any, and only the
+ *  first is worth reporting in detail. */
+function unavailableReason(): string {
+  return supabaseConfigError
+    ? `Accounts are unavailable in this build — ${supabaseConfigError}`
+    : 'Accounts are not available right now.';
+}
+
+type ClientResult =
+  | { ok: true; client: SupabaseClient<Database> }
+  | { ok: false; error: string };
+
+/**
+ * Resolve the Supabase client for an action the user just took.
+ *
+ * Three ways it can be unavailable, and they are not the same thing: the build
+ * carries no credentials, the build carries broken ones, or the SDK chunk
+ * itself failed to arrive. The last one is a transport failure — the user is
+ * offline or holding a stale cache after a deploy — so it borrows the wording
+ * transport failures already get rather than claiming, wrongly, that accounts
+ * don't exist in this build.
+ *
+ * Module scope rather than the component body so the recovery effect can call
+ * it without taking it as a dependency (it closes over nothing that renders).
+ */
+async function requireClient(): Promise<ClientResult> {
+  let client: SupabaseClient<Database> | null;
+  try {
+    client = await getSupabase();
+  } catch {
+    return { ok: false, error: friendlyAuthError('Load failed') };
+  }
+  return client ? { ok: true, client } : { ok: false, error: unavailableReason() };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
@@ -115,71 +168,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(next);
     };
 
-    // Capture the configured client in a non-null local. TypeScript cannot keep
-    // a module-level nullable import narrowed inside later callback closures.
-    const client = supabase;
-    if (!client) {
+    if (!isSupabaseConfigured) {
       reconcileLocalAccount(null);
       setLoading(false);
       return;
     }
 
     let active = true;
-    client.auth.getSession().then(({ data }) => {
+    // Assigned once the subscription and listener exist. The cleanup below runs
+    // it if it is set; the async body runs it itself if unmount beat it there.
+    let teardown: (() => void) | null = null;
+
+    void (async () => {
+      let client: SupabaseClient<Database> | null;
+      try {
+        client = await getSupabase();
+      } catch {
+        // The SDK chunk could not be fetched. Nothing is signed in and nothing
+        // can be, so settle into the same state as an unconfigured build rather
+        // than leaving the app stuck on `loading` forever.
+        client = null;
+      }
+      if (!active) return;
+      if (!client) {
+        reconcileLocalAccount(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await client.auth.getSession();
       if (!active) return;
       applySession(data.session);
       setLoading(false);
-    });
 
-    const { data: sub } = client.auth.onAuthStateChange((_event, next) => {
-      applySession(next);
-      setLoading(false);
-    });
+      const { data: sub } = client.auth.onAuthStateChange((_event, next) => {
+        applySession(next);
+        setLoading(false);
+      });
 
-    const requestedSignOut = () => { void client.auth.signOut(); };
-    window.addEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+      const requestedSignOut = () => { void client.auth.signOut(); };
+      window.addEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+
+      teardown = () => {
+        sub.subscription.unsubscribe();
+        window.removeEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+      };
+      // Unmounting between the `active` check above and this assignment would
+      // otherwise leak the subscription — the cleanup has already run and will
+      // not run again.
+      if (!active) { teardown(); teardown = null; }
+    })();
 
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
-      window.removeEventListener(REQUEST_SIGN_OUT_EVENT, requestedSignOut);
+      teardown?.();
     };
   }, []);
 
-  /** Supabase's own auth copy ("Invalid login credentials") reads fine, but
-   *  transport failures surface as raw fetch errors — translate those.
-   *
-   *  WKWebView words a failed fetch as "Load failed", which users reasonably
-   *  read as an app bug rather than a connection problem. Naming the host we
-   *  couldn't reach also makes a wrong-project build self-evident from a
-   *  screenshot, which is otherwise only visible by unpacking the .ipa. */
-  function friendlyAuthError(message: string): string {
-    if (/failed to fetch|network|fetch failed|load failed/i.test(message)) {
-      return supabaseHost
-        ? `Can't reach ${supabaseHost} — check your connection and try again.`
-        : "Can't reach the server — check your connection and try again.";
-    }
-    return message;
-  }
-
-  /** Why sign-in is unavailable. A build carrying broken credentials is a
-   *  different problem from one deliberately built without any, and only the
-   *  first is worth reporting in detail. */
-  function unavailableReason(): string {
-    return supabaseConfigError
-      ? `Accounts are unavailable in this build — ${supabaseConfigError}`
-      : 'Accounts are not available right now.';
-  }
-
   async function signInEmail(email: string, password: string) {
-    if (!supabase) return { error: unavailableReason() };
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
+    const { error } = await r.client.auth.signInWithPassword({ email: email.trim(), password });
     return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
   async function signUpEmail(email: string, password: string, name?: string) {
-    if (!supabase) return { error: unavailableReason() };
-    const { data, error } = await supabase.auth.signUp({
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
+    const { data, error } = await r.client.auth.signUp({
       email: email.trim(),
       password,
       options: {
@@ -201,8 +257,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * does not distinguish the two either.
    */
   async function resetPassword(email: string) {
-    if (!supabase) return { error: unavailableReason() };
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
+    const { error } = await r.client.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: emailRedirectUrl(RECOVERY_PATH),
     });
     return error ? { error: friendlyAuthError(error.message) } : {};
@@ -243,14 +300,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) setRecovery({ active: false, error: params.message });
         return;
       }
-      if (!supabase) return;
+      // Unconfigured builds ignore recovery links exactly as before. A failure
+      // to *fetch* the SDK is new and is reported: the alternative is dropping
+      // the user on a normal-looking dashboard with their reset silently lost.
+      if (!isSupabaseConfigured) return;
+      const r = await requireClient();
+      if (cancelled) return;
+      if (!r.ok) { setRecovery({ active: false, error: r.error }); return; }
 
       const { error } = params.kind === 'tokens'
-        ? await supabase.auth.setSession({
+        ? await r.client.auth.setSession({
             access_token: params.accessToken,
             refresh_token: params.refreshToken,
           })
-        : await supabase.auth.exchangeCodeForSession(params.code);
+        : await r.client.auth.exchangeCodeForSession(params.code);
 
       if (cancelled) return;
       setRecovery(error
@@ -275,8 +338,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function completePasswordReset(password: string) {
-    if (!supabase) return { error: unavailableReason() };
-    const { error } = await supabase.auth.updateUser({ password });
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
+    const { error } = await r.client.auth.updateUser({ password });
     if (error) return { error: friendlyAuthError(error.message) };
     // Recovery is over; the user is now signed in with the new password. The
     // session established above is a real one, so there is nothing to sign out
@@ -290,7 +354,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInApple() {
-    if (!supabase) return { error: unavailableReason() };
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
 
     // Native iOS: use the real "Sign in with Apple" sheet and exchange the
     // identity token with Supabase. A nonce (hashed for Apple, raw for Supabase)
@@ -311,7 +376,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const idToken = result.response?.identityToken;
         if (!idToken) return { error: 'Apple sign-in was cancelled.' };
-        const { error } = await supabase.auth.signInWithIdToken({
+        const { error } = await r.client.auth.signInWithIdToken({
           provider: 'apple',
           token: idToken,
           nonce: rawNonce,
@@ -326,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Web: standard OAuth redirect flow.
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await r.client.auth.signInWithOAuth({
       provider: 'apple',
       options: { redirectTo: window.location.origin },
     });
@@ -334,18 +399,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    const r = await requireClient();
+    if (!r.ok) return;
+    await r.client.auth.signOut();
   }
 
   async function deleteAccount() {
-    if (!supabase) return { error: unavailableReason() };
+    const r = await requireClient();
+    if (!r.ok) return { error: r.error };
     // Server-side cascade delete via SECURITY DEFINER RPC (see supabase/schema.sql).
-    const { error } = await supabase.rpc('delete_account');
+    const { error } = await r.client.rpc('delete_account');
     if (error) return { error: error.message };
     // The auth row is gone; clear the local session. Auth-state handling clears
     // every Fight Camp-owned local key before exposing the signed-out session.
-    await supabase.auth.signOut();
+    await r.client.auth.signOut();
     return {};
   }
 

@@ -1,4 +1,6 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+// Type-only import: erased at build time, so naming the SDK here costs no
+// bytes. The runtime `createClient` is pulled in by `getSupabase()` below.
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 /**
@@ -107,12 +109,38 @@ export const supabaseHost: string | null = (() => {
  */
 export const isSupabaseConfigured = !!(config.url && config.key && !config.error);
 
+/** Memoised client promise — the SDK is fetched and constructed at most once. */
+let clientPromise: Promise<SupabaseClient<Database> | null> | null = null;
+
 /**
  * The Supabase client, or null when unconfigured. Callers must null-check
  * (or gate on `isSupabaseConfigured`) so a missing env never crashes the app.
+ *
+ * **Why this is async.** `@supabase/supabase-js` is 203 kB raw / 54 kB gzipped
+ * — the single largest dependency in the app. It used to be a static import
+ * here, and because `AuthContext` (mounted eagerly from `main.tsx`) imported
+ * this module, every cold start downloaded and parsed the whole SDK *before
+ * first paint* — in an app whose defining property is that it works offline
+ * with no account. `vite.config.ts` made it worse by naming a `supabase`
+ * manual chunk, which promotes a chunk to a static import of the entry and
+ * earns it a `<link rel="modulepreload">` (that config's own comment explains
+ * this, for recharts).
+ *
+ * Deferring it costs nothing in practice: everything reachable before sign-in
+ * needs only the synchronous config exports above, which carry no SDK code.
+ * A build with no Supabase env never fetches the SDK at all, and a configured
+ * one fetches it in parallel with the first render instead of ahead of it.
+ * The chunk is still precached by the service worker (`globPatterns` covers
+ * `**\/*.js`), so an installed PWA opened in a gym with no signal is unaffected.
  */
-export const supabase: SupabaseClient<Database> | null = isSupabaseConfigured
-  ? createClient<Database>(config.url, config.key, {
+export function getSupabase(): Promise<SupabaseClient<Database> | null> {
+  if (!isSupabaseConfigured) return Promise.resolve(null);
+
+  // Not cached on failure: a chunk fetch can lose to a flaky connection, and
+  // caching the rejection would make the first failure permanent for the whole
+  // session — sign-in would stay broken until the app was force-quit.
+  clientPromise ??= import('@supabase/supabase-js')
+    .then(({ createClient }) => createClient<Database>(config.url, config.key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -120,8 +148,14 @@ export const supabase: SupabaseClient<Database> | null = isSupabaseConfigured
         // browser tab does; we handle the Apple/Google callback explicitly.
         detectSessionInUrl: false,
       },
-    })
-  : null;
+    }))
+    .catch((e: unknown) => {
+      clientPromise = null;
+      throw e;
+    });
+
+  return clientPromise;
+}
 
 /**
  * Unauthenticated liveness probe against GoTrue. Used by Settings →

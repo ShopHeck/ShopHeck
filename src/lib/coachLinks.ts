@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 import type { Database } from './database.types';
 import type { FightCamp, WeightEntry } from '../types';
 
@@ -42,6 +42,7 @@ export interface FighterDetail {
 
 /** Coach: mint a shareable invite code (retries once on the unlikely collision). */
 export async function createInvite(coachId: string): Promise<{ code?: string; error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   for (let attempt = 0; attempt < 2; attempt++) {
     const code = generateCode();
@@ -54,6 +55,7 @@ export async function createInvite(coachId: string): Promise<{ code?: string; er
 
 /** Coach: list previously generated, still-valid invite codes. */
 export async function listInvites(coachId: string): Promise<string[]> {
+  const supabase = await getSupabase();
   if (!supabase) return [];
   const { data } = await supabase
     .from('coach_invites')
@@ -68,6 +70,7 @@ export async function listInvites(coachId: string): Promise<string[]> {
 
 /** Fighter: redeem a coach's invite code. Returns the coach's id on success. */
 export async function redeemInvite(code: string): Promise<{ coachId?: string; error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   const { data, error } = await supabase.rpc('redeem_coach_invite', { invite_code: code.trim().toUpperCase() });
   if (error) return { error: error.message };
@@ -84,6 +87,7 @@ export async function redeemInvite(code: string): Promise<{ coachId?: string; er
 
 /** Fighter: mint a single-use code to hand OUT to a coach (retries once on collision). */
 export async function createFighterInvite(fighterId: string): Promise<{ code?: string; error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   for (let attempt = 0; attempt < 2; attempt++) {
     const code = generateCode();
@@ -96,6 +100,7 @@ export async function createFighterInvite(fighterId: string): Promise<{ code?: s
 
 /** Coach: redeem a code a fighter shared. Returns the fighter's id on success. */
 export async function redeemFighterInvite(code: string): Promise<{ fighterId?: string; error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   const { data, error } = await supabase.rpc('redeem_fighter_invite', { invite_code: code.trim().toUpperCase() });
   if (error) return { error: error.message };
@@ -106,6 +111,7 @@ export async function redeemFighterInvite(code: string): Promise<{ fighterId?: s
  *  must reflect the server (a coach can create the link from their side via a
  *  shared fighter code — the fighter still needs the revoke button). */
 export async function hasActiveCoachLink(fighterId: string): Promise<boolean> {
+  const supabase = await getSupabase();
   if (!supabase) return false;
   const { data } = await supabase
     .from('coach_fighter_links')
@@ -118,12 +124,14 @@ export async function hasActiveCoachLink(fighterId: string): Promise<boolean> {
 
 /** Fighter: drop the current coach link(s). */
 export async function unlinkAllCoaches(fighterId: string): Promise<void> {
+  const supabase = await getSupabase();
   if (!supabase) return;
   await supabase.from('coach_fighter_links').delete().eq('fighter_id', fighterId);
 }
 
 /** Coach: roster of linked fighters, each with their most recent camp. */
 export async function listLinkedFighters(coachId: string): Promise<LinkedFighter[]> {
+  const supabase = await getSupabase();
   if (!supabase) return [];
   const { data: links, error } = await supabase
     .from('coach_fighter_links')
@@ -193,6 +201,7 @@ export interface CloudCoachNote {
  * any coach linked to them — RLS decides which, so this needs no role check.
  */
 export async function listCoachNotes(fighterId: string): Promise<CloudCoachNote[]> {
+  const supabase = await getSupabase();
   if (!supabase) return [];
   const { data } = await supabase
     .from('coach_notes')
@@ -221,6 +230,7 @@ export async function postCoachNote(note: {
   category: string;
   content: string;
 }): Promise<{ error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   const { error } = await supabase.from('coach_notes').insert({
     coach_id: note.coachId,
@@ -242,6 +252,7 @@ export async function postCoachNote(note: {
  * would leave the note on the fighter's phone permanently.
  */
 export async function removeCoachNote(noteId: string): Promise<{ error?: string }> {
+  const supabase = await getSupabase();
   if (!supabase) return { error: 'Cloud sync is not configured.' };
   const { error } = await supabase
     .from('coach_notes')
@@ -302,6 +313,7 @@ function campFromRow(c: CampRow): FightCamp {
  * served by the same `is_coach_of` RLS policies the detail view already uses.
  */
 export async function getTeamSnapshots(coachId: string): Promise<TeamFighterSnapshot[]> {
+  const supabase = await getSupabase();
   if (!supabase) return [];
   const { data: links } = await supabase
     .from('coach_fighter_links')
@@ -367,6 +379,7 @@ export async function getTeamSnapshots(coachId: string): Promise<TeamFighterSnap
 
 /** Coach: a linked fighter's full data for the detail view. */
 export async function getFighterDetail(fighterId: string): Promise<FighterDetail> {
+  const supabase = await getSupabase();
   if (!supabase) return { camps: [], workouts: [], sparring: [], weights: [] };
   const [camps, workouts, sparring, weights] = await Promise.all([
     // Deleted rows are tombstoned, not removed (see lib/sync.ts) — a coach
