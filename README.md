@@ -121,6 +121,7 @@ subscription with a monthly quota.
 | [`app-store-listing.md`](docs/app-store-listing.md) | Listing copy |
 | [`troubleshooting-signin-and-purchases.md`](docs/troubleshooting-signin-and-purchases.md) | When sign-in or IAP fails |
 | [`open-work.md`](docs/open-work.md) | What is actually still open |
+| [`submission-summary.md`](docs/submission-summary.md) | What changed since build 17 (dated snapshot) |
 | [`audit-2026-08.md`](docs/audit-2026-08.md) | Engineering audit (historical) |
 | [`ux-audit.md`](docs/ux-audit.md) | UX audit (historical) |
 

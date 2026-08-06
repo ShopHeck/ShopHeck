@@ -15,7 +15,18 @@ import {
 import { buildTeamOverview, FLAG_LABELS, type TeamOverviewRow } from '../utils/teamOverview';
 import UpgradeModal from './shared/UpgradeModal';
 import GlassMetricTile from './shared/GlassMetricTile';
-import type { CoachNoteCategory } from '../types';
+import type { AdaptationKind, CampAdaptation, CoachNoteCategory } from '../types';
+
+/**
+ * An adaptation is a decision, not a verdict — so these are not the pace tiers.
+ * A deload is a fighter listening to their body, and colouring it amber would
+ * tell the coach something went wrong.
+ */
+const ADAPTATION_COLORS: Record<AdaptationKind, string> = {
+  recovery: 'var(--accent-green)',
+  deload: 'var(--accent-blue)',
+  intensify: 'var(--accent-flame)',
+};
 import {
   LineChart,
   Line,
@@ -69,7 +80,25 @@ const CATEGORY_STYLES: Record<CoachNoteCategory, { label: string; cls: string }>
   general:      { label: 'General',      cls: 'bg-dark-500 text-gray-400' },
 };
 
-export default function CoachDashboard() {
+/**
+ * Which of the coach's two tabs is being rendered.
+ *
+ * The tab bar has always had both, and both used to render this component with
+ * no argument — so a coach had two tabs showing one screen. They are two jobs:
+ * `overview` answers "who needs me today", `roster` answers "show me a specific
+ * fighter". The fighter detail view is reachable from either and is shared
+ * below, which is why this is one component with a mode rather than two files
+ * that would each need their own copy of the detail screen and its note form.
+ */
+export type CoachView = 'overview' | 'roster';
+
+interface Props {
+  mode?: CoachView;
+  /** Lets the overview hand off to the roster tab. */
+  onNavigate?: (view: string) => void;
+}
+
+export default function CoachDashboard({ mode = 'overview', onNavigate }: Props) {
   const { state, dispatch } = useApp();
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { fighters, camps, workoutLogs, sparringLogs, weightEntries, currentUser, coachNotes } = state;
@@ -91,6 +120,11 @@ export default function CoachDashboard() {
   // The coach side is a paid tier. Free coaches see the roster shell, but
   // opening a fighter's data / notes requires Coach Pro.
   const coachPro = isCoachPro(state.subscription);
+
+  // Declared here rather than beside the list render because the fighter
+  // detail views return early, above that point, and their back button names
+  // the tab it returns to.
+  const overview = mode === 'overview';
 
   // Team overview (Coach Pro). Loaded alongside the roster rather than on
   // demand — it is the first thing on the screen, and a spinner where the
@@ -215,12 +249,16 @@ export default function CoachDashboard() {
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       : [];
     const latestW = campWeights[campWeights.length - 1]?.weight ?? camp?.current_weight ?? 0;
+    // Stored camp-relative (no campId inside), so this is the shape as written
+    // — the coach never needs the local id it was stripped of.
+    const campAdaptations = [...((camp?.adaptations ?? []) as unknown as Omit<CampAdaptation, 'campId'>[])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     return (
       <div className="space-y-4 pb-4">
         <div className="mx-4 mt-4">
           <button onClick={() => { setCloudFighter(null); setCloudDetail(null); }} className="flex items-center gap-2 text-brand-500 text-sm font-medium mb-4">
-            ← Back to Fighters
+            ← Back to {overview ? 'Team' : 'Fighters'}
           </button>
           <div className="card flex items-center gap-4">
             <div className="w-14 h-14 bg-brand-900/50 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -276,6 +314,41 @@ export default function CoachDashboard() {
                 icon={<Scale size={13} style={{ color: 'var(--accent-blue)' }} />}
               />
             </div>
+
+            {/* Accepted adaptations. Until these synced, a coach opening this
+                screen saw the plan as generated — so a fighter who had accepted
+                a deload looked like one who had simply skipped the sessions.
+                Newest first, and only the last few: the full audit trail is on
+                the fighter's own screen. */}
+            {campAdaptations.length > 0 && (
+              <div className="mx-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Plan Adaptations</p>
+                <div className="space-y-2">
+                  {campAdaptations.slice(0, 4).map(a => (
+                    <div key={a.id} className="card flex items-start gap-3">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: tint(ADAPTATION_COLORS[a.kind], 0.18),
+                          color: ADAPTATION_COLORS[a.kind],
+                        }}
+                        aria-hidden="true"
+                      >
+                        <Activity size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white capitalize">
+                          {a.kind} · Week {a.weekNumber}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {a.reasons.join(' · ') || 'Accepted by the fighter'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {campSparring.length > 0 && (
               <div className="mx-4">
@@ -442,7 +515,7 @@ export default function CoachDashboard() {
       <div className="space-y-4 pb-4">
         <div className="mx-4 mt-4">
           <button onClick={() => { setSelectedFighter(null); setShowNoteForm(false); }} className="flex items-center gap-2 text-brand-500 text-sm font-medium mb-4">
-            ← Back to Fighters
+            ← Back to {overview ? 'Team' : 'Fighters'}
           </button>
 
           {/* Fighter Header */}
@@ -678,29 +751,47 @@ export default function CoachDashboard() {
     );
   }
 
+  // ── Triage counts, for the overview header and its summary tiles ──
+  // Read off the same rows the table renders, so the count and the table can
+  // never disagree about who needs attention.
+  const flaggedRows = team.filter(r => r.flags.length > 0);
+  const fightWeekRows = team.filter(r => r.flags.includes('fight-week'));
+  const rosterSize = linked.length || activeFighters.length;
+
   return (
     <div className="space-y-4 pb-4">
       <div className="mx-4 mt-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-black text-white">Coach View</h2>
-            <p className="text-sm text-gray-400">{activeFighters.length} fighter{activeFighters.length !== 1 ? 's' : ''} in system</p>
+            <h2 className="text-xl font-black text-white">{overview ? 'Team' : 'Fighters'}</h2>
+            <p className="text-sm text-gray-400">
+              {overview
+                ? (team.length > 0
+                    ? `${flaggedRows.length} of ${team.length} need${flaggedRows.length === 1 ? 's' : ''} your attention`
+                    : 'Camp status across your roster')
+                : `${rosterSize} fighter${rosterSize !== 1 ? 's' : ''} in system`}
+            </p>
           </div>
           <div className="w-10 h-10 bg-brand-900/40 rounded-xl flex items-center justify-center">
-            <Users size={18} className="text-brand-400" />
+            {overview
+              ? <Activity size={18} className="text-brand-400" />
+              : <Users size={18} className="text-brand-400" />}
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="input pl-9"
-            placeholder="Search fighters..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
+        {/* Search — the roster's job, not the overview's. The overview is a
+            fixed, already-prioritised list; there is nothing there to find. */}
+        {!overview && (
+          <div className="relative mb-4">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              className="input pl-9"
+              placeholder="Search fighters..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        )}
 
         {/* Coach Pro CTA — coach features are a paid tier */}
         {!coachPro && (
@@ -719,10 +810,29 @@ export default function CoachDashboard() {
           </button>
         )}
 
+        {/* The triage strip — the answer to "who needs me today" above the
+            table that says why. Overview only, and only once the rows exist:
+            two tiles reading zero would be a worse answer than no tiles. */}
+        {overview && team.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <GlassMetricTile
+              label="Need attention"
+              value={flaggedRows.length}
+              icon={<Activity size={14} />}
+              goodDirection="down"
+            />
+            <GlassMetricTile
+              label="In fight week"
+              value={fightWeekRows.length}
+              icon={<Zap size={14} />}
+            />
+          </div>
+        )}
+
         {/* Team Overview — the triage table. Coach Pro only: it is the roster
             analytics the tier is sold on, and every field it reads is behind
             the same gate as the fighter detail view. */}
-        {authConfigured && authUser && coachPro && linked.length > 0 && (
+        {overview && authConfigured && authUser && coachPro && linked.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Users size={14} className="text-brand-400" />
@@ -823,8 +933,31 @@ export default function CoachDashboard() {
           </div>
         )}
 
+        {/* What the overview shows when the triage table cannot render. Each
+            case has a different fix, so each gets its own sentence rather than
+            one generic "nothing here yet" — a coach who is simply not signed in
+            should not be told to buy anything. */}
+        {overview && !(authConfigured && authUser && coachPro && linked.length > 0) && (
+          <div className="card text-center py-8">
+            <Users size={28} className="text-gray-450 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">
+              {!authConfigured || !authUser
+                ? 'Sign in to see camp status across your team.'
+                : !coachPro
+                  ? 'Coach Pro shows every fighter’s adherence, cut pace and quiet streaks in one table.'
+                  : 'Connect a fighter and their camp status shows up here.'}
+            </p>
+            <button
+              onClick={() => (!coachPro && authUser ? setShowUpgrade(true) : onNavigate?.('fighters'))}
+              className="mt-3 text-sm font-semibold text-brand-400"
+            >
+              {!coachPro && authUser ? 'See Coach Pro' : 'Go to Fighters'}
+            </button>
+          </div>
+        )}
+
         {/* Connected Fighters (cloud) */}
-        {authConfigured && authUser && (
+        {!overview && authConfigured && authUser && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Cloud size={14} className="text-brand-400" />
@@ -869,7 +1002,7 @@ export default function CoachDashboard() {
         )}
 
         {/* Camp Overview */}
-        {activeCamp && (
+        {overview && activeCamp && (
           <div className="bg-gradient-to-br from-dark-700 to-dark-600 border border-dark-400 rounded-xl p-4 mb-4">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Active Camp Overview</p>
             <div className="grid grid-cols-3 gap-3">
@@ -890,7 +1023,7 @@ export default function CoachDashboard() {
         )}
 
         {/* Legacy local fighter list — only in offline/demo mode (cloud uses Connected Fighters above) */}
-        {activeFighters.length > 0 && (
+        {!overview && activeFighters.length > 0 && (
           <div className="space-y-3">
             {filtered.map(f => {
               const fCamp = camps[camps.length - 1];
@@ -950,7 +1083,7 @@ export default function CoachDashboard() {
       </div>
 
       {/* Local-mode hint — only when offline (cloud coaches use Connected Fighters) */}
-      {!authUser && activeFighters.length === 0 && (
+      {!overview && !authUser && activeFighters.length === 0 && (
         <div className="mx-4 card text-center py-8">
           <User size={32} className="text-gray-450 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">Fighters will appear here once they create accounts and link you as their coach in their Settings.</p>

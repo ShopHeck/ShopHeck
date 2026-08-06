@@ -24,6 +24,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor-community/bluetooth-le": "^7.3.2",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.8",
     "@capacitor/haptics": "^7.0.5",
     "@capacitor/ios": "^7.6.8",

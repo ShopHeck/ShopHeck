@@ -52,14 +52,20 @@ public class WatchBridgePlugin: CAPInstancePlugin, CAPBridgedPlugin {
             call.reject("Watch session is not available")
             return
         }
-        let payload: [String: Any] = [
-            "kind": "startSession",
-            "rounds": call.getInt("rounds") ?? 12,
-            "workSec": call.getInt("workSec") ?? 180,
-            "restSec": call.getInt("restSec") ?? 60,
-            "prepSec": call.getInt("prepSec") ?? 0,
-            "label": call.getString("label") ?? "Round Timer",
-        ]
+        // Built through WatchSessionConfig rather than as a literal dictionary.
+        // The keys used to be spelled out here, which meant the shared
+        // WatchMessages.swift was not actually shared with this side — renaming
+        // a key on the watch would have compiled cleanly and failed silently on
+        // a device, mid-round, which is the exact bug that file exists to make
+        // impossible. It also gets the clamping for free: these values arrive
+        // from a JSON bridge and drive a countdown.
+        let config = WatchSessionConfig(
+            rounds: call.getInt(WatchMessage.Key.rounds) ?? WatchSessionConfig.fallback.rounds,
+            workSec: call.getInt(WatchMessage.Key.workSec) ?? WatchSessionConfig.fallback.workSec,
+            restSec: call.getInt(WatchMessage.Key.restSec) ?? WatchSessionConfig.fallback.restSec,
+            prepSec: call.getInt(WatchMessage.Key.prepSec) ?? 0,
+            label: call.getString(WatchMessage.Key.label) ?? WatchSessionConfig.fallback.label
+        )
 
         // Application context, not sendMessage: it is a single latest-value
         // slot that the system delivers whenever the watch app next runs, even
@@ -67,7 +73,7 @@ public class WatchBridgePlugin: CAPInstancePlugin, CAPBridgedPlugin {
         // when the watch app is not in the foreground, which is the normal
         // case at the moment a fighter starts a round on the phone.
         do {
-            try session.updateApplicationContext(payload)
+            try session.updateApplicationContext(config.payload)
             call.resolve()
         } catch {
             call.reject("Could not reach the watch: \(error.localizedDescription)")
@@ -79,21 +85,24 @@ public class WatchBridgePlugin: CAPInstancePlugin, CAPBridgedPlugin {
             call.resolve()
             return
         }
-        try? session.updateApplicationContext(["kind": "endSession"])
+        try? session.updateApplicationContext([WatchMessage.kindKey: WatchMessage.endSession])
         call.resolve()
     }
 
     private func forward(_ payload: [String: Any]) {
-        guard let kind = payload["kind"] as? String else { return }
+        guard let kind = payload[WatchMessage.kindKey] as? String else { return }
         switch kind {
-        case "heartRate":
-            guard let bpm = payload["bpm"] as? Int else { return }
+        case WatchMessage.heartRate:
+            guard let bpm = payload[WatchMessage.Key.bpm] as? Int else { return }
+            // The JS event names are the plugin's own contract with the web
+            // layer (src/plugins/WatchBridge.ts) and stay literals — they are
+            // not part of the phone↔watch wire format.
             notifyListeners("heartRate", data: [
                 "bpm": bpm,
-                "timestamp": payload["timestamp"] as? Double ?? Date().timeIntervalSince1970,
+                "timestamp": payload[WatchMessage.Key.timestamp] as? Double ?? Date().timeIntervalSince1970,
             ])
-        case "command":
-            guard let command = payload["command"] as? String else { return }
+        case WatchMessage.command:
+            guard let command = payload[WatchMessage.Key.command] as? String else { return }
             notifyListeners("watchCommand", data: ["command": command])
         default:
             break

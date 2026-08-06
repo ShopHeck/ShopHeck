@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Fight Camp</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<!-- Both are inherited from the build settings, which the Fastlane
+	     sync_extension_versions lane keeps equal to the host app's. A watch
+	     bundle whose version differs from its host is rejected at upload. -->
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+
+	<!-- Which iPhone app this watch app belongs to. Must be the host bundle
+	     id exactly; a mismatch is not a build error, it is a watch app that
+	     silently never installs. -->
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>app.fightcamptraining</string>
+	<!-- Single-target watch app (watchOS 7+ layout) rather than the legacy
+	     WatchKit app + extension pair. -->
+	<key>WKApplication</key>
+	<true/>
+	<!-- The timer has to keep counting, and the heart-rate stream has to keep
+	     sampling, while the fighter's wrist is down mid-round. Workout
+	     processing is the mode that grants both. -->
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+
+	<!-- Read only, deliberately. WorkoutHeartRate requests `toShare: []` and
+	     never saves the workout — the phone app owns writing to Health. An
+	     NSHealthUpdateUsageDescription here would be a usage string for a
+	     permission this bundle never asks for, which is its own rejection risk. -->
+	<key>NSHealthShareUsageDescription</key>
+	<string>Fight Camp reads your heart rate during a round session to show live training zones.</string>
+</dict>
+</plist>

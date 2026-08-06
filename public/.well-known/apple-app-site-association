@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["WV4L598A44.app.fightcamptraining"],
+        "components": [
+          {
+            "/": "/auth/*",
+            "comment": "Password-reset links. Deliberately scoped to /auth/ rather than the whole site: a rule matching / would claim every URL on this domain, so a tap on the privacy policy or the support page would launch the app instead of opening the page."
+          }
+        ]
+      }
+    ]
+  }
+}

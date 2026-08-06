@@ -6,7 +6,7 @@ import type {
   WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
   DashboardPrefs, FitbitConfig, MacroEntry, CampFactorWeights, FightRound,
   Sport, WeightClass, ExperienceLevel, UserRole, SessionType, OffSeasonGoal, HRVSource,
-  SubscriptionState, CoachNote,
+  SubscriptionState, CoachNote, CampAdaptation, CornerSession, AiAnalysis, AiAnalyses,
 } from '../types';
 
 type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
@@ -131,6 +131,27 @@ function hashRow(row: unknown): string {
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36);
+}
+
+/**
+ * Record an embedded record's id in the sync ledger.
+ *
+ * Adaptations and corner sessions live inside a camp's jsonb, so they never go
+ * through `uuidFor` — their id IS their cloud id, stored verbatim. That left
+ * them out of the id map, and the id map is not only a translation table: its
+ * keys are this device's "I have synced this" ledger, which `pullState`
+ * snapshots into `previouslySynced` so `mergeCloud` can tell a locally-deleted
+ * record from one it has never seen.
+ *
+ * Without this, reverting an adaptation or discarding a corner session offline
+ * and then reopening online restored it: the pull saw an id it had no record
+ * of, called it new, and merged the stale cloud copy back in.
+ *
+ * Mapping the id to itself is not a placeholder — for an embedded record the
+ * local id and the cloud id are genuinely the same string.
+ */
+function recordEmbedded(map: Record<string, string>, ids: Iterable<string>): void {
+  for (const id of ids) map[id] = id;
 }
 
 /** Stable uuid for a local id, minted once and persisted. */
@@ -325,6 +346,26 @@ export async function pushState(
       for (const [k, v] of Object.entries(state.dayOverrides ?? {})) {
         if (k.startsWith(prefix)) overrides[k.slice(prefix.length)] = v;
       }
+      // Same relative-key treatment for the three slices that used to be
+      // local-only. `campId` comes off the adaptations and corner sessions
+      // because the row it is stored on already says which camp it is, and a
+      // local camp id is meaningless on the device that pulls it back.
+      const adaptations = (state.campAdaptations ?? [])
+        .filter(a => a.campId === c.id)
+        .map(({ campId: _campId, ...rest }) => rest);
+      const cornerSessions = (state.cornerSessions ?? [])
+        .filter(s => s.campId === c.id)
+        .map(({ campId: _campId, ...rest }) => rest);
+      // Dismissal keys are `${campId}:${weekNumber}:${kind}` — the prefix goes
+      // for the same reason, leaving `${weekNumber}:${kind}`.
+      const dismissedPrefix = `${c.id}:`;
+      const dismissed = (state.dismissedAdaptations ?? [])
+        .filter(k => k.startsWith(dismissedPrefix))
+        .map(k => k.slice(dismissedPrefix.length));
+      // Ledger them as synced, so a later revert or discard reads as a delete
+      // rather than as a record the next pull has never seen.
+      recordEmbedded(map, adaptations.map(a => a.id));
+      recordEmbedded(map, cornerSessions.map(s => s.id));
       return {
         id: uuidFor(c.id),
         user_id: userId,
@@ -344,6 +385,9 @@ export async function pushState(
         game_plan: (state.gamePlans?.[c.id] ?? null) as unknown as Ins<'camps'>['game_plan'],
         completed_sessions: completed as Ins<'camps'>['completed_sessions'],
         day_overrides: overrides as Ins<'camps'>['day_overrides'],
+        adaptations: adaptations as unknown as Ins<'camps'>['adaptations'],
+        dismissed_adaptations: dismissed as unknown as Ins<'camps'>['dismissed_adaptations'],
+        corner_sessions: cornerSessions as unknown as Ins<'camps'>['corner_sessions'],
       };
     });
     {
@@ -381,7 +425,8 @@ export async function pushState(
 
     const err4 = await run('weight_entries', (state.weightEntries ?? []).filter(e => childOf(e.campId)).map(e => ({
       id: uuidFor(e.id), user_id: userId, camp_id: uuidFor(e.campId),
-      date: e.date, weight: e.weight, notes: e.notes ?? '', created_at: ts(e, now),
+      date: e.date, weight: e.weight, notes: e.notes ?? '',
+      official_weigh_in: e.officialWeighIn ?? false, created_at: ts(e, now),
     })), 'id', true);
     if (err4) return fail(err4);
 
@@ -417,8 +462,26 @@ export async function pushState(
     // the connect flow is per-device PKCE, so syncing them buys nothing but puts
     // a re-usable credential in our database. Only the non-secret client id and
     // the last-sync marker travel; a new device re-runs the (one-tap) connect.
+    // Saved AI analyses are keyed `${kind}:${subjectId}` where the subject is a
+    // local camp or fight-result id, so the key is rewritten to the subject's
+    // CLOUD uuid before it goes up — a raw local key would name nothing on the
+    // device that pulls it. Analyses whose subject this device has never pushed
+    // are skipped rather than minting a uuid for a row that does not exist:
+    // both parent tables were written above, so anything still unmapped here
+    // has been deleted locally.
+    const analyses: AiAnalyses = {};
+    for (const [key, analysis] of Object.entries(state.aiAnalyses ?? {})) {
+      const sep = key.indexOf(':');
+      if (sep === -1) continue;
+      const kind = key.slice(0, sep);
+      const subjectUuid = map[key.slice(sep + 1)];
+      if (!subjectUuid) continue;
+      analyses[`${kind}:${subjectUuid}`] = analysis;
+    }
+
     const errState = await run('user_state', [{
       user_id: userId,
+      ai_analyses: analyses as unknown as Ins<'user_state'>['ai_analyses'],
       gamification: (state.gamification ?? null) as Ins<'user_state'>['gamification'],
       dashboard_prefs: (state.dashboardPrefs ?? null) as Ins<'user_state'>['dashboard_prefs'],
       fitbit_config: (state.fitbitConfig
@@ -464,6 +527,14 @@ export interface CloudSnapshot {
   gamification: GamificationState | null;
   dashboardPrefs: DashboardPrefs | null;
   fitbitConfig: FitbitConfig | null;
+  /** Accepted adaptations, re-stamped with this device's local camp ids. */
+  campAdaptations: CampAdaptation[];
+  /** Declined adaptation keys, re-prefixed with this device's local camp ids. */
+  dismissedAdaptations: string[];
+  /** Corner-scored fights, re-stamped with this device's local camp ids. */
+  cornerSessions: CornerSession[];
+  /** Saved AI analyses, re-keyed to this device's local subject ids. */
+  aiAnalyses: AiAnalyses;
   /**
    * Local ids this device had already mapped to a cloud row before this pull.
    * A record in here that is missing from local state was deleted here, so the
@@ -625,6 +696,12 @@ export async function pullState(userId: string): Promise<PullResult> {
     const gamePlans: Record<string, GamePlan> = {};
     const completedSessions: Record<string, boolean> = {};
     const dayOverrides: Record<string, boolean> = {};
+    // Accumulated out of the camp rows below, the same way the three maps above
+    // are: each is stored camp-relative and re-stamped with this device's local
+    // camp id on the way in.
+    const campAdaptations: CampAdaptation[] = [];
+    const dismissedAdaptations: string[] = [];
+    const cornerSessions: CornerSession[] = [];
 
     /**
      * Local ids of rows another device has tombstoned. mergeCloud removes these
@@ -655,6 +732,22 @@ export async function pullState(userId: string): Promise<PullResult> {
       if (dov) for (const [rel, v] of Object.entries(dov)) dayOverrides[`${campLocalId}-${rel}`] = v;
       const gp = c.game_plan as GamePlan | null;
       if (gp) gamePlans[campLocalId] = { ...gp, campId: campLocalId };
+      for (const a of (c.adaptations ?? []) as Omit<CampAdaptation, 'campId'>[]) {
+        campAdaptations.push({ ...a, campId: campLocalId });
+        // Same ledger entry the top-level rows get from `lid()`.
+        // `previouslySynced` was snapshotted before this loop, so an id recorded
+        // here still counts as new on THIS pull — which is what makes restore
+        // work — and as previously-seen on the next one, which is what makes a
+        // later revert stick instead of being undone by the stale cloud copy.
+        recordEmbedded(map, [a.id]);
+      }
+      for (const rel of (c.dismissed_adaptations ?? []) as string[]) {
+        dismissedAdaptations.push(`${campLocalId}:${rel}`);
+      }
+      for (const s of (c.corner_sessions ?? []) as unknown as Omit<CornerSession, 'campId'>[]) {
+        cornerSessions.push({ ...s, campId: campLocalId });
+        recordEmbedded(map, [s.id]);
+      }
       return {
         id: campLocalId,
         fightDate: c.fight_date ?? undefined,
@@ -695,6 +788,25 @@ export async function pullState(userId: string): Promise<PullResult> {
 
     const st = stateQ.data as Row<'user_state'> | null;
 
+    const fightResults: FightResult[] = live(fightQ.data as Row<'fight_results'>[] | null).map((r: Row<'fight_results'>) => ({
+      id: lid(r.id), campId: lid(r.camp_id), fighterId: userId, fightDate: r.fight_date,
+      opponent: r.opponent, outcome: r.outcome as FightResult['outcome'],
+      method: r.method as FightResult['method'], roundStopped: r.round_stopped ?? undefined,
+      totalRounds: r.total_rounds, rounds: (r.rounds ?? []) as unknown as FightRound[],
+      weighInWeight: r.weigh_in_weight ?? undefined, fightNightWeight: r.fight_night_weight ?? undefined,
+      stylePlanFollowed: (r.style_plan_followed ?? 3) as 1 | 2 | 3 | 4 | 5,
+      overallNotes: r.overall_notes ?? '', lessons: r.lessons ?? '',
+      readinessAtFight: r.readiness_at_fight ?? undefined, createdAt: r.created_at,
+    }));
+
+    // The only subjects an AI analysis may legitimately be filed against: the
+    // camps and fight results this pull actually returned. Hoisted out of the
+    // snapshot literal so the analysis keys below can be checked against it.
+    const knownSubjectIds = new Set<string>([
+      ...camps.map(c => c.id),
+      ...fightResults.map(r => r.id),
+    ]);
+
     const snapshot: CloudSnapshot = {
       profile,
       camps,
@@ -717,6 +829,10 @@ export async function pullState(userId: string): Promise<PullResult> {
       weightEntries: live(weightQ.data as Row<'weight_entries'>[] | null).map((e: Row<'weight_entries'>) => ({
         id: lid(e.id), campId: lid(e.camp_id), date: e.date, weight: e.weight,
         notes: e.notes ?? '', createdAt: e.created_at,
+        // Undefined rather than false when unset, matching how the flag is
+        // written locally — an entry that is not the official weigh-in simply
+        // does not carry the key.
+        officialWeighIn: e.official_weigh_in || undefined,
       })),
       nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) => ({
         id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
@@ -729,16 +845,7 @@ export async function pullState(userId: string): Promise<PullResult> {
         restingHR: h.resting_hr ?? undefined, source: h.source as HRVSource,
         notes: h.notes ?? undefined, createdAt: h.created_at,
       })),
-      fightResults: live(fightQ.data as Row<'fight_results'>[] | null).map((r: Row<'fight_results'>) => ({
-        id: lid(r.id), campId: lid(r.camp_id), fighterId: userId, fightDate: r.fight_date,
-        opponent: r.opponent, outcome: r.outcome as FightResult['outcome'],
-        method: r.method as FightResult['method'], roundStopped: r.round_stopped ?? undefined,
-        totalRounds: r.total_rounds, rounds: (r.rounds ?? []) as unknown as FightRound[],
-        weighInWeight: r.weigh_in_weight ?? undefined, fightNightWeight: r.fight_night_weight ?? undefined,
-        stylePlanFollowed: (r.style_plan_followed ?? 3) as 1 | 2 | 3 | 4 | 5,
-        overallNotes: r.overall_notes ?? '', lessons: r.lessons ?? '',
-        readinessAtFight: r.readiness_at_fight ?? undefined, createdAt: r.created_at,
-      })),
+      fightResults,
       // `coachId` stays the coach's cloud uuid — there is no local profile to
       // resolve it against, and `coach_name` is denormalized onto the row for
       // exactly this reason (the fighter cannot read the coach's profile row).
@@ -763,6 +870,24 @@ export async function pullState(userId: string): Promise<PullResult> {
       gamification: (st?.gamification ?? null) as GamificationState | null,
       dashboardPrefs: (st?.dashboard_prefs ?? null) as DashboardPrefs | null,
       fitbitConfig: (st?.fitbit_config ?? null) as FitbitConfig | null,
+      campAdaptations,
+      dismissedAdaptations,
+      cornerSessions,
+      // Keys go up as `${kind}:${cloud uuid}` and come back as
+      // `${kind}:${local id}`. An analysis whose subject this pull did not
+      // return is dropped rather than mapped: `lid()` would mint a local id for
+      // it, and the analysis would then be keyed to a camp or fight that is not
+      // in the snapshot — saved output filed against nothing.
+      aiAnalyses: Object.fromEntries(
+        Object.entries((st?.ai_analyses ?? {}) as unknown as Record<string, AiAnalysis>)
+          .flatMap(([key, analysis]): [string, AiAnalysis][] => {
+            const sep = key.indexOf(':');
+            if (sep === -1) return [];
+            const localId = lid(key.slice(sep + 1));
+            if (!knownSubjectIds.has(localId)) return [];
+            return [[`${key.slice(0, sep)}:${localId}`, { ...analysis, subjectId: localId }]];
+          }),
+      ),
       previouslySynced,
       tombstoned,
     };
@@ -824,6 +949,15 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
   // safe.
   const liveCampIds = new Set(camps.map(camp => camp.id));
   const campPrefixes = camps.map(camp => `${camp.id}-`);
+  // The dismissal keys use a colon separator (`${campId}:${week}:${kind}`), not
+  // the hyphen the session maps use, so they need their own prefix list.
+  const campKeyPrefixes = camps.map(camp => `${camp.id}:`);
+
+  // Fight results are merged up here rather than inline below because saved AI
+  // analyses are filed against either a camp or a fight, and pruning them needs
+  // to know which fights survived the merge.
+  const fightResults = union(state.fightResults ?? [], c.fightResults);
+  const liveFightIds = new Set(fightResults.map(r => r.id));
   const forLiveCamps = (map: Record<string, boolean>): Record<string, boolean> =>
     Object.fromEntries(
       Object.entries(map).filter(([k]) => campPrefixes.some(prefix => k.startsWith(prefix))),
@@ -851,7 +985,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     weightEntries: union(state.weightEntries, c.weightEntries),
     nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
-    fightResults: union(state.fightResults ?? [], c.fightResults),
+    fightResults,
     // Coach notes merge like every other collection, but only the cloud side is
     // ever written by anyone but this device: a fighter's local `coachNotes`
     // are their own local-fighter notes, and the coach's arrive here. `union`
@@ -892,6 +1026,30 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
         }
       : undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,
+    // The three slices that used to stop at the device. Each is filtered to the
+    // surviving camps for the same reason the session maps are: they are
+    // camp-scoped, and merging them wholesale would re-seed an adaptation or a
+    // scored fight for a camp another device deleted.
+    //
+    // `union` is right for adaptations and corner sessions — they are id'd
+    // records, and the same delete semantics apply — but NOT for the dismissal
+    // list, which is a set of keys with no ids and no tombstones. A union of
+    // sets is the honest merge there: undismissing is not an action the app
+    // offers, so a key on either side stays dismissed.
+    campAdaptations: union(state.campAdaptations ?? [], c.campAdaptations)
+      .filter(a => liveCampIds.has(a.campId)),
+    cornerSessions: union(state.cornerSessions ?? [], c.cornerSessions)
+      .filter(s => liveCampIds.has(s.campId)),
+    dismissedAdaptations: [
+      ...new Set([...(state.dismissedAdaptations ?? []), ...c.dismissedAdaptations]),
+    ].filter(k => campKeyPrefixes.some(prefix => k.startsWith(prefix))),
+    // Cloud first so a locally-regenerated analysis wins over the stored one.
+    // Keyed on `${kind}:${subjectId}`, so filtering by the subject being live
+    // needs the id back out of the key.
+    aiAnalyses: Object.fromEntries(
+      [...Object.entries(c.aiAnalyses), ...Object.entries(state.aiAnalyses ?? {})]
+        .filter(([, a]) => liveCampIds.has(a.subjectId) || liveFightIds.has(a.subjectId)),
+    ),
   };
 }
 

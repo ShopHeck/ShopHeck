@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { supabase, isSupabaseConfigured, supabaseConfigError, supabaseHost, supabaseUrl } from '../lib/supabase';
 import {
   notifyLocalDataCleared,
@@ -26,15 +27,35 @@ const REQUEST_SIGN_OUT_EVENT = 'fightcamp:request-sign-out';
  * Supabase client parses the token out of the URL on load), so the web origin
  * is the destination in both builds.
  *
+ * On iOS the web origin is no longer a dead end: `/auth/recovery` is claimed as
+ * a universal link (see public/.well-known/apple-app-site-association and the
+ * associated-domains entitlement), so tapping a reset link in Mail opens the
+ * installed app straight onto the set-a-new-password screen. The URL still has
+ * to be an https one on the associated domain — that is how universal links
+ * work — so this function is unchanged in shape; what changed is that the link
+ * it builds is now intercepted.
+ *
  * Same env-with-production-fallback pattern as `VITE_FUNCTIONS_BASE` in
  * lib/aiCoach.ts, deliberately sharing that variable rather than adding a
  * second URL to keep in step with it.
  */
 const PROD_SITE = 'https://fightcamp.netlify.app';
-function emailRedirectUrl(): string {
+
+/**
+ * The path password-reset links land on.
+ *
+ * Its own path rather than the site root because the associated-domains file
+ * claims paths, not fragments: a rule broad enough to catch a recovery link at
+ * `/` would claim every URL on the domain, so tapping a link to the privacy
+ * policy or the support page would launch the app instead of opening the page.
+ * Netlify's SPA catch-all serves index.html here, so the web flow is unchanged.
+ */
+const RECOVERY_PATH = '/auth/recovery';
+
+function emailRedirectUrl(path = ''): string {
   const configured = import.meta.env.VITE_FUNCTIONS_BASE as string | undefined;
-  if (configured) return configured;
-  return Capacitor.isNativePlatform() ? PROD_SITE : window.location.origin;
+  const base = configured ?? (Capacitor.isNativePlatform() ? PROD_SITE : window.location.origin);
+  return `${base.replace(/\/$/, '')}${path}`;
 }
 
 function randomNonce(length = 32): string {
@@ -182,51 +203,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function resetPassword(email: string) {
     if (!supabase) return { error: unavailableReason() };
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: emailRedirectUrl(),
+      redirectTo: emailRedirectUrl(RECOVERY_PATH),
     });
     return error ? { error: friendlyAuthError(error.message) } : {};
   }
 
   /**
-   * Consume a password-reset redirect on first load.
+   * Consume a password-reset redirect, from either of the two ways one arrives.
    *
-   * Runs once, before anything else can navigate: the tokens live in the URL and
-   * are stripped as soon as they are read, so a later effect that happened to
-   * rewrite the location would destroy them. `detectSessionInUrl` is off (see
+   * **On load** — the web build, and the cold-start case on iOS. The tokens
+   * live in the URL and are stripped as soon as they are read, so this runs
+   * before anything else can navigate; an effect that happened to rewrite the
+   * location first would destroy them. `detectSessionInUrl` is off (see
    * lib/supabase.ts), which is exactly why this has to be explicit.
+   *
+   * **From `appUrlOpen`** — a universal link tapped while the app is already
+   * running. iOS hands the URL to the app without navigating the WebView, so
+   * `window.location` never changes and the load path above would never see it.
+   * This is the ordinary case, not the edge one: the app is usually still in
+   * the background when a fighter switches to Mail to find the link.
    */
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const params = readRecoveryParams(window.location.href);
-    if (!params) return;
 
-    // Strip immediately — these are credentials in the address bar, and they
-    // would otherwise survive into history or a screenshot.
-    window.history.replaceState({}, '', urlWithoutAuthParams(window.location.href));
-
-    if (params.kind === 'error') {
-      setRecovery({ active: false, error: params.message });
-      return;
-    }
-    if (!supabase) return;
-
-    const client = supabase;
     let cancelled = false;
-    (async () => {
+
+    async function consume(url: string, fromLocation: boolean) {
+      const params = readRecoveryParams(url);
+      if (!params) return;
+
+      // Strip immediately — these are credentials in the address bar, and they
+      // would otherwise survive into history or a screenshot. Only meaningful
+      // for the on-load path; an appUrlOpen URL was never in the address bar.
+      if (fromLocation) {
+        window.history.replaceState({}, '', urlWithoutAuthParams(window.location.href));
+      }
+
+      if (params.kind === 'error') {
+        if (!cancelled) setRecovery({ active: false, error: params.message });
+        return;
+      }
+      if (!supabase) return;
+
       const { error } = params.kind === 'tokens'
-        ? await client.auth.setSession({
+        ? await supabase.auth.setSession({
             access_token: params.accessToken,
             refresh_token: params.refreshToken,
           })
-        : await client.auth.exchangeCodeForSession(params.code);
+        : await supabase.auth.exchangeCodeForSession(params.code);
 
       if (cancelled) return;
       setRecovery(error
         ? { active: false, error: friendlyRecoveryError(error.message) }
         : { active: true });
-    })();
+    }
 
-    return () => { cancelled = true; };
+    void consume(window.location.href, true);
+
+    if (!Capacitor.isNativePlatform()) return () => { cancelled = true; };
+
+    // Imported lazily so the web bundle never pulls in the native plugin, and
+    // so a build without it configured cannot break sign-in on the web.
+    const handle = CapacitorApp.addListener('appUrlOpen', event => {
+      void consume(event.url, false);
+    });
+
+    return () => {
+      cancelled = true;
+      void handle.then(h => h.remove());
+    };
   }, []);
 
   async function completePasswordReset(password: string) {

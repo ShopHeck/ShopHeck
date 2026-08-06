@@ -115,6 +115,15 @@ export interface WeightEntry {
   weight: number;
   notes: string;
   createdAt: string;
+  /**
+   * This entry is the fight's official weigh-in, not a training weigh-in.
+   *
+   * The fighter tells us; nothing infers it. Whether the cut is *over* cannot be
+   * derived from the number and the calendar — being at target four days out is
+   * a fighter holding weight, and treating it as a completed cut is how the app
+   * would come to recommend refuelling before the scale. See `cutPhase`.
+   */
+  officialWeighIn?: boolean;
 }
 
 export interface MacroEntry {
@@ -453,9 +462,11 @@ export interface CornerRound {
  * the fighter's readiness weights from those numbers, so improving them
  * improves every future camp.
  *
- * Local-only, like the other post-Phase-4 slices: `pushState` enumerates the
- * columns it sends. A session is short-lived — it exists to be handed to the
- * post-fight form and then kept as the record of what the corner saw.
+ * Synced as `camps.corner_sessions`, with `campId` stripped — the row it is
+ * stored on already says which camp it belongs to, and a local camp id means
+ * nothing on the device that pulls it back. It lives on the camp rather than in
+ * a table of its own so a reinstall restores a fighter's corner-scored fights
+ * with the camp they belong to.
  */
 export interface CornerSession {
   id: string;
@@ -491,10 +502,13 @@ export type AdaptationKind = 'recovery' | 'deload' | 'intensify';
  * make the schedule flicker as data arrives, and would re-score finished camps
  * against a plan that never existed. See `utils/adaptiveCamp.ts`.
  *
- * Local-only for now — `pushState` enumerates the columns it sends, so this
- * does not reach the cloud, and a linked coach sees the unadapted plan. The
- * fighter's adherence is unaffected either way, because an adaptation never
- * changes the number of sessions in a week.
+ * Synced as `camps.adaptations`, with `campId` stripped (the row says which
+ * camp). Storing it on the camp rather than in its own table is what makes a
+ * linked coach see it: the coach's `select('*')` on camps already returns it,
+ * under the policy that already governs the camp. Before it synced, a coach saw
+ * the plan as generated — so a fighter who accepted a deload looked like one who
+ * had skipped the sessions. Adherence was never affected either way, because an
+ * adaptation does not change the number of sessions in a week.
  */
 export interface CampAdaptation {
   id: string;
@@ -525,10 +539,11 @@ export type AiAnalysisKind = 'insights' | 'post-fight';
  * A completed AI analysis, kept so leaving the screen doesn't destroy output
  * the subscription just paid to generate.
  *
- * Deliberately **local-only**: `pushState` enumerates the `user_state` columns
- * it sends, so this slice never reaches the cloud. These are long text blobs
- * that are cheap to regenerate and would otherwise inflate every sync for a
- * value the fighter can rebuild in one tap.
+ * Synced as `user_state.ai_analyses` — the fighter's own row, which no coach
+ * can read. Per-user rather than per-camp because a post-fight analysis hangs
+ * off a fight result, not a camp; the subject id is rewritten to its cloud uuid
+ * on the way out and back to a local id on the way in, so the key still names
+ * something on a second device.
  */
 export interface AiAnalysis {
   kind: AiAnalysisKind;
@@ -568,12 +583,12 @@ export interface AppState {
   fightResults: FightResult[];
   gamification?: GamificationState;
   dashboardPrefs?: DashboardPrefs;
-  /** Saved AI analyses, keyed by `${kind}:${subjectId}`. Local-only. */
+  /** Saved AI analyses, keyed by `${kind}:${subjectId}`. */
   aiAnalyses?: AiAnalyses;
-  /** Accepted schedule adaptations. Local-only — see CampAdaptation. */
+  /** Accepted schedule adaptations — see CampAdaptation. */
   campAdaptations?: CampAdaptation[];
   /** Adaptation keys the fighter dismissed, so the same card cannot re-nag. */
   dismissedAdaptations?: string[];
-  /** Fights scored live from the corner. Local-only — see CornerSession. */
+  /** Fights scored live from the corner — see CornerSession. */
   cornerSessions?: CornerSession[];
 }

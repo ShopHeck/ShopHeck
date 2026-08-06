@@ -28,68 +28,79 @@ verify it in one command.
 
 ## Open
 
-### Coach information architecture
+Nothing in `src/` or `ios/` is known-open. The five engineering items that stood
+here on 2026-08-05 are closed — see
+[`docs/submission-summary.md`](./submission-summary.md) for what each turned
+into.
 
-The Dashboard and Fighters tabs render the identical `CoachDashboard` component,
-so a coach has two tabs showing one screen.
+What is left is not code. Every item below needs an account, a dashboard or a
+device, and **each one is a silent failure**: the build compiles, ships and
+launches, and the feature is simply dead. They are listed in the order a
+submission hits them.
 
-```sh
-grep -n "CoachDashboard />" src/App.tsx     # two hits, same component
-```
+### Apply the sync migration in Supabase
 
-Now more worth fixing than it was: the Team Overview triage table gives the
-Dashboard tab something of its own to be, with Fighters remaining the roster and
-detail view.
-
-### Made weight hides Cut Coach instead of replacing it
-
-`WeightTracker` drops the Cut Coach panel entirely once `proj.status === 'made'`,
-so the fighter loses the feature at the moment fight-week rehydration and
-refuelling advice would be most useful.
+Adaptations, corner sessions, saved AI analyses and the official-weigh-in flag
+now push to columns that do not exist until the migration runs. `pushState` will
+fail on `user_state` and `weight_entries`, and the sync banner will show an
+error.
 
 ```sh
-grep -n "proj.status !== 'made'" src/components/WeightTracker.tsx
+# Supabase Dashboard → SQL Editor → run:
+cat supabase/migrations/20260805210000_sync_adaptations_corner_and_analyses.sql
 ```
 
-### Password reset does not work on native
+Idempotent (`add column if not exists`), so re-running it is safe.
 
-The recovery redirect is handled (`utils/authRecovery.ts`), but the link itself
-always points at the **web** origin — `emailRedirectUrl()` cannot use
-`capacitor://localhost` because a mail client can't resolve it. So a fighter who
-resets from the iOS app sets their new password in Safari, then returns to the
-app and signs in with it. That works, but it is a seam.
+### Allow-list the password-reset redirect
 
-Closing it means a universal link (associated domains + an `apple-app-site-association`
-file) so the reset link opens the app directly.
+Supabase silently falls back to the project Site URL for any `redirectTo` it
+does not recognise, so an un-listed URL does not error — it sends the fighter to
+`/`, where nothing claims the link and the app never opens.
 
-### Adaptations and corner sessions are local-only
+Add `https://fightcamp.netlify.app/auth/recovery` under **Authentication → URL
+Configuration → Redirect URLs**.
 
-`campAdaptations`, `cornerSessions` and `aiAnalyses` never reach the cloud —
-`pushState` enumerates the `user_state` columns it sends, and none of these are
-among them. Consequences, in order of how much they matter:
+### Enable Associated Domains on the App ID
 
-- A coach sees the **unadapted** plan for a fighter who accepted a deload.
-- A fighter who reinstalls loses their corner-scored fights.
+Required by the universal-link entitlement added in `App.entitlements`. Without
+it the entitlement fails to sign and the archive is rejected at upload — the one
+item here that is *not* silent.
 
-Adherence is *not* affected, by design: an adaptation never changes a week's
-session count, so a coach's adherence figure still matches their fighter's.
-
-Closing this means a schema migration (a `jsonb` column on `camps`, or new
-tables) plus push/pull wiring — see `src/lib/sync.ts`.
-
-### Apple Watch target is not in the Xcode project
-
-The watch app's Swift exists and is reviewed, but nothing compiles it yet, and
-**none of the Swift in this feature has been compiled at all**.
+Developer Portal → Identifiers → `app.fightcamptraining` → **Associated
+Domains**.
 
 ```sh
-grep -c WatchApp ios/App/App.xcodeproj/project.pbxproj      # 0 — no watch target
-grep -c WatchBridgePlugin ios/App/App.xcodeproj/project.pbxproj  # 4 — phone side IS wired
+grep -n associated-domains ios/App/App/App.entitlements   # 1 hit
 ```
 
-The phone-side plugin had to be added to the App target because `AppDelegate`
-registers it; without it the iOS build would not compile. The watch target
-itself is left as an Xcode step — see [`apple-watch.md`](./apple-watch.md).
+### Register the watch App ID and enable HealthKit on it
+
+`register_app_identifier` in the Fastfile creates
+`app.fightcamptraining.watchkitapp` on first archive, but it creates the
+identifier only — it does not set capabilities. Without HealthKit enabled there,
+the watch entitlement fails to sign.
+
+See [`apple-watch.md`](./apple-watch.md) § Remaining setup.
+
+### Compile the watch app once
+
+The `FightCampWatch` target now exists and compiles the Swift in
+`ios/App/WatchApp/`, but **no Swift in this feature has ever been type checked** —
+there is no Swift toolchain in the environment it was authored in. The first
+`xcodebuild` is the first compile. Expect to fix errors on that run; the target
+existing is what makes them findable rather than invisible.
+
+```sh
+grep -c FightCampWatch ios/App/App.xcodeproj/project.pbxproj   # >0 — target present
+```
+
+### Attach the IAP products to the version
+
+Carried over from the build-17 rejection and still the single most likely cause
+of another one (Guideline 2.1(b)). A subscription that is "Ready to Submit" but
+not *attached to the version* is not submitted. See
+[`app-store-submission.md`](./app-store-submission.md) § 9a.
 
 ---
 
@@ -99,4 +110,8 @@ itself is left as an Xcode step — see [`apple-watch.md`](./apple-watch.md).
   discard is the monthly/annual toggle. `AuthScreen`'s guard exists because the
   cost there was a half-typed sign-in form.
 - **A full visual redesign.** Proposed as three directions in PR #82 and
-  declined.
+  declined. (The Liquid Glass work that has since landed is the *existing*
+  design system being applied consistently, which is a different thing.)
+- **A watch complication, and the game plan on the wrist.** Real gaps, listed in
+  [`apple-watch.md`](./apple-watch.md) § Known gaps — but follow-up features
+  rather than unfinished work.
