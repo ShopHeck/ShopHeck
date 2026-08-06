@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, Circle, Timer } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCurrentWeekNumber } from '../utils/campGenerator';
 import { sessionKey as buildSessionKey, weekAdherence } from '../utils/adherence';
@@ -7,6 +7,7 @@ import { format, parseISO, addDays } from 'date-fns';
 import { triggerHaptic, HAPTIC } from '../hooks/useHaptics';
 import type { SessionType } from '../types';
 import type { LogPrefill } from '../App';
+import { timerPrefillForSession, type TimerPrefill } from '../utils/timerSession';
 import DurationBadge from './shared/DurationBadge';
 import { SESSION_COLORS, SESSION_LABELS } from '../utils/sessionVisuals';
 import { tint } from '../utils/designTokens';
@@ -48,9 +49,11 @@ const FULL_DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 
 interface Props {
   onLogSession: (prefill: LogPrefill) => void;
+  /** Opens the round timer already set up for this session. */
+  onStartTimer: (prefill: TimerPrefill) => void;
 }
 
-export default function WeeklyPlanner({ onLogSession }: Props) {
+export default function WeeklyPlanner({ onLogSession, onStartTimer }: Props) {
   const { state, dispatch } = useApp();
   const { activeCamp, trainingSchedule, completedSessions, dayOverrides, workoutLogs } = state;
 
@@ -59,7 +62,27 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDay());
 
   const week = trainingSchedule[selectedWeek - 1];
-  if (!week || !activeCamp) return null;
+  // `activeCamp` is guaranteed by App's camp gate, but `selectedWeek` is state:
+  // it survives a camp being regenerated shorter, which used to leave the whole
+  // planner rendering nothing under the header with no way to get back to a
+  // valid week. Snapping to the current week is always a legal move.
+  if (!activeCamp) return null;
+  if (!week) {
+    return (
+      <div className="mx-4 mt-10 card text-center py-12">
+        <p className="text-gray-400 font-semibold">Week {selectedWeek} isn&apos;t in this camp</p>
+        <p className="text-sm text-gray-450 mt-1 max-w-xs mx-auto">
+          This camp runs {trainingSchedule.length} week{trainingSchedule.length === 1 ? '' : 's'}.
+        </p>
+        <button
+          onClick={() => setSelectedWeek(currentWeekNum)}
+          className="btn-primary mt-4 mx-auto text-sm py-2 px-4"
+        >
+          Go to week {currentWeekNum}
+        </button>
+      </div>
+    );
+  }
 
   const isOffSeason = !!activeCamp.isOffSeason;
   // For off-season, compute cycle and phase-within-cycle for the selected week
@@ -341,20 +364,43 @@ export default function WeeklyPlanner({ onLogSession }: Props) {
                           <>
                             <p className="text-xs text-gray-400 mt-2 leading-relaxed">{session.description}</p>
                             {session.notes && <p className="text-xs text-gray-400 mt-1 italic">{session.notes}</p>}
-                            <button
-                              onClick={() => onLogSession({
-                                sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                                title: session.title,
-                                duration: session.duration,
-                              })}
-                              className={`mt-3 text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border ${
-                                isOffSeason
-                                  ? 'text-teal-400 border-teal-700/50'
-                                  : 'text-brand-400 border-brand-700/50'
-                              }`}
-                            >
-                              + Log this session
-                            </button>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                onClick={() => onLogSession({
+                                  sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                                  title: session.title,
+                                  duration: session.duration,
+                                })}
+                                className={`text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border ${
+                                  isOffSeason
+                                    ? 'text-teal-400 border-teal-700/50'
+                                    : 'text-brand-400 border-brand-700/50'
+                                }`}
+                              >
+                                + Log this session
+                              </button>
+                              {/* Only for sessions a round clock applies to —
+                                  `timerPrefillForSession` returns null for rest
+                                  and recovery, and the button follows it rather
+                                  than restating which types those are. */}
+                              {(() => {
+                                const tp = activeCamp ? timerPrefillForSession(session, activeCamp) : null;
+                                if (!tp) return null;
+                                return (
+                                  <button
+                                    onClick={() => { triggerHaptic(HAPTIC.tick); onStartTimer(tp); }}
+                                    className={`text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 ${
+                                      isOffSeason
+                                        ? 'text-teal-400 border-teal-700/50'
+                                        : 'text-brand-400 border-brand-700/50'
+                                    }`}
+                                  >
+                                    <Timer size={12} />
+                                    {tp.rounds}×{Math.round(tp.workSec / 60)}min
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </>
                         )}
                       </div>

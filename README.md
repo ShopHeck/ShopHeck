@@ -29,7 +29,7 @@ you need; each block documents what it turns on.
 | Command | What it does |
 |---|---|
 | `npm run quality` | The gate CI runs. Nothing merges red. |
-| `npm test` | Vitest, 281 tests |
+| `npm test` | Vitest, 288 tests |
 | `npm run cap:ios` | Build, sync, open Xcode |
 | `npm run screenshots` | Regenerate all 14 App Store captures |
 | `npm run verify:appstore` | Check the App Store asset set |
@@ -87,7 +87,9 @@ it, and an adaptation never changes a week's session count. See
 `utils/adaptiveCamp.ts`.
 
 **Round timer** — presets, custom presets, HR zones and MyZone points, Gym
-Display takeover, Live Activity / Dynamic Island, background round alerts.
+Display takeover, Live Activity / Dynamic Island, background round alerts. Any
+session on the plan opens the timer already set up for it — sparring inherits
+the fight's own round format. See `utils/timerSession.ts`.
 
 **Corner Mode** — fight night. The game plan's round segments show between
 rounds; the corner scores each round in one tap; the post-fight breakdown is

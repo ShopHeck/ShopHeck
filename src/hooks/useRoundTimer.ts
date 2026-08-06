@@ -93,6 +93,22 @@ function loadTimer(): TimerSave | null {
   } catch { return null; }
 }
 
+/**
+ * True when a session is mid-flight in persisted state.
+ *
+ * Needed because the timer view unmounts whenever the fighter navigates away,
+ * so on remount `phase` and `isRunning` are still their initial `idle`/false
+ * values: the restore effect below and any consumer effect run in the *same*
+ * commit, and both see the pre-restore render. Anything that must not disturb a
+ * live session has to ask storage — the same source restore reads — rather than
+ * the state, which has not caught up yet. ('done' is not live: a finished
+ * session is safe to clear.)
+ */
+export function hasLiveTimerSession(): boolean {
+  const saved = loadTimer();
+  return !!saved && saved.phase !== 'idle' && saved.phase !== 'done';
+}
+
 function fastForward(s: TimerSave): TimerSave {
   const { rounds, workSec, restSec, prepSec } = s;
   let { phase, currentRound, phaseDeadline } = s;
