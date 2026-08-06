@@ -72,6 +72,46 @@ generates and pushes just the missing profile. The shared certificate is reused,
 never reissued, so this cannot contribute to the certificate cap. Running the
 `certs` lane by hand does the same thing up front.
 
+## Entitlements and capabilities
+
+An entitlement in a target's `.entitlements` file is only half of the
+arrangement. The other half is a **capability on the App ID**, and Apple writes
+an App ID's capabilities into a provisioning profile at the moment the profile
+is cut — so a profile issued before a capability was enabled never gains it, no
+matter how many times it is downloaded. Xcode compares the two at archive time:
+
+```
+Provisioning profile "match AppStore app.fightcamptraining.watchkitapp"
+doesn't include the com.apple.developer.healthkit and
+com.apple.developer.healthkit.access entitlements.
+(in target 'FightCampWatch' from project 'App')
+```
+
+That lands ~20 minutes into a macOS run and names neither the App ID nor the
+stale profile, which are the two things actually wrong. Both halves are now
+handled automatically, on every archive:
+
+- **`sync_app_capabilities`** reads each signed target's `CODE_SIGN_ENTITLEMENTS`
+  plist out of the Xcode project, maps each key through `ENTITLEMENT_CAPABILITIES`
+  in the Fastfile, and enables anything the App ID is missing.
+- **`sync_match_profiles`** then parses the profile match installed for each
+  bundle and re-issues any that does not carry the entitlements its target
+  ships. That covers a capability enabled a moment earlier *and* one enabled by
+  hand in the portal — neither reaches back into a profile already in storage.
+  Only the profile is re-cut; the shared certificate is reused, so this cannot
+  contribute to the certificate cap either.
+
+**Adding an entitlement is one edit**: put it in the target's `.entitlements`
+file. If `ENTITLEMENT_CAPABILITIES` has no row for the key, the build stops
+immediately and tells you to add one, rather than archiving for twenty minutes
+and failing at signing. Use `capability: nil` for an entitlement Apple grants
+without a capability of its own.
+
+If a re-cut profile *still* lacks the entitlement, the capability did not take
+on the App ID — a few cannot be set through the App Store Connect API and have
+to be ticked once by hand under Identifiers in the Developer Portal. The lane
+says so by name and stops before the archive.
+
 ### Two things Apple checks that signing does not
 
 Both of these reject the **upload**, minutes after a green archive:

@@ -61,28 +61,6 @@ does not recognise, so an un-listed URL does not error — it sends the fighter 
 Add `https://fightcamp.netlify.app/auth/recovery` under **Authentication → URL
 Configuration → Redirect URLs**.
 
-### Enable Associated Domains on the App ID
-
-Required by the universal-link entitlement added in `App.entitlements`. Without
-it the entitlement fails to sign and the archive is rejected at upload — the one
-item here that is *not* silent.
-
-Developer Portal → Identifiers → `app.fightcamptraining` → **Associated
-Domains**.
-
-```sh
-grep -n associated-domains ios/App/App/App.entitlements   # 1 hit
-```
-
-### Register the watch App ID and enable HealthKit on it
-
-`register_app_identifier` in the Fastfile creates
-`app.fightcamptraining.watchkitapp` on first archive, but it creates the
-identifier only — it does not set capabilities. Without HealthKit enabled there,
-the watch entitlement fails to sign.
-
-See [`apple-watch.md`](./apple-watch.md) § Remaining setup.
-
 ### Compile the watch app once
 
 The `FightCampWatch` target now exists and compiles the Swift in
