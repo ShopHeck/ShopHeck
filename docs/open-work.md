@@ -61,17 +61,16 @@ does not recognise, so an un-listed URL does not error — it sends the fighter 
 Add `https://fightcamp.netlify.app/auth/recovery` under **Authentication → URL
 Configuration → Redirect URLs**.
 
-### Compile the watch app once
+### Run the watch app once, on a wrist
 
-The `FightCampWatch` target now exists and compiles the Swift in
-`ios/App/WatchApp/`, but **no Swift in this feature has ever been type checked** —
-there is no Swift toolchain in the environment it was authored in. The first
-`xcodebuild` is the first compile. Expect to fix errors on that run; the target
-existing is what makes them findable rather than invisible.
+The watch app now compiles and ships — it is in the TestFlight build. What it
+has never done is *run*. Every line of `ios/App/WatchApp/` has been type checked
+and none of it has been executed: the bells, the phone link, the heart-rate
+stream and the clock are all reasoning rather than observation.
 
-```sh
-grep -c FightCampWatch ios/App/App.xcodeproj/project.pbxproj   # >0 — target present
-```
+Pair a watch, install the TestFlight build, and work through
+[`apple-watch.md`](./apple-watch.md) § Verifying. Expect to find things; a
+compiler agrees a `Timer` is well typed, not that it fires when the wrist drops.
 
 ### Attach the IAP products to the version
 

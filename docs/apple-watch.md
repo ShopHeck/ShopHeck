@@ -7,9 +7,10 @@ the timer's HR ring, the recovery score — required a Bluetooth chest strap. Mo
 fighters do not own one. A lot of them own a watch. This is the same data
 through a different pipe, so the whole HR half of the app lights up for them.
 
-> **Build status.** This target now **compiles and archives**. Getting there
-> took three rounds, each one uncovering the next because the previous failure
-> had been masking it:
+> **Build status.** This target now **builds, signs and ships to TestFlight**
+> ([run 31068591596](https://github.com/ShopHeck/ShopHeck/actions/runs/31068591596)).
+> Getting there took three rounds, each one uncovering the next because the
+> previous failure had been masking it:
 >
 > 1. **Signing.** The watch App ID had no HealthKit capability, so its profile
 >    was cut without the entitlement and the archive refused to sign. Fixed in
@@ -20,17 +21,17 @@ through a different pipe, so the whole HR half of the app lights up for them.
 >    the next line already provides the runtime it reached for, and the call was
 >    `invalidate()`, which would have *ended* a session rather than kept the
 >    screen alive. Everything else type checked first time.
-> 3. **Uploading — still open.** `build_app` then went green (212s), and Apple
->    rejected the upload instead: a bundle carrying the HealthKit entitlement
->    must ship `NSHealthUpdateUsageDescription` even when it only reads. The key
->    is added, which is the documented fix, but **no upload has succeeded yet**.
->    Apple validates in stages, so a further complaint behind this one is
->    possible. The next post-merge run is what settles it.
+> 3. **Uploading.** `build_app` then went green (212s) and Apple rejected the
+>    upload instead: a bundle carrying the HealthKit entitlement must ship
+>    `NSHealthUpdateUsageDescription` even when it only reads. Added, and the
+>    next run uploaded cleanly.
 >
-> Two things are unproven, then. Whether Apple accepts the bundle — see above.
-> And whether any of this *runs*: nothing here has executed on a wrist, and a
-> compiler checking types says nothing about whether the timer keeps time or the
-> bells ring. See *Verifying* below.
+> What is still unproven is *running*. Nothing here has executed on a wrist. A
+> green upload means Apple accepted the bundle's shape — signatures, plists,
+> versions — and says nothing about whether the timer keeps time, the bells
+> ring, or the heart rate arrives. Every claim in the sections below is
+> reasoning about code that has been type checked and never run. See
+> *Verifying*, and treat the first wrist session as the real test.
 >
 > The Developer Portal side — the watch App ID and the HealthKit capability on
 > it — is provisioned by the pipeline rather than by hand; see *Signing setup*
