@@ -40,9 +40,26 @@ export async function generatePKCE(): Promise<{ verifier: string; challenge: str
 
 // ─── Auth URL ─────────────────────────────────────────────────────────────
 
+/**
+ * OAuth redirect target.
+ *
+ * Prefer `VITE_FITBIT_REDIRECT_URI` so native (capacitor://localhost) and web
+ * share one HTTPS callback registered in the Fitbit developer console —
+ * universal links then open the app. Without it, fall back to the current
+ * origin+pathname (excludes hash/search so PKCE state is not part of the URI).
+ * Fitbit matches redirect_uri exactly, so the value must be stable across the
+ * authorize and token exchange steps.
+ */
+export function fitbitRedirectUri(): string {
+  const configured = (import.meta.env.VITE_FITBIT_REDIRECT_URI as string | undefined)?.trim();
+  if (configured) return configured;
+  if (typeof window === 'undefined') return 'https://fightcamp.netlify.app/';
+  const path = window.location.pathname || '/';
+  return window.location.origin + path;
+}
+
 function redirectURI(): string {
-  // Use origin + pathname so hash and search params are excluded
-  return window.location.origin + window.location.pathname;
+  return fitbitRedirectUri();
 }
 
 export function buildFitbitAuthURL(clientId: string, challenge: string, state: string): string {

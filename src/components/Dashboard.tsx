@@ -20,6 +20,7 @@ import FightCountdownCard from './shared/FightCountdownCard';
 import FightReadinessGauge from './shared/FightReadinessGauge';
 import { SESSION_COLORS, SESSION_ICONS } from '../utils/sessionVisuals';
 import { readinessColor, tint } from '../utils/designTokens';
+import { timerPrefillForDay, type TimerPrefill } from '../utils/timerSession';
 
 /**
  * Camp phases run cool→hot as the fight approaches, which is why they use the
@@ -43,9 +44,11 @@ import type { LogPrefill } from '../App';
 interface Props {
   onNavigate: (view: string, prefill?: LogPrefill) => void;
   onShowFightBreakdown: (fightId: string) => void;
+  /** Same handover the weekly planner uses so Today starts the right clock. */
+  onStartTimer: (prefill: TimerPrefill) => void;
 }
 
-export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
+export default function Dashboard({ onNavigate, onShowFightBreakdown, onStartTimer }: Props) {
   const { state } = useApp();
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults, conditioningTests, nutritionLogs } = state;
@@ -134,11 +137,18 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
 
+  // Same derivation the planner's "Start timer" uses, applied to the first
+  // timeable block on today's card. Without this the CTA only opened a bare
+  // default timer and ignored the planned session.
+  const todayTimerPrefill = todaySessions && !todaySessions.isRestDay
+    ? timerPrefillForDay(todaySessions.sessions, activeCamp)
+    : null;
+
   return (
     <div className="space-y-4 pb-4">
-      {/* Locked contract — §3.4. Content order, dimensions and the fight-week
-          crimson state all live in the component, so this card cannot drift
-          from the one the readiness screen and the spec describe. */}
+      {/* Today cockpit order: countdown → readiness → train today → weight →
+          coach/adaptation → secondary analytics. Progress/tools stay below the
+          fold so fight-week decisions are one glance. */}
       <div className="mt-4">
         <FightCountdownCard
           daysOut={daysUntil}
@@ -154,8 +164,6 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         />
       </div>
 
-      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
-
       {/* Corner Mode — fight week only, and only until a result exists. The
           whole value is being one tap away on the night; buried in a menu it
           would never be found with gloves already on. */}
@@ -163,7 +171,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onNavigate('corner')}
-            className="w-full flex items-center gap-3 bg-gradient-to-br from-red-900/40 to-dark-700 border border-red-800/60 rounded-2xl p-4 text-left hover:border-red-600 transition-colors"
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-red-900/40 to-dark-700 border border-red-800/60 rounded-2xl p-4 text-left hover:border-red-600 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-red-900/50 flex items-center justify-center flex-shrink-0">
               <Swords size={22} className="text-red-300" />
@@ -184,7 +192,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onNavigate('fight-log')}
-            className="w-full flex items-center gap-3 bg-gradient-to-br from-purple-900/40 to-dark-700 border border-purple-800 rounded-2xl p-4 text-left hover:border-purple-600 transition-colors"
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-purple-900/40 to-dark-700 border border-purple-800 rounded-2xl p-4 text-left hover:border-purple-600 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-purple-900/50 flex items-center justify-center flex-shrink-0">
               <Trophy size={22} className="text-purple-300" />
@@ -203,7 +211,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onShowFightBreakdown(campFightResult.id)}
-            className="w-full flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-2xl p-4 text-left hover:border-brand-700 transition-colors"
+            className="w-full flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-2xl p-4 text-left hover:border-brand-700 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-brand-900/40 flex items-center justify-center flex-shrink-0">
               <History size={20} className="text-brand-300" />
@@ -219,12 +227,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Compact readiness variant (§3.6): the same gauge component the detail
-          screen renders, at a smaller scale, with one line of truncated
-          recommendation and a chevron. It links to the full screen rather than
-          duplicating it — which is also why the breakdown does not appear here.
-          This previously drew a rotated full circle while the detail screen drew
-          the correct 270° arc, so the same score had two different shapes. */}
+      {/* Compact readiness — primary decision surface after countdown. */}
       {readiness && (
         <div className="mx-4">
           <GlassSurface
@@ -260,9 +263,32 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Coach Note Banner */}
-      {/* Adaptive Camp — renders nothing unless the signals genuinely warrant
-          a change, so it sits above the coach note without competing with it. */}
+      {/* Primary action: start today's work with the same timer prefill the
+          planner uses. Falls back to a bare timer only when nothing today is
+          round-clockable (rest / recovery-only). */}
+      {todaySessions && !todaySessions.isRestDay && todaySessions.sessions[0] && (
+        <div className="mx-4">
+          <button
+            onClick={() => {
+              if (todayTimerPrefill) onStartTimer(todayTimerPrefill);
+              else onNavigate('timer');
+            }}
+            className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base min-h-[52px]"
+          >
+            <Zap size={18} />
+            {todayTimerPrefill ? 'Start today\'s session' : 'Open timer'}
+          </button>
+          <p className="text-xs text-gray-450 text-center mt-2 truncate">
+            {todayTimerPrefill
+              ? `${todayTimerPrefill.label} · ${todayTimerPrefill.rounds}×${Math.round(todayTimerPrefill.workSec / 60)}min`
+              : todaySessions.sessions[0].title}
+            {!todayTimerPrefill && todaySessions.sessions.length > 1
+              ? ` · +${todaySessions.sessions.length - 1} more`
+              : ''}
+          </p>
+        </div>
+      )}
+
       <AdaptationCard />
 
       {latestCoachNote && (
@@ -283,6 +309,30 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           </div>
         </div>
       )}
+
+      {/* Metric tiles */}
+      <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+        <GlassMetricTile
+          label={madeWeight ? 'On target' : 'To cut'}
+          value={madeWeight ? '✓' : weightToGo}
+          icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
+          onClick={() => onNavigate('weight')}
+        />
+        <GlassMetricTile
+          label="Sessions"
+          value={totalWorkouts}
+          icon={<Activity size={13} style={{ color: 'var(--accent-green)' }} />}
+          onClick={() => onNavigate('log')}
+        />
+        <GlassMetricTile
+          label="Rounds"
+          value={totalSparingRounds}
+          icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
+          onClick={() => onNavigate('progress')}
+        />
+      </div>
+
+      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
 
       {/* Current Phase */}
       {currentWeek && (
@@ -340,30 +390,6 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           </div>
         </div>
       )}
-
-      {/* Metric tiles — locked dimensions (§3.4), solid fill rather than live
-          blur (§3.2 names this grid specifically). Labels are single-line by
-          contract, so the unit moves into the label and the value stays bare. */}
-      <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
-        <GlassMetricTile
-          label={madeWeight ? 'On target' : 'To cut'}
-          value={madeWeight ? '✓' : weightToGo}
-          icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
-          onClick={() => onNavigate('weight')}
-        />
-        <GlassMetricTile
-          label="Sessions"
-          value={totalWorkouts}
-          icon={<Activity size={13} style={{ color: 'var(--accent-green)' }} />}
-          onClick={() => onNavigate('log')}
-        />
-        <GlassMetricTile
-          label="Rounds"
-          value={totalSparingRounds}
-          icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
-          onClick={() => onNavigate('progress')}
-        />
-      </div>
 
       {/* This Week Summary */}
       {(weekPlanned > 0 || weekLogs.length > 0) && (

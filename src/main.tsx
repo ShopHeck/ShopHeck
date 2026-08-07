@@ -20,6 +20,7 @@ import '@fontsource/inter/latin-900.css'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
+import { scrubSentryEvent } from './utils/sentryScrub'
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -27,6 +28,11 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     release: 'fight-camp-training@1.0.0',
     integrations: [SentryReact.browserTracingIntegration()],
     tracesSampleRate: 0.1,
+    // Strip bearer tokens, Fitbit/Stripe secrets and health fields before any
+    // event leaves the device. Crash reporting still works; payloads do not.
+    beforeSend(event) {
+      return scrubSentryEvent(event as unknown as Record<string, unknown>) as unknown as typeof event;
+    },
   }, SentryReact.init);
 }
 

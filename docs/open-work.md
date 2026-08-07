@@ -99,6 +99,11 @@ Optional smoke after those two:
   cleanup); JS always calls native end when ending.
 - Watch commands carry `sessionId` + `seq` + `createdAt`; phone drops stale /
   wrong-session queued commands (`WatchBridgePlugin`, `src/utils/watchCommand.ts`).
+- Sentry `beforeSend` scrubs tokens/health fields (`src/utils/sentryScrub.ts`).
+- Fitbit bearer tokens persist outside the main account blob; optional
+  `VITE_FITBIT_REDIRECT_URI` for stable OAuth redirects.
+- Today dashboard prioritizes countdown → readiness → start session; timer glove
+  mode + larger planner CTAs; focus-visible rings; OffSeasonDashboard lazy-loaded.
 
 ---
 

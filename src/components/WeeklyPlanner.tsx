@@ -371,7 +371,7 @@ export default function WeeklyPlanner({ onLogSession, onStartTimer }: Props) {
                                   title: session.title,
                                   duration: session.duration,
                                 })}
-                                className={`text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border ${
+                                className={`text-sm font-semibold min-h-[44px] bg-black/30 hover:bg-black/50 px-4 py-2.5 rounded-xl transition-all border ${
                                   isOffSeason
                                     ? 'text-teal-400 border-teal-700/50'
                                     : 'text-brand-400 border-brand-700/50'
@@ -389,14 +389,14 @@ export default function WeeklyPlanner({ onLogSession, onStartTimer }: Props) {
                                 return (
                                   <button
                                     onClick={() => { triggerHaptic(HAPTIC.tick); onStartTimer(tp); }}
-                                    className={`text-xs font-semibold bg-black/30 hover:bg-black/50 px-3 py-1.5 rounded-lg transition-all border flex items-center gap-1.5 ${
+                                    className={`text-sm font-semibold min-h-[44px] bg-black/30 hover:bg-black/50 px-4 py-2.5 rounded-xl transition-all border flex items-center gap-1.5 ${
                                       isOffSeason
                                         ? 'text-teal-400 border-teal-700/50'
                                         : 'text-brand-400 border-brand-700/50'
                                     }`}
                                   >
-                                    <Timer size={12} />
-                                    {tp.rounds}×{Math.round(tp.workSec / 60)}min
+                                    <Timer size={14} />
+                                    Start timer · {tp.rounds}×{Math.round(tp.workSec / 60)}min
                                   </button>
                                 );
                               })()}
