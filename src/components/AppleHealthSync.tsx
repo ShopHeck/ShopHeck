@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
-import { Heart, Upload, Download, CheckCircle, AlertCircle, ChevronDown, X } from 'lucide-react';
+import { Heart, Upload, Download, CheckCircle, AlertCircle, ChevronDown, X, Smartphone } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useApp } from '../context/AppContext';
 import { addDays, format, parseISO } from 'date-fns';
 import type { WeightEntry, WorkoutLog, SessionType } from '../types';
 import { formatWeight } from '../utils/units';
+import { previewNativeHealthImport } from '../utils/healthSync';
 
 // Map Apple Health workout types to app session types
 const HK_TYPE_MAP: Record<string, { type: SessionType; label: string }> = {
@@ -110,6 +112,84 @@ export default function AppleHealthSync() {
   const [imported, setImported] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [nativeBusy, setNativeBusy] = useState(false);
+  const isNative = Capacitor.isNativePlatform();
+
+  async function importFromDevice() {
+    if (!activeCamp) {
+      setImportError('Set up a fight camp first before importing.');
+      return;
+    }
+    setImportError('');
+    setPreview(null);
+    setImported(false);
+    setNativeBusy(true);
+    try {
+      const campStart = activeCamp.startDate;
+      const campEnd = activeCamp.fightDate
+        ?? format(addDays(parseISO(activeCamp.startDate), activeCamp.campWeeks * 7), 'yyyy-MM-dd');
+      const existingDates = new Set(
+        weightEntries.filter(e => e.campId === activeCamp.id).map(e => e.date),
+      );
+      const existingWorkoutKeys = new Set(
+        workoutLogs.filter(l => l.campId === activeCamp.id).map(l => `${l.date}-${l.title}`),
+      );
+      const res = await previewNativeHealthImport({
+        campStart,
+        campEnd,
+        existingWeightDates: existingDates,
+        existingWorkoutKeys: existingWorkoutKeys,
+      });
+      if (!res.available) {
+        setImportError('Apple Health is not available on this device.');
+        return;
+      }
+      if (!res.granted) {
+        setImportError(res.error || 'Health access was not granted. Enable Fight Camp in Settings → Health → Data Access.');
+        return;
+      }
+      if (res.weights.length === 0 && res.workouts.length === 0) {
+        setImportError('No new weigh-ins or workouts found in this camp’s date range.');
+        return;
+      }
+      const campId = activeCamp.id;
+      const campWeeks = activeCamp.campWeeks;
+      const weights = res.weights.map(w => ({
+        campId,
+        date: w.date,
+        weight: w.weight,
+        notes: w.notes,
+      }));
+      const workouts = res.workouts.map(w => {
+        const weekNumber = getWeekNumForDate(w.date, campStart, campWeeks);
+        return {
+          campId,
+          date: w.date,
+          weekNumber,
+          dayLabel: format(parseISO(w.date), 'EEEE'),
+          sessionType: w.sessionType,
+          title: w.title,
+          duration: w.duration,
+          rpe: w.rpe,
+          notes: w.notes,
+          completed: true as const,
+        };
+      });
+      const allDates = [...weights.map(w => w.date), ...workouts.map(w => w.date)];
+      setPreview({
+        weights,
+        workouts,
+        dateRange: {
+          min: allDates.reduce((a, b) => (a < b ? a : b)),
+          max: allDates.reduce((a, b) => (a > b ? a : b)),
+        },
+        rawWeightCount: res.weights.length,
+        rawWorkoutCount: res.workouts.length,
+      });
+    } finally {
+      setNativeBusy(false);
+    }
+  }
 
   function handleFile(file: File) {
     setImportError('');
@@ -267,13 +347,39 @@ export default function AppleHealthSync() {
       {/* IMPORT TAB */}
       {tab === 'import' && (
         <div className="space-y-4">
+          {isNative && (
+            <div className="mx-4 card space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-900/40 flex items-center justify-center flex-shrink-0">
+                  <Smartphone size={18} className="text-brand-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white">Import from this iPhone</p>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Pull weigh-ins and workouts from Apple Health for this camp — no Mac export needed.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void importFromDevice()}
+                disabled={nativeBusy || !activeCamp}
+                className="btn-primary w-full min-h-[48px] disabled:opacity-50"
+              >
+                {nativeBusy ? 'Reading Health…' : 'Import from Apple Health'}
+              </button>
+            </div>
+          )}
+
           {/* Instructions */}
           <div className="mx-4">
             <button
               onClick={() => setShowInstructions(s => !s)}
               className="w-full flex items-center justify-between text-left"
             >
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">How to Export from Apple Health</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                {isNative ? 'Or export XML from Health' : 'How to Export from Apple Health'}
+              </p>
               <ChevronDown size={14} className={`text-gray-400 transition-transform ${showInstructions ? 'rotate-180' : ''}`} />
             </button>
             {showInstructions && (

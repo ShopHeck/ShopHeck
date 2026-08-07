@@ -25,6 +25,7 @@ import GlassMetricTile from './shared/GlassMetricTile';
 import { PACE_COLORS, type PaceTier } from '../utils/designTokens';
 import CutCoach from './CutCoach';
 import { computeCutProjection, idealWeightAt } from '../utils/weightCut';
+import { evaluateCutSafety } from '../utils/cutSafety';
 import { parseWeightInput, weightRangeHint } from '../utils/validation';
 import { todayISO, isFutureISODate } from '../utils/dates';
 
@@ -165,14 +166,15 @@ export default function WeightTracker() {
   }
 
   // Flag the hard "concern" on the RATE required, not just absolute lbs — an 8-lb
-  // cut in 4 days (2 lb/day) is dangerous even though it's under 10 lbs. proj
-  // .lbsPerDayNeeded is calendar-day based and collapses to the raw remaining lbs
-  // on weigh-in day, which is correctly treated as urgent. The old absolute-lbs
-  // trigger is kept as a fallback so nothing that used to warn stops warning.
+  // cut in 4 days (2 lb/day) is dangerous even though it's under 10 lbs.
+  // evaluateCutSafety uses needed vs observed weekly pace (~2 lb/week and ~1%
+  // body-weight/week aggressive; higher = extreme). Short-window absolute cuts
+  // still trip the days-left fallback below.
+  const cutSafety = evaluateCutSafety(proj);
   const cutRatePerDay = proj.trackable && proj.status !== 'made' ? proj.lbsPerDayNeeded : null;
-  const isDangerousRate = cutRatePerDay !== null && cutRatePerDay >= 1.5;
+  const isDangerousRate = cutSafety.level === 'extreme';
   const isCritical =
-    (cutRatePerDay !== null && cutRatePerDay >= 1) ||
+    cutSafety.level !== 'ok' ||
     (daysUntilFight !== null && toGo > 10 && daysUntilFight < 14);
 
   // The domain has five projection states; the design system has three pace
@@ -257,11 +259,14 @@ export default function WeightTracker() {
         <div className="mx-4 bg-red-900/30 border border-red-800 rounded-xl p-3 flex items-start gap-3">
           <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-red-300">Weight Cut Concern</p>
+            <p className="text-sm font-semibold text-red-300">
+              {cutSafety.level === 'extreme' ? 'Unsafe cut pace' : 'Weight Cut Concern'}
+            </p>
             <p className="text-xs text-red-400/80 mt-0.5">
-              {isDangerousRate
-                ? `Making weight would take about ${d(cutRatePerDay!).toFixed(1)} ${unit}/day — an unsafe pace. Talk to your coach before cutting further.`
-                : `You have ${formatWeightDelta(toGo, unit)} to cut with ${daysUntilFight ?? 0} days until fight${cutRatePerDay !== null ? ` (~${d(cutRatePerDay).toFixed(1)} ${unit}/day)` : ''}. Consult your coach.`}
+              {cutSafety.message
+                || (isDangerousRate
+                  ? `Making weight would take about ${d(cutRatePerDay!).toFixed(1)} ${unit}/day — an unsafe pace. Talk to your coach before cutting further.`
+                  : `You have ${formatWeightDelta(toGo, unit)} to cut with ${daysUntilFight ?? 0} days until fight${cutRatePerDay !== null ? ` (~${d(cutRatePerDay).toFixed(1)} ${unit}/day)` : ''}. Consult your coach.`)}
             </p>
           </div>
         </div>

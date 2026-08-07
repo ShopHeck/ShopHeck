@@ -104,6 +104,8 @@ Optional smoke after those two:
   `VITE_FITBIT_REDIRECT_URI` for stable OAuth redirects.
 - Today dashboard prioritizes countdown → readiness → start session; timer glove
   mode + larger planner CTAs; focus-visible rings; OffSeasonDashboard lazy-loaded.
+- Native Apple Health **read** import (one-tap on device) plus cut-rate safety
+  warnings (`cutSafety.ts`) and phone timer applying filtered Watch commands.
 
 ---
 
