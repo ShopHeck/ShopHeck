@@ -22,10 +22,11 @@ is the free tier's taster, bounded by the free quota.
 
 ## Setup checklist
 
-1. **Apply the schema addition.** `supabase/schema.sql` now contains the
-   `ai_usage` table and the `increment_ai_usage` function (bottom of the file).
-   Run that section in the Supabase SQL editor (the whole file is idempotent —
-   re-running it is safe).
+1. **Apply the schema addition.** Prefer running the ordered files in
+   `supabase/migrations/`. `supabase/schema.sql` is a full snapshot that ends
+   with authorization hardening — safe to re-run only if you run the **entire**
+   file (the harden block must remain last). The `ai_usage` table and
+   `increment_ai_usage` function live near the end of the snapshot.
 2. **Set Netlify env vars** (Site settings → Environment variables, server-only,
    no `VITE_` prefix):
    | Var | Required | Default | Notes |

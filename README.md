@@ -32,7 +32,17 @@ you need; each block documents what it turns on.
 | `npm test` | Vitest, 288 tests |
 | `npm run cap:ios` | Build, sync, open Xcode |
 | `npm run screenshots` | Regenerate all 14 App Store captures |
+| `npm run preview:video` | Generate App Store preview videos |
 | `npm run verify:appstore` | Check the App Store asset set |
+
+### iOS native dependencies
+
+```bash
+npm run build && npx cap sync ios
+cd ios/App && pod install   # Homebrew CocoaPods — never bundle exec pod
+```
+
+See [`docs/ios-cocoapods.md`](docs/ios-cocoapods.md).
 
 ---
 
@@ -123,6 +133,8 @@ subscription with a monthly quota.
 | [`app-store-listing.md`](docs/app-store-listing.md) | Listing copy |
 | [`troubleshooting-signin-and-purchases.md`](docs/troubleshooting-signin-and-purchases.md) | When sign-in or IAP fails |
 | [`open-work.md`](docs/open-work.md) | What is actually still open |
+| [`release-checklist-ops.md`](docs/release-checklist-ops.md) | Non-code ship checklist |
+| [`ios-cocoapods.md`](docs/ios-cocoapods.md) | `pod install` vs Bundler |
 | [`submission-summary.md`](docs/submission-summary.md) | What changed since build 17 (dated snapshot) |
 | [`audit-2026-08.md`](docs/audit-2026-08.md) | Engineering audit (historical) |
 | [`ux-audit.md`](docs/ux-audit.md) | UX audit (historical) |

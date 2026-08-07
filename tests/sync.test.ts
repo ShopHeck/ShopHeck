@@ -170,7 +170,7 @@ describe('pullState — ordering', () => {
       const tables = mock.orders.map(o => o.table).sort();
       expect(tables).toEqual([
         'camps', 'coach_notes', 'conditioning_tests', 'fight_results', 'hrv_entries',
-        'nutrition_logs', 'sparring_logs', 'weight_entries', 'workout_logs',
+        'nutrition_logs', 'sparring_logs', 'timer_presets', 'weight_entries', 'workout_logs',
       ]);
     });
   });
@@ -191,6 +191,7 @@ describe('pullState — ordering', () => {
         // Coach notes are keyed by fighter_id rather than user_id, but they
         // are still a prepend-convention list and must come back newest-first.
         'coach_notes',
+        'timer_presets',
       ]) {
         expect(byTable[table].ascending, `${table} must be newest-first`).toBe(false);
       }
@@ -211,7 +212,7 @@ describe('pullState — pagination', () => {
       const tables = mock.ranges.map(r => r.table).sort();
       expect(tables).toEqual([
         'camps', 'coach_notes', 'conditioning_tests', 'fight_results', 'hrv_entries',
-        'nutrition_logs', 'sparring_logs', 'weight_entries', 'workout_logs',
+        'nutrition_logs', 'sparring_logs', 'timer_presets', 'weight_entries', 'workout_logs',
       ]);
       for (const r of mock.ranges) {
         expect(r.from).toBe(0);

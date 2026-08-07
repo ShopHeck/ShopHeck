@@ -1,5 +1,5 @@
 import { getSupabase } from './supabase';
-import { generateId } from '../utils/storage';
+import { generateId, loadCustomPresets, saveCustomPresets } from '../utils/storage';
 import type { Database } from './database.types';
 import type {
   AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest,
@@ -7,6 +7,7 @@ import type {
   DashboardPrefs, FitbitConfig, MacroEntry, CampFactorWeights, FightRound,
   Sport, WeightClass, ExperienceLevel, UserRole, SessionType, OffSeasonGoal, HRVSource,
   SubscriptionState, CoachNote, CampAdaptation, CornerSession, AiAnalysis, AiAnalyses,
+  CustomTimerPreset,
 } from '../types';
 
 type Row<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
@@ -251,6 +252,16 @@ export async function pushState(
      * would take the account's identity row with it.
      */
     prunable = false,
+    /**
+     * Column used for dirty-hash keys and prune `.in(...)` filters.
+     *
+     * Defaults to `onConflict`. Set separately when the upsert conflict target
+     * is a composite natural key (e.g. nutrition_logs unique on
+     * user_id,camp_id,date) but tombstones still address rows by primary `id`.
+     * Without this, a composite onConflict string is not a row field, so every
+     * row would hash-collide on "" and prune would call `.in('user_id,camp_id,date', …)`.
+     */
+    hashKey = onConflict,
   ): Promise<string | null> => {
     const key = String(table);
     const prev = hashes.tables[key] ?? {};
@@ -258,9 +269,9 @@ export async function pushState(
     const dirty: Ins<T>[] = [];
 
     for (const row of rows) {
-      // Rows are keyed by whatever column resolves the conflict, so a
+      // Rows are keyed by the hash column (usually the conflict target), so a
       // single-row table like user_state keys on user_id.
-      const rowKey = String((row as Record<string, unknown>)[onConflict] ?? '');
+      const rowKey = String((row as Record<string, unknown>)[hashKey] ?? '');
       const h = hashRow(row);
       next[rowKey] = h;
       if (forceFull || prev[rowKey] !== h) dirty.push(row);
@@ -288,9 +299,8 @@ export async function pushState(
           const { error } = await supabase!
             .from(table)
             .update({ deleted_at: now } as never)
-            // `onConflict` is the table's key column ('id' everywhere
-            // prunable), but it is typed as a plain string here.
-            .in(onConflict as never, gone);
+            // `hashKey` is the addressable PK/column for prune (usually `id`).
+            .in(hashKey as never, gone);
           if (error) return `${String(table)} (prune): ${error.message}`;
           pruned += gone.length;
         } else {
@@ -431,11 +441,16 @@ export async function pushState(
     })), 'id', true);
     if (err4) return fail(err4);
 
+    // Conflict target is the table's natural unique key (user_id, camp_id, date),
+    // not the surrogate id. Two offline devices can each mint a different local
+    // id for the same day; upserting on id alone inserts two rows and trips the
+    // unique constraint. Hash/prune still key on id so tombstones address the
+    // row this device created.
     const err5 = await run('nutrition_logs', (state.nutritionLogs ?? []).filter(n => childOf(n.campId)).map(n => ({
       id: uuidFor(n.id), user_id: userId, camp_id: uuidFor(n.campId),
       date: n.date, water_oz: n.waterOz, meal_ratings: n.mealRatings as Ins<'nutrition_logs'>['meal_ratings'],
       macros: (n.macros ?? null) as Ins<'nutrition_logs'>['macros'], notes: n.notes ?? '', created_at: ts(n, now),
-    })), 'id', true);
+    })), 'user_id,camp_id,date', true, 'id');
     if (err5) return fail(err5);
 
     const err6 = await run('hrv_entries', (state.hrvEntries ?? []).filter(h => childOf(h.campId)).map(h => ({
@@ -455,6 +470,26 @@ export async function pushState(
       readiness_at_fight: r.readinessAtFight ?? null, created_at: ts(r, now),
     })), 'id', true);
     if (err7) return fail(err7);
+
+    // Custom timer presets live outside AppState (localStorage only) so the
+    // timer screen can load them without hydrating the whole account. They still
+    // need cloud backup: the table and RLS already exist, but nothing wrote them
+    // until now — a reinstall or second device silently lost every preset.
+    const errPresets = await run(
+      'timer_presets',
+      loadCustomPresets().map(p => ({
+        id: uuidFor(p.id),
+        user_id: userId,
+        label: p.label,
+        rounds: p.rounds,
+        work_sec: p.workSec,
+        rest_sec: p.restSec,
+        created_at: p.createdAt || now,
+      })),
+      'id',
+      true,
+    );
+    if (errPresets) return fail(errPresets);
 
     // 4) Misc per-user state (single row).
     //
@@ -581,8 +616,11 @@ function makeLocalIdResolver(map: Record<string, string>) {
  * rows (the ones furthest down the ORDER BY) exactly for the users who pay
  * for multi-device sync. Page with `.range()` until a short page returns;
  * the ordering established at the call site is what makes the pages tile.
+ *
+ * Exported so Coach Pro paths (team overview / fighter detail) can use the
+ * same paging contract instead of silently truncating large rosters.
  */
-const PAGE_SIZE = 1000;
+export const PAGE_SIZE = 1000;
 
 type ListResult<T> = { data: T[] | null; error: { message: string } | null };
 
@@ -591,12 +629,15 @@ type ListResult<T> = { data: T[] | null; error: { message: string } | null };
  * to, so a paginated query slots into pullState exactly where the unpaged one
  * sat.
  */
-async function selectAll<T>(
-  build: (from: number, to: number) => PromiseLike<ListResult<T>>,
+export async function selectAll<T>(
+  // Query builders from @supabase/supabase-js are thenable but not typed as
+  // PromiseLike<{data,error}> — accept unknown and resolve.
+  build: (from: number, to: number) => unknown,
 ): Promise<ListResult<T>> {
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await build(from, from + PAGE_SIZE - 1);
+    const result = await Promise.resolve(build(from, from + PAGE_SIZE - 1)) as ListResult<T>;
+    const { data, error } = result;
     if (error) return { data: null, error };
     const page = data ?? [];
     rows.push(...page);
@@ -620,7 +661,7 @@ export async function pullState(userId: string): Promise<PullResult> {
   const lid = makeLocalIdResolver(map);
 
   try {
-    const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ] = await Promise.all([
+    const [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ, presetsQ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       // Tombstoned rows are fetched too, not filtered out. Filtering makes a
       // deleted row indistinguishable from one that never existed, and
@@ -689,9 +730,13 @@ export async function pullState(userId: string): Promise<PullResult> {
           .order('created_at', { ascending: false }).range(from, to),
       ),
       supabase.from('user_state').select('*').eq('user_id', userId).maybeSingle(),
+      selectAll<Row<'timer_presets'>>(
+        (from, to) => client.from('timer_presets').select('*').eq('user_id', userId)
+          .order('created_at', { ascending: false }).range(from, to),
+      ),
     ]);
 
-    const firstErr = [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ]
+    const firstErr = [profileQ, campsQ, workoutsQ, sparringQ, condQ, weightQ, nutritionQ, hrvQ, fightQ, notesQ, stateQ, presetsQ]
       .map(q => q.error?.message).find(Boolean);
     if (firstErr) return { ok: false, error: firstErr };
 
@@ -893,6 +938,28 @@ export async function pullState(userId: string): Promise<PullResult> {
       previouslySynced,
       tombstoned,
     };
+
+    // Timer presets are stored outside AppState. Merge cloud → localStorage
+    // here (local wins on id collision, matching mergeCloud) so a second device
+    // or reinstall recovers them without waiting for RoundTimer to remount.
+    const cloudPresets: CustomTimerPreset[] = live(presetsQ.data as Row<'timer_presets'>[] | null).map(p => ({
+      id: lid(p.id),
+      label: p.label,
+      rounds: p.rounds,
+      workSec: p.work_sec,
+      restSec: p.rest_sec,
+      createdAt: p.created_at,
+    }));
+    const localPresets = loadCustomPresets();
+    const presetIds = new Set(localPresets.map(p => p.id));
+    const mergedPresets = [
+      ...localPresets,
+      ...cloudPresets.filter(p => !presetIds.has(p.id) && !previouslySynced.has(p.id)),
+    ].filter(p => !tombstoned.has(p.id));
+    saveCustomPresets(mergedPresets);
+    try {
+      window.dispatchEvent(new Event('fightcamp-presets-changed'));
+    } catch { /* non-browser test env */ }
 
     saveIdMap(map);
     return { ok: true, snapshot };

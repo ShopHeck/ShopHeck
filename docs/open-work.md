@@ -1,7 +1,8 @@
 # Open work
 
-**Verified against source on 2026-08-05.** Every item below was checked by
-reading the code, not by trusting a previous document.
+**Verified against source on 2026-08-05; ops items updated 2026-08-06.** Every
+item below was checked by reading the code or by an explicit operator action —
+not by trusting a previous document.
 
 ## Why this file exists
 
@@ -28,39 +29,6 @@ verify it in one command.
 
 ## Open
 
-Nothing in `src/` or `ios/` is known-open. The five engineering items that stood
-here on 2026-08-05 are closed — see
-[`docs/submission-summary.md`](./submission-summary.md) for what each turned
-into.
-
-What is left is not code. Every item below needs an account, a dashboard or a
-device, and **each one is a silent failure**: the build compiles, ships and
-launches, and the feature is simply dead. They are listed in the order a
-submission hits them.
-
-### Apply the sync migration in Supabase
-
-Adaptations, corner sessions, saved AI analyses and the official-weigh-in flag
-now push to columns that do not exist until the migration runs. `pushState` will
-fail on `user_state` and `weight_entries`, and the sync banner will show an
-error.
-
-```sh
-# Supabase Dashboard → SQL Editor → run:
-cat supabase/migrations/20260805210000_sync_adaptations_corner_and_analyses.sql
-```
-
-Idempotent (`add column if not exists`), so re-running it is safe.
-
-### Allow-list the password-reset redirect
-
-Supabase silently falls back to the project Site URL for any `redirectTo` it
-does not recognise, so an un-listed URL does not error — it sends the fighter to
-`/`, where nothing claims the link and the app never opens.
-
-Add `https://fightcamp.netlify.app/auth/recovery` under **Authentication → URL
-Configuration → Redirect URLs**.
-
 ### Run the watch app once, on a wrist
 
 The archive now builds, signs and uploads with the watch app inside it. Two
@@ -85,6 +53,48 @@ Carried over from the build-17 rejection and still the single most likely cause
 of another one (Guideline 2.1(b)). A subscription that is "Ready to Submit" but
 not *attached to the version* is not submitted. See
 [`app-store-submission.md`](./app-store-submission.md) § 9a.
+
+### Upload App Store assets (local set is ready)
+
+Local generation already passes:
+
+```sh
+npm run verify:appstore   # must exit 0 — screenshots + previews present
+```
+
+Still open: upload the files under `ios/fastlane/screenshots/en-US/` in App
+Store Connect (that directory is gitignored; regenerate with
+`npm run appstore:assets` if missing).
+
+---
+
+## Closed — ops (2026-08-06, operator confirmed)
+
+- **Supabase migrations applied** (sync columns + auth hardening).
+- **Password-reset redirect allow-listed:**
+  `https://fightcamp.netlify.app/auth/recovery`
+
+Optional smoke after those two:
+
+1. Sign in on a second device / fresh install → adaptations, corner sessions,
+   AI analyses, and official weigh-in flag sync without a banner error.
+2. Request password reset → link opens the app recovery screen (not bare `/`).
+
+---
+
+## Closed in the 2026-08-06 implementation pass (code)
+
+- Canonical `schema.sql` ends with authorization hardening so a full re-run
+  cannot undo RLS (verify: `tail supabase/schema.sql`).
+- First-party `ios/App/App/PrivacyInfo.xcprivacy` bundled in the App target.
+- Nutrition sync upserts on `(user_id, camp_id, date)` to avoid multi-device
+  unique violations (`src/lib/sync.ts`).
+- Coach Pro list/detail/team queries paginate via `selectAll` and surface errors
+  instead of returning a silent empty roster (`src/lib/coachLinks.ts`).
+- Custom timer presets push/pull with the rest of cloud sync.
+- CocoaPods vs Bundler documented in `docs/ios-cocoapods.md`.
+- App Store screenshots + preview videos generated; `npm run verify:appstore`
+  green locally.
 
 ---
 
