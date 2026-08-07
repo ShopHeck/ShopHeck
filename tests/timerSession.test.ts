@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  timerPrefillForDay,
   timerPrefillForSession,
   timerSessionMinutes,
   timerSessionSeconds,
@@ -109,5 +110,23 @@ describe('timerPrefillForSession', () => {
       rounds: 1, workSec: 180, restSec: 60, label: 'Sparring · fight format',
     });
     expect(timerPrefillForSession(session('conditioning', Number.NaN), broken)?.rounds).toBe(1);
+  });
+
+  it('timerPrefillForDay picks the first timeable session like the dashboard CTA', () => {
+    // Rest/recovery first must not block a later sparring block.
+    const day = [
+      session('recovery', 30, 'Mobility'),
+      session('sparring', 60, 'Hard sparring', '5x3min sparring'),
+      session('conditioning', 40, 'Bag'),
+    ];
+    expect(timerPrefillForDay(day, boxing)).toMatchObject({
+      rounds: 5, workSec: 180, label: 'Sparring · fight format',
+    });
+    expect(timerPrefillForDay([session('rest', 0, 'Rest')], boxing)).toBeNull();
+    // Non-sparring stated title is kept so the timer shows what was planned.
+    expect(timerPrefillForDay(
+      [session('conditioning', 50, 'Bag work', '8x3min bag rounds')],
+      boxing,
+    )).toMatchObject({ rounds: 8, workSec: 180, label: 'Bag work' });
   });
 });

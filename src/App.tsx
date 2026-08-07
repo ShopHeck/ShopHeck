@@ -274,6 +274,7 @@ function AppShell() {
                   if (v === 'log' && prefill) navigateToLog(prefill);
                   else navigate(v as View);
                 }}
+                onStartTimer={navigateToTimer}
                 onShowFightBreakdown={(id) => { setActiveFightId(id); navigate('fight-breakdown'); }}
               />
             )}

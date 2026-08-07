@@ -114,6 +114,23 @@ export function timerPrefillForSession(
 }
 
 /**
+ * First session on today's plan that can drive a round clock.
+ *
+ * Used by the dashboard "Start today's session" CTA so it matches the planner's
+ * Start timer handover instead of opening a bare default timer.
+ */
+export function timerPrefillForDay(
+  sessions: ReadonlyArray<Pick<TrainingSession, 'type' | 'title' | 'duration'> & { description?: string }>,
+  camp: Pick<FightCamp, 'rounds' | 'roundDuration'>,
+): TimerPrefill | null {
+  for (const session of sessions) {
+    const prefill = timerPrefillForSession(session, camp);
+    if (prefill) return prefill;
+  }
+  return null;
+}
+
+/**
  * Total elapsed training time for a completed round session.
  *
  * Rest happens only BETWEEN rounds, so N rounds contain N work intervals and

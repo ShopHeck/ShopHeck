@@ -20,6 +20,7 @@ import FightCountdownCard from './shared/FightCountdownCard';
 import FightReadinessGauge from './shared/FightReadinessGauge';
 import { SESSION_COLORS, SESSION_ICONS } from '../utils/sessionVisuals';
 import { readinessColor, tint } from '../utils/designTokens';
+import { timerPrefillForDay, type TimerPrefill } from '../utils/timerSession';
 
 /**
  * Camp phases run cool→hot as the fight approaches, which is why they use the
@@ -43,9 +44,11 @@ import type { LogPrefill } from '../App';
 interface Props {
   onNavigate: (view: string, prefill?: LogPrefill) => void;
   onShowFightBreakdown: (fightId: string) => void;
+  /** Same handover the weekly planner uses so Today starts the right clock. */
+  onStartTimer: (prefill: TimerPrefill) => void;
 }
 
-export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
+export default function Dashboard({ onNavigate, onShowFightBreakdown, onStartTimer }: Props) {
   const { state } = useApp();
   const unit = state.dashboardPrefs?.weightUnit ?? 'lbs';
   const { activeCamp, trainingSchedule, workoutLogs, weightEntries, sparringLogs, coachNotes, currentUser, completedSessions, fightResults, conditioningTests, nutritionLogs } = state;
@@ -133,6 +136,13 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
   const latestCoachNote = coachNotes
     .filter(n => n.fighterId === currentUser?.id && n.campId === activeCamp.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+
+  // Same derivation the planner's "Start timer" uses, applied to the first
+  // timeable block on today's card. Without this the CTA only opened a bare
+  // default timer and ignored the planned session.
+  const todayTimerPrefill = todaySessions && !todaySessions.isRestDay
+    ? timerPrefillForDay(todaySessions.sessions, activeCamp)
+    : null;
 
   return (
     <div className="space-y-4 pb-4">
@@ -253,19 +263,28 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Primary action: start / log today's work */}
+      {/* Primary action: start today's work with the same timer prefill the
+          planner uses. Falls back to a bare timer only when nothing today is
+          round-clockable (rest / recovery-only). */}
       {todaySessions && !todaySessions.isRestDay && todaySessions.sessions[0] && (
         <div className="mx-4">
           <button
-            onClick={() => onNavigate('timer')}
+            onClick={() => {
+              if (todayTimerPrefill) onStartTimer(todayTimerPrefill);
+              else onNavigate('timer');
+            }}
             className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base min-h-[52px]"
           >
             <Zap size={18} />
-            Start today&apos;s session
+            {todayTimerPrefill ? 'Start today\'s session' : 'Open timer'}
           </button>
           <p className="text-xs text-gray-450 text-center mt-2 truncate">
-            {todaySessions.sessions[0].title}
-            {todaySessions.sessions.length > 1 ? ` · +${todaySessions.sessions.length - 1} more` : ''}
+            {todayTimerPrefill
+              ? `${todayTimerPrefill.label} · ${todayTimerPrefill.rounds}×${Math.round(todayTimerPrefill.workSec / 60)}min`
+              : todaySessions.sessions[0].title}
+            {!todayTimerPrefill && todaySessions.sessions.length > 1
+              ? ` · +${todaySessions.sessions.length - 1} more`
+              : ''}
           </p>
         </div>
       )}
