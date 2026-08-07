@@ -2,6 +2,7 @@ import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, Cond
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 import { defaultGamificationState } from './gamification';
 import { upsertCornerRound } from './cornerMode';
+import { clearFitbitSecrets, loadFitbitSecrets, saveFitbitSecrets } from './fitbitSecrets';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -229,7 +230,7 @@ export function loadState(): AppState {
     // weightUnit is deliberately absent from the defaults, so it stays
     // undefined ("never chosen") unless the stored document set it — that is
     // what lets mergeCloud restore the account's synced choice on a new device.
-    return {
+    const merged: AppState = {
       ...defaults,
       ...stored,
       gamification: stored.gamification
@@ -242,6 +243,31 @@ export function loadState(): AppState {
         ? { ...defaults.subscription, ...stored.subscription }
         : defaults.subscription,
     };
+
+    // Re-attach Fitbit bearer tokens from the side store. Older builds kept
+    // them inside fightcamp_app; migrate once on read, then keep them out.
+    const secrets = loadFitbitSecrets();
+    const legacy = merged.fitbitConfig;
+    if (legacy?.accessToken || legacy?.refreshToken) {
+      saveFitbitSecrets({
+        accessToken: legacy.accessToken ?? secrets.accessToken,
+        refreshToken: legacy.refreshToken ?? secrets.refreshToken,
+        expiresAt: legacy.expiresAt ?? secrets.expiresAt,
+        userId: legacy.userId ?? secrets.userId,
+      });
+    }
+    const side = loadFitbitSecrets();
+    if (merged.fitbitConfig || side.accessToken) {
+      merged.fitbitConfig = {
+        clientId: merged.fitbitConfig?.clientId ?? '',
+        lastSync: merged.fitbitConfig?.lastSync,
+        accessToken: side.accessToken,
+        refreshToken: side.refreshToken,
+        expiresAt: side.expiresAt,
+        userId: side.userId,
+      };
+    }
+    return merged;
   } catch {
     return createDefaultState();
   }
@@ -249,7 +275,32 @@ export function loadState(): AppState {
 
 export function saveState(state: AppState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Persist Fitbit secrets out-of-band, then write the account document
+    // without bearer tokens. A parse failure of fightcamp_app must not leave
+    // third-party credentials stranded inside a half-read blob.
+    if (state.fitbitConfig?.accessToken || state.fitbitConfig?.refreshToken) {
+      saveFitbitSecrets({
+        accessToken: state.fitbitConfig.accessToken,
+        refreshToken: state.fitbitConfig.refreshToken,
+        expiresAt: state.fitbitConfig.expiresAt,
+        userId: state.fitbitConfig.userId,
+      });
+    } else if (!state.fitbitConfig) {
+      clearFitbitSecrets();
+    }
+    const forDisk: AppState = state.fitbitConfig
+      ? {
+          ...state,
+          fitbitConfig: {
+            clientId: state.fitbitConfig.clientId,
+            lastSync: state.fitbitConfig.lastSync,
+            // expiresAt/userId are non-secret metadata useful offline; tokens stay out.
+            expiresAt: state.fitbitConfig.expiresAt,
+            userId: state.fitbitConfig.userId,
+          },
+        }
+      : state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(forDisk));
   } catch {
     console.error('Failed to save state');
   }

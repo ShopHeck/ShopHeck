@@ -12,7 +12,6 @@ import type { SessionType } from './types';
 // ── Static imports — rendered immediately on first paint ──────────────────
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
-import OffSeasonDashboard from './components/OffSeasonDashboard';
 import RoundTimer from './components/RoundTimer';   // audio init; keep static
 import BottomNav from './components/shared/BottomNav';
 import { tabViewIds } from './components/shared/navTabs';
@@ -28,6 +27,7 @@ import { useAuth } from './context/AuthContext';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 // ── Lazy imports — loaded on first navigation to that view ────────────────
+const OffSeasonDashboard = lazy(() => import('./components/OffSeasonDashboard'));
 const WeeklyPlanner    = lazy(() => import('./components/WeeklyPlanner'));
 const WorkoutLogger    = lazy(() => import('./components/WorkoutLogger'));
 const WeightTracker    = lazy(() => import('./components/WeightTracker'));

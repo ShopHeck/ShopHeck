@@ -210,6 +210,9 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
   const [customPresets, setCustomPresets] = useState<CustomTimerPreset[]>([]);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Glove mode: hide dense chrome and enlarge primary controls for mid-round
+  // taps with wraps/gloves on. Defaults off so setup stays fully visible.
+  const [gloveMode, setGloveMode] = useState(false);
 
   // Load custom presets on mount
   useEffect(() => { setCustomPresets(loadCustomPresets()); }, []);
@@ -449,14 +452,15 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
 
   return (
     <div className="pb-4">
-      {/* Presets */}
+      {/* Presets — hidden in glove mode so the countdown owns the screen. */}
+      {!gloveMode && (
       <div className="mx-4 mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-1 items-center">
         {PRESETS.map((p, i) => (
           <button
             key={p.label}
             onClick={() => { setPlanLabel(null); selectPreset(i); }}
             disabled={isRunning}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               selectedPreset === i
                 ? 'bg-brand-600 border-brand-500 text-white'
                 : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
@@ -478,7 +482,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
                 selectPreset(idx);
               }}
               disabled={isRunning}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 selectedPreset === PRESETS.length + i
                   ? 'bg-purple-600 border-purple-500 text-white'
                   : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
@@ -487,14 +491,16 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
               {p.label}
             </button>
             {/* Always-visible delete — hover-only affordances are invisible on
-                touch, which is the entire target platform. */}
+                touch, which is the entire target platform. 44×44 hit area. */}
             <button
               onClick={() => deleteCustomPreset(p.id)}
               disabled={isRunning}
               aria-label={`Delete preset ${p.label}`}
-              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-dark-500 border border-dark-400 text-gray-400 hover:text-white flex items-center justify-center disabled:opacity-50"
+              className="absolute -top-2 -right-2 w-11 h-11 rounded-full flex items-center justify-center disabled:opacity-50"
             >
-              <X size={9} />
+              <span className="w-5 h-5 rounded-full bg-dark-500 border border-dark-400 text-gray-400 hover:text-white flex items-center justify-center">
+                <X size={10} />
+              </span>
             </button>
           </div>
         ))}
@@ -503,17 +509,33 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
           <button
             onClick={() => setShowPresetModal(true)}
             aria-label="Create a custom timer preset"
-            className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dark-500 border-dashed text-gray-400 hover:text-white hover:border-dark-300 flex items-center justify-center transition-all"
+            className="flex-shrink-0 w-11 h-11 rounded-xl bg-dark-700 border border-dark-500 border-dashed text-gray-400 hover:text-white hover:border-dark-300 flex items-center justify-center transition-all"
           >
             <Plus size={16} />
           </button>
         ) : (
           <ProGate required="fighter_pro" inline={false}>
-            <button aria-label="Create a custom timer preset (Fighter Pro)" className="flex-shrink-0 w-9 h-9 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-400 flex items-center justify-center">
+            <button aria-label="Create a custom timer preset (Fighter Pro)" className="flex-shrink-0 w-11 h-11 rounded-xl bg-dark-700 border border-dashed border-dark-500 text-gray-400 flex items-center justify-center">
               <Plus size={16} />
             </button>
           </ProGate>
         )}
+      </div>
+      )}
+
+      <div className="mx-4 mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setGloveMode(g => !g)}
+          aria-pressed={gloveMode}
+          className={`text-xs font-semibold px-3 py-2 min-h-[40px] rounded-lg border transition-colors ${
+            gloveMode
+              ? 'bg-brand-600/20 border-brand-500 text-brand-300'
+              : 'bg-dark-700 border-dark-500 text-gray-400 hover:text-white'
+          }`}
+        >
+          {gloveMode ? 'Exit glove mode' : 'Glove mode'}
+        </button>
       </div>
 
       {/* Where these settings came from, when they came from the plan. Without
@@ -661,6 +683,13 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
                 {mep} MEP {mep >= mepTarget ? `✓ target hit (${mepTarget})` : `/ ${mepTarget} target`}
               </p>
             )}
+            <button
+              type="button"
+              onClick={() => onStartPause()}
+              className="btn-primary w-full mt-4 min-h-[52px]"
+            >
+              Start another session
+            </button>
           </div>
         )}
       </div>
@@ -671,18 +700,18 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
           else in the app the CSS pseudo-class is good enough; here it is the
           difference between a control that confirms it fired and one that
           appears not to have. */}
-      <div className="mx-4 mt-6 flex gap-3 justify-center items-center">
+      <div className={`mx-4 mt-6 flex gap-3 justify-center items-center ${gloveMode ? 'scale-110 origin-center' : ''}`}>
         <PressableButton
           onClick={reset}
           aria-label="Reset timer"
-          className="w-14 h-14 rounded-full bg-surface-1 border border-surface-2 flex items-center justify-center text-gray-400 hover:text-white hover:border-surface-3"
+          className={`${gloveMode ? 'w-16 h-16' : 'w-14 h-14'} rounded-full bg-surface-1 border border-surface-2 flex items-center justify-center text-gray-400 hover:text-white hover:border-surface-3`}
         >
-          <RotateCcw size={20} />
+          <RotateCcw size={gloveMode ? 24 : 20} />
         </PressableButton>
         <PressableButton
           onClick={onStartPause}
           aria-label={phase === 'done' ? 'Start a new session' : isRunning ? 'Pause timer' : 'Start timer'}
-          className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-2"
+          className={`${gloveMode ? 'w-24 h-24' : 'w-20 h-20'} rounded-full flex items-center justify-center text-white shadow-2`}
           style={
             phase === 'done'
               ? { backgroundColor: 'var(--pace-ahead)', color: 'var(--bg-obsidian)' }
@@ -691,7 +720,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
               : { backgroundColor: 'var(--accent-flame)', boxShadow: 'var(--glow-active)' }
           }
         >
-          {isRunning ? <Pause size={30} /> : <Play size={30} className="translate-x-0.5" />}
+          {isRunning ? <Pause size={gloveMode ? 36 : 30} /> : <Play size={gloveMode ? 36 : 30} className="translate-x-0.5" />}
         </PressableButton>
         {/* Bluetooth HR button */}
         {hr.supported && (
@@ -700,7 +729,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
             disabled={hr.connecting}
             aria-label={hr.connected ? `Disconnect heart rate monitor (${hr.deviceName})` : 'Connect heart rate monitor'}
             title={hr.connected ? `Connected: ${hr.deviceName}` : 'Connect HR device'}
-            className="w-14 h-14 rounded-full border flex items-center justify-center disabled:opacity-50"
+            className={`${gloveMode ? 'w-16 h-16' : 'w-14 h-14'} rounded-full border flex items-center justify-center disabled:opacity-50`}
             style={
               hr.connected
                 ? {
@@ -720,6 +749,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
           </PressableButton>
         )}
         {/* Fullscreen button */}
+        {!gloveMode && (
         <ProGate required="fighter_pro" inline>
           <PressableButton
             onClick={toggleFullscreen}
@@ -729,9 +759,11 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
           </PressableButton>
         </ProGate>
+        )}
       </div>
 
-      {/* Settings */}
+      {/* Settings — collapsed in glove mode to keep the control row uncontested. */}
+      {!gloveMode && (
       <div className="mx-4 mt-6 space-y-3">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Timer Settings</p>
 
@@ -1002,6 +1034,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
 
         </div>
       </div>
+      )}
 
       {showPresetModal && (
         <PresetModal onSave={savePreset} onClose={() => setShowPresetModal(false)} />

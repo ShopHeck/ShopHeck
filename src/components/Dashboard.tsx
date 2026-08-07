@@ -136,9 +136,9 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Locked contract — §3.4. Content order, dimensions and the fight-week
-          crimson state all live in the component, so this card cannot drift
-          from the one the readiness screen and the spec describe. */}
+      {/* Today cockpit order: countdown → readiness → train today → weight →
+          coach/adaptation → secondary analytics. Progress/tools stay below the
+          fold so fight-week decisions are one glance. */}
       <div className="mt-4">
         <FightCountdownCard
           daysOut={daysUntil}
@@ -154,8 +154,6 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         />
       </div>
 
-      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
-
       {/* Corner Mode — fight week only, and only until a result exists. The
           whole value is being one tap away on the night; buried in a menu it
           would never be found with gloves already on. */}
@@ -163,7 +161,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onNavigate('corner')}
-            className="w-full flex items-center gap-3 bg-gradient-to-br from-red-900/40 to-dark-700 border border-red-800/60 rounded-2xl p-4 text-left hover:border-red-600 transition-colors"
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-red-900/40 to-dark-700 border border-red-800/60 rounded-2xl p-4 text-left hover:border-red-600 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-red-900/50 flex items-center justify-center flex-shrink-0">
               <Swords size={22} className="text-red-300" />
@@ -184,7 +182,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onNavigate('fight-log')}
-            className="w-full flex items-center gap-3 bg-gradient-to-br from-purple-900/40 to-dark-700 border border-purple-800 rounded-2xl p-4 text-left hover:border-purple-600 transition-colors"
+            className="w-full flex items-center gap-3 bg-gradient-to-br from-purple-900/40 to-dark-700 border border-purple-800 rounded-2xl p-4 text-left hover:border-purple-600 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-purple-900/50 flex items-center justify-center flex-shrink-0">
               <Trophy size={22} className="text-purple-300" />
@@ -203,7 +201,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         <div className="mx-4">
           <button
             onClick={() => onShowFightBreakdown(campFightResult.id)}
-            className="w-full flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-2xl p-4 text-left hover:border-brand-700 transition-colors"
+            className="w-full flex items-center gap-3 bg-dark-700 border border-dark-500 rounded-2xl p-4 text-left hover:border-brand-700 transition-colors min-h-[56px]"
           >
             <div className="w-12 h-12 rounded-xl bg-brand-900/40 flex items-center justify-center flex-shrink-0">
               <History size={20} className="text-brand-300" />
@@ -219,12 +217,7 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Compact readiness variant (§3.6): the same gauge component the detail
-          screen renders, at a smaller scale, with one line of truncated
-          recommendation and a chevron. It links to the full screen rather than
-          duplicating it — which is also why the breakdown does not appear here.
-          This previously drew a rotated full circle while the detail screen drew
-          the correct 270° arc, so the same score had two different shapes. */}
+      {/* Compact readiness — primary decision surface after countdown. */}
       {readiness && (
         <div className="mx-4">
           <GlassSurface
@@ -260,9 +253,23 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
         </div>
       )}
 
-      {/* Coach Note Banner */}
-      {/* Adaptive Camp — renders nothing unless the signals genuinely warrant
-          a change, so it sits above the coach note without competing with it. */}
+      {/* Primary action: start / log today's work */}
+      {todaySessions && !todaySessions.isRestDay && todaySessions.sessions[0] && (
+        <div className="mx-4">
+          <button
+            onClick={() => onNavigate('timer')}
+            className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base min-h-[52px]"
+          >
+            <Zap size={18} />
+            Start today&apos;s session
+          </button>
+          <p className="text-xs text-gray-450 text-center mt-2 truncate">
+            {todaySessions.sessions[0].title}
+            {todaySessions.sessions.length > 1 ? ` · +${todaySessions.sessions.length - 1} more` : ''}
+          </p>
+        </div>
+      )}
+
       <AdaptationCard />
 
       {latestCoachNote && (
@@ -283,6 +290,30 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           </div>
         </div>
       )}
+
+      {/* Metric tiles */}
+      <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
+        <GlassMetricTile
+          label={madeWeight ? 'On target' : 'To cut'}
+          value={madeWeight ? '✓' : weightToGo}
+          icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
+          onClick={() => onNavigate('weight')}
+        />
+        <GlassMetricTile
+          label="Sessions"
+          value={totalWorkouts}
+          icon={<Activity size={13} style={{ color: 'var(--accent-green)' }} />}
+          onClick={() => onNavigate('log')}
+        />
+        <GlassMetricTile
+          label="Rounds"
+          value={totalSparingRounds}
+          icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
+          onClick={() => onNavigate('progress')}
+        />
+      </div>
+
+      <ProgressWidget onOpenProgress={() => onNavigate('achievements')} />
 
       {/* Current Phase */}
       {currentWeek && (
@@ -340,30 +371,6 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown }: Props) {
           </div>
         </div>
       )}
-
-      {/* Metric tiles — locked dimensions (§3.4), solid fill rather than live
-          blur (§3.2 names this grid specifically). Labels are single-line by
-          contract, so the unit moves into the label and the value stays bare. */}
-      <div className="mx-4 grid grid-cols-3" style={{ gap: 'var(--space-3)' }}>
-        <GlassMetricTile
-          label={madeWeight ? 'On target' : 'To cut'}
-          value={madeWeight ? '✓' : weightToGo}
-          icon={<TrendingDown size={13} style={{ color: 'var(--accent-flame)' }} />}
-          onClick={() => onNavigate('weight')}
-        />
-        <GlassMetricTile
-          label="Sessions"
-          value={totalWorkouts}
-          icon={<Activity size={13} style={{ color: 'var(--accent-green)' }} />}
-          onClick={() => onNavigate('log')}
-        />
-        <GlassMetricTile
-          label="Rounds"
-          value={totalSparingRounds}
-          icon={<Zap size={13} style={{ color: 'var(--accent-gold)' }} />}
-          onClick={() => onNavigate('progress')}
-        />
-      </div>
 
       {/* This Week Summary */}
       {(weekPlanned > 0 || weekLogs.length > 0) && (
