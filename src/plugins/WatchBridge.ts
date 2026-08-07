@@ -22,6 +22,8 @@ export interface WatchSessionOptions {
   restSec: number;
   prepSec: number;
   label: string;
+  /** Shared with the wrist so late queued commands cannot hit another session. */
+  sessionId: string;
 }
 
 export interface WatchHeartRateEvent {
@@ -32,6 +34,10 @@ export interface WatchHeartRateEvent {
 
 export interface WatchCommandEvent {
   command: 'start' | 'pause' | 'reset';
+  sessionId?: string;
+  seq?: number;
+  /** Epoch seconds from the wrist. */
+  createdAt?: number;
 }
 
 export interface WatchBridgePlugin {

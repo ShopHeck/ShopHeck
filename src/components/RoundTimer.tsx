@@ -336,7 +336,7 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
       return;
     }
     void WatchBridge.startSession({
-      rounds, workSec, restSec, prepSec, label: presetLabel,
+      rounds, workSec, restSec, prepSec, label: presetLabel, sessionId,
     }).catch(() => {
       // No watch paired, or the watch app is not installed. The phone timer is
       // unaffected, and nagging about a device the fighter may not own would be
@@ -356,6 +356,15 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [phase, sessionId]);
+
+  // Cold launch / process restart: JS has no memory of a prior Live Activity,
+  // but ActivityKit may still be showing one. When the timer mounts with no
+  // active session, ask native to end every system-held timer activity.
+  useEffect(() => {
+    if (!sessionId) void endLiveActivity();
+    // Mount-only: sessionId at first paint is the signal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const savePreset = useCallback((p: Omit<CustomTimerPreset, 'id' | 'createdAt'>) => {
     const newPreset: CustomTimerPreset = { ...p, id: generateId(), createdAt: new Date().toISOString() };

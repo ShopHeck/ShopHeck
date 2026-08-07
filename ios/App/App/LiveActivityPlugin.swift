@@ -161,18 +161,35 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
     }
 
     @objc func end(_ call: CAPPluginCall) {
-        endCurrentActivity()
+        endAllActivities()
         call.resolve(["ended": true])
     }
 
-    private func endCurrentActivity() {
-        guard #available(iOS 16.2, *), let activity = currentActivity as? Activity<TimerActivityAttributes> else {
+    /// End every system-held timer activity, not only the in-memory handle.
+    ///
+    /// After a process restart `currentActivity` is nil while ActivityKit may
+    /// still display a prior session. Ending only the handle left orphans on
+    /// the Lock Screen until the next start() recovered them.
+    private func endAllActivities() {
+        guard #available(iOS 16.2, *) else {
+            currentActivity = nil
             return
         }
         currentActivity = nil
+        let leftovers = Activity<TimerActivityAttributes>.activities
+        guard !leftovers.isEmpty else { return }
         Task {
-            // end(using:) is the 16.1 API; end(_:dismissalPolicy:) needs 16.2.
-            await activity.end(using: nil)
+            for activity in leftovers {
+                // end(using:) is the 16.1 API; end(_:dismissalPolicy:) needs 16.2.
+                await activity.end(using: nil)
+            }
         }
+    }
+
+    private func endCurrentActivity() {
+        // Kept as a named path for call sites that historically ended "the"
+        // current activity — same body as endAllActivities so orphans cannot
+        // diverge again.
+        endAllActivities()
     }
 }
