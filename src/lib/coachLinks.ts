@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { selectAll } from './sync';
 import type { Database } from './database.types';
 import type { FightCamp, WeightEntry } from '../types';
 
@@ -133,30 +134,50 @@ export async function unlinkAllCoaches(fighterId: string): Promise<void> {
 export async function listLinkedFighters(coachId: string): Promise<LinkedFighter[]> {
   const supabase = await getSupabase();
   if (!supabase) return [];
-  const { data: links, error } = await supabase
-    .from('coach_fighter_links')
-    .select('fighter_id, created_at')
-    .eq('coach_id', coachId)
-    .eq('status', 'active');
-  if (error || !links || links.length === 0) return [];
+  const client = supabase;
+  const linksQ = await selectAll<{ fighter_id: string; created_at: string }>(
+    (from, to) => client.from('coach_fighter_links')
+      .select('fighter_id, created_at')
+      .eq('coach_id', coachId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true })
+      .range(from, to),
+  );
+  if (linksQ.error) {
+    console.error('listLinkedFighters links:', linksQ.error.message);
+    throw new Error(linksQ.error.message);
+  }
+  const links = linksQ.data ?? [];
+  if (links.length === 0) return [];
 
   const ids = links.map(l => l.fighter_id);
   const linkedAt = new Map(links.map(l => [l.fighter_id, l.created_at]));
 
-  const [{ data: profiles }, { data: camps }] = await Promise.all([
-    supabase.from('profiles').select('*').in('id', ids),
-    supabase.from('camps').select('*').in('user_id', ids).is('deleted_at', null),
+  // Profiles and camps are small relative to log tables, but still page so a
+  // large Coach Pro roster cannot silently truncate past the PostgREST cap.
+  const [profilesQ, campsQ] = await Promise.all([
+    selectAll<Database['public']['Tables']['profiles']['Row']>(
+      (from, to) => client.from('profiles').select('id, name, sport, weight_class, experience, gym')
+        .in('id', ids).order('name', { ascending: true }).range(from, to),
+    ),
+    selectAll<CampRow>(
+      (from, to) => client.from('camps').select('*')
+        .in('user_id', ids).is('deleted_at', null)
+        .order('created_at', { ascending: false }).range(from, to),
+    ),
   ]);
+  if (profilesQ.error) throw new Error(profilesQ.error.message);
+  if (campsQ.error) throw new Error(campsQ.error.message);
 
   const latestByFighter = new Map<string, CampRow>();
-  for (const c of (camps ?? []) as CampRow[]) {
+  for (const c of (campsQ.data ?? []) as CampRow[]) {
     const prev = latestByFighter.get(c.user_id);
     if (!prev || new Date(c.created_at).getTime() > new Date(prev.created_at).getTime()) {
       latestByFighter.set(c.user_id, c);
     }
   }
 
-  return (profiles ?? []).map(p => ({
+  return (profilesQ.data ?? []).map(p => ({
     id: p.id,
     name: p.name,
     sport: p.sport,
@@ -203,12 +224,16 @@ export interface CloudCoachNote {
 export async function listCoachNotes(fighterId: string): Promise<CloudCoachNote[]> {
   const supabase = await getSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
-    .from('coach_notes')
-    .select('*')
-    .eq('fighter_id', fighterId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+  const client = supabase;
+  const { data, error } = await selectAll<Database['public']['Tables']['coach_notes']['Row']>(
+    (from, to) => client.from('coach_notes')
+      .select('*')
+      .eq('fighter_id', fighterId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .range(from, to),
+  );
+  if (error) throw new Error(error.message);
   return (data ?? []).map(n => ({
     id: n.id,
     coachId: n.coach_id,
@@ -315,31 +340,57 @@ function campFromRow(c: CampRow): FightCamp {
 export async function getTeamSnapshots(coachId: string): Promise<TeamFighterSnapshot[]> {
   const supabase = await getSupabase();
   if (!supabase) return [];
-  const { data: links } = await supabase
-    .from('coach_fighter_links')
-    .select('fighter_id')
-    .eq('coach_id', coachId)
-    .eq('status', 'active');
-  const ids = (links ?? []).map(l => l.fighter_id);
+  const client = supabase;
+  const linksQ = await selectAll<{ fighter_id: string }>(
+    (from, to) => client.from('coach_fighter_links')
+      .select('fighter_id')
+      .eq('coach_id', coachId)
+      .eq('status', 'active')
+      .order('fighter_id', { ascending: true })
+      .range(from, to),
+  );
+  if (linksQ.error) throw new Error(linksQ.error.message);
+  const ids = (linksQ.data ?? []).map(l => l.fighter_id);
   if (ids.length === 0) return [];
 
-  const [{ data: profiles }, { data: camps }, { data: workouts }, { data: weights }] = await Promise.all([
-    supabase.from('profiles').select('*').in('id', ids),
-    supabase.from('camps').select('*').in('user_id', ids).is('deleted_at', null),
-    supabase.from('workout_logs').select('*').in('user_id', ids).is('deleted_at', null),
-    supabase.from('weight_entries').select('*').in('user_id', ids).is('deleted_at', null),
+  // Narrow column lists + pagination: a coach with many active camps can cross
+  // the PostgREST default page size on workouts/weights alone. The previous
+  // unpaged select('*') silently truncated and made adherence look perfect.
+  const [profilesQ, campsQ, workoutsQ, weightsQ] = await Promise.all([
+    selectAll<{ id: string; name: string; sport: string }>(
+      (from, to) => client.from('profiles').select('id, name, sport')
+        .in('id', ids).order('name', { ascending: true }).range(from, to),
+    ),
+    selectAll<CampRow>(
+      (from, to) => client.from('camps').select('*')
+        .in('user_id', ids).is('deleted_at', null)
+        .order('created_at', { ascending: false }).range(from, to),
+    ),
+    selectAll<{ id: string; user_id: string; camp_id: string; date: string }>(
+      (from, to) => client.from('workout_logs').select('id, user_id, camp_id, date')
+        .in('user_id', ids).is('deleted_at', null)
+        .order('date', { ascending: false }).range(from, to),
+    ),
+    selectAll<{ id: string; user_id: string; camp_id: string; date: string; weight: number; notes: string | null; created_at: string }>(
+      (from, to) => client.from('weight_entries').select('id, user_id, camp_id, date, weight, notes, created_at')
+        .in('user_id', ids).is('deleted_at', null)
+        .order('date', { ascending: false }).range(from, to),
+    ),
   ]);
+  for (const q of [profilesQ, campsQ, workoutsQ, weightsQ]) {
+    if (q.error) throw new Error(q.error.message);
+  }
 
   // Newest camp per fighter — the same "current camp" rule the detail view uses.
   const latestByFighter = new Map<string, CampRow>();
-  for (const c of (camps ?? []) as CampRow[]) {
+  for (const c of (campsQ.data ?? []) as CampRow[]) {
     const prev = latestByFighter.get(c.user_id);
     if (!prev || new Date(c.created_at).getTime() > new Date(prev.created_at).getTime()) {
       latestByFighter.set(c.user_id, c);
     }
   }
 
-  return (profiles ?? []).map(p => {
+  return (profilesQ.data ?? []).map(p => {
     const row = latestByFighter.get(p.id) ?? null;
     const camp = row ? campFromRow(row) : null;
 
@@ -359,11 +410,11 @@ export async function getTeamSnapshots(coachId: string): Promise<TeamFighterSnap
       sport: p.sport,
       camp,
       completedSessions,
-      workoutDates: (workouts ?? [])
+      workoutDates: (workoutsQ.data ?? [])
         .filter(w => w.user_id === p.id && (!row || w.camp_id === row.id))
         .map(w => w.date)
         .sort((a, b) => b.localeCompare(a)),
-      weights: (weights ?? [])
+      weights: (weightsQ.data ?? [])
         .filter(w => w.user_id === p.id && (!row || w.camp_id === row.id))
         .map(w => ({
           id: w.id,
@@ -381,14 +432,31 @@ export async function getTeamSnapshots(coachId: string): Promise<TeamFighterSnap
 export async function getFighterDetail(fighterId: string): Promise<FighterDetail> {
   const supabase = await getSupabase();
   if (!supabase) return { camps: [], workouts: [], sparring: [], weights: [] };
+  const client = supabase;
+  // Deleted rows are tombstoned, not removed (see lib/sync.ts) — a coach
+  // should see the same camp history the fighter does. Page every collection:
+  // a multi-year fight log can exceed the default PostgREST page size.
   const [camps, workouts, sparring, weights] = await Promise.all([
-    // Deleted rows are tombstoned, not removed (see lib/sync.ts) — a coach
-    // should see the same camp history the fighter does.
-    supabase.from('camps').select('*').eq('user_id', fighterId).is('deleted_at', null),
-    supabase.from('workout_logs').select('*').eq('user_id', fighterId).is('deleted_at', null),
-    supabase.from('sparring_logs').select('*').eq('user_id', fighterId).is('deleted_at', null),
-    supabase.from('weight_entries').select('*').eq('user_id', fighterId).is('deleted_at', null),
+    selectAll<CampRow>(
+      (from, to) => client.from('camps').select('*').eq('user_id', fighterId)
+        .is('deleted_at', null).order('created_at', { ascending: false }).range(from, to),
+    ),
+    selectAll<Database['public']['Tables']['workout_logs']['Row']>(
+      (from, to) => client.from('workout_logs').select('*').eq('user_id', fighterId)
+        .is('deleted_at', null).order('date', { ascending: false }).range(from, to),
+    ),
+    selectAll<Database['public']['Tables']['sparring_logs']['Row']>(
+      (from, to) => client.from('sparring_logs').select('*').eq('user_id', fighterId)
+        .is('deleted_at', null).order('date', { ascending: false }).range(from, to),
+    ),
+    selectAll<Database['public']['Tables']['weight_entries']['Row']>(
+      (from, to) => client.from('weight_entries').select('*').eq('user_id', fighterId)
+        .is('deleted_at', null).order('date', { ascending: false }).range(from, to),
+    ),
   ]);
+  for (const q of [camps, workouts, sparring, weights]) {
+    if (q.error) throw new Error(q.error.message);
+  }
   return {
     camps: (camps.data ?? []) as CampRow[],
     workouts: workouts.data ?? [],

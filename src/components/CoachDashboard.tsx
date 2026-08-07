@@ -133,7 +133,14 @@ export default function CoachDashboard({ mode = 'overview', onNavigate }: Props)
 
   useEffect(() => {
     if (!authConfigured || !authUser || currentUser?.role !== 'coach') return;
-    listLinkedFighters(authUser.id).then(setLinked);
+    let active = true;
+    listLinkedFighters(authUser.id)
+      .then(rows => { if (active) setLinked(rows); })
+      .catch(err => {
+        console.error('listLinkedFighters failed', err);
+        if (active) setLinked([]);
+      });
+    return () => { active = false; };
   }, [authConfigured, authUser, currentUser?.role]);
 
   useEffect(() => {
@@ -167,10 +174,17 @@ export default function CoachDashboard({ mode = 'overview', onNavigate }: Props)
     setCloudFighter(f);
     setLoadingDetail(true);
     setCloudNoteError('');
-    const [detail, notes] = await Promise.all([getFighterDetail(f.id), listCoachNotes(f.id)]);
-    setCloudDetail(detail);
-    setCloudNotes(notes);
-    setLoadingDetail(false);
+    try {
+      const [detail, notes] = await Promise.all([getFighterDetail(f.id), listCoachNotes(f.id)]);
+      setCloudDetail(detail);
+      setCloudNotes(notes);
+    } catch (err) {
+      setCloudDetail(null);
+      setCloudNotes([]);
+      setCloudNoteError(err instanceof Error ? err.message : 'Could not load fighter data.');
+    } finally {
+      setLoadingDetail(false);
+    }
   }
 
   async function submitCloudNote(campId: string) {

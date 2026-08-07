@@ -213,6 +213,11 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
 
   // Load custom presets on mount
   useEffect(() => { setCustomPresets(loadCustomPresets()); }, []);
+  useEffect(() => {
+    const reload = () => setCustomPresets(loadCustomPresets());
+    window.addEventListener('fightcamp-presets-changed', reload);
+    return () => window.removeEventListener('fightcamp-presets-changed', reload);
+  }, []);
 
   // Exit the takeover when the browser leaves real fullscreen (Esc on web).
   // Entering is driven by state alone — see toggleFullscreen.
