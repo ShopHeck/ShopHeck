@@ -135,13 +135,23 @@ export async function syncLiveActivity(snapshot: LiveActivityTimerSnapshot, sess
   }
 }
 
-/** Tear the activity down (session complete, reset, or app-foregrounded). */
+/** Tear the activity down (session complete, reset, or orphan cleanup).
+ *
+ * Always reaches native end when Live Activities are supported — even if this
+ * JS module never saw a start. After a process kill the module-level `started`
+ * flag is false while ActivityKit may still hold a Lock Screen / Dynamic
+ * Island timer; skipping the native call left that orphan up until the next
+ * start() recovered it.
+ */
 export async function endLiveActivity(): Promise<void> {
-  if (!started) return;
   started = false;
+  if (!Capacitor.isNativePlatform()) return;
+  // Capability probe may not have run yet on a cold launch that immediately
+  // tears down an orphan — still try native end; unsupported platforms no-op.
   try {
+    if (supportKnown === false) return;
     await TimerLiveActivity.end();
-  } catch { /* noop */ }
+  } catch { /* decoration */ }
 }
 
 /** True once an activity has been started in this app run. */

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { buildSegments, type LiveActivityTimerSnapshot } from '../src/utils/liveActivity';
+import { shouldAcceptWatchCommand } from '../src/utils/watchCommand';
 
 // The Live Activity keeps counting while the app is suspended because the
 // widget renders these segments against Date(). Getting the segment geometry
@@ -99,5 +100,60 @@ describe('buildSegments — Live Activity schedule geometry', () => {
     // Subsequent work rounds stay at the base duration.
     const nextWork = segs.find(x => x.kind === 'work' && x.round === 2);
     expect(nextWork!.endMs - nextWork!.startMs).toBe(180_000);
+  });
+});
+
+describe('shouldAcceptWatchCommand — stale command rejection', () => {
+  // transferUserInfo can deliver a start/pause/reset minutes late, after the
+  // fighter already finished a different session. Accepting those would restart
+  // or pause the wrong timer. These rules are the phone-side filter.
+
+  const NOW = 1_700_000_000_000; // fixed epoch ms
+
+  it('accepts a fresh command for the active session with a newer seq', () => {
+    expect(shouldAcceptWatchCommand(
+      { command: 'pause', sessionId: 's1', seq: 2, createdAtMs: NOW - 1_000 },
+      { activeSessionId: 's1', lastSeq: 1, nowMs: NOW },
+    )).toBe(true);
+  });
+
+  it('rejects a command from a different session once one is active', () => {
+    expect(shouldAcceptWatchCommand(
+      { command: 'start', sessionId: 'old', seq: 9, createdAtMs: NOW },
+      { activeSessionId: 's1', lastSeq: 0, nowMs: NOW },
+    )).toBe(false);
+  });
+
+  it('rejects a duplicate or older sequence for the same session', () => {
+    expect(shouldAcceptWatchCommand(
+      { command: 'pause', sessionId: 's1', seq: 3, createdAtMs: NOW },
+      { activeSessionId: 's1', lastSeq: 3, nowMs: NOW },
+    )).toBe(false);
+    expect(shouldAcceptWatchCommand(
+      { command: 'pause', sessionId: 's1', seq: 2, createdAtMs: NOW },
+      { activeSessionId: 's1', lastSeq: 3, nowMs: NOW },
+    )).toBe(false);
+  });
+
+  it('rejects a command older than the TTL even if seq is new', () => {
+    expect(shouldAcceptWatchCommand(
+      { command: 'reset', sessionId: 's1', seq: 10, createdAtMs: NOW - 60_000 },
+      { activeSessionId: 's1', lastSeq: 1, nowMs: NOW, ttlMs: 30_000 },
+    )).toBe(false);
+  });
+
+  it('accepts a command that establishes the first active session', () => {
+    // Wrist-started sessions reach the phone before any phone-side startSession.
+    expect(shouldAcceptWatchCommand(
+      { command: 'start', sessionId: 'wrist-1', seq: 1, createdAtMs: NOW },
+      { activeSessionId: null, lastSeq: 0, nowMs: NOW },
+    )).toBe(true);
+  });
+
+  it('rejects payloads missing identity metadata (cannot prove freshness)', () => {
+    expect(shouldAcceptWatchCommand(
+      { command: 'start' },
+      { activeSessionId: 's1', lastSeq: 0, nowMs: NOW },
+    )).toBe(false);
   });
 });

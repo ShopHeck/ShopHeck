@@ -12,7 +12,8 @@ import WatchConnectivity
 ///   a round that already finished.
 /// - **Commands → phone** use `transferUserInfo`, which is queued and
 ///   guaranteed. "The fighter pressed start" must not be lost because the phone
-///   was in a pocket at that instant.
+///   was in a pocket at that instant. Each command carries sessionId + seq +
+///   createdAt so the phone can drop a late delivery from a finished session.
 @MainActor
 final class WatchConnectivityClient: NSObject, ObservableObject {
     @Published private(set) var phoneReachable = false
@@ -48,11 +49,14 @@ final class WatchConnectivityClient: NSObject, ObservableObject {
         )
     }
 
-    func send(command: WatchMessage.Command) {
+    func send(command: WatchMessage.Command, sessionId: String, seq: Int) {
         guard let session else { return }
         session.transferUserInfo([
             WatchMessage.kindKey: WatchMessage.command,
             WatchMessage.Key.command: command.rawValue,
+            WatchMessage.Key.sessionId: sessionId,
+            WatchMessage.Key.seq: seq,
+            WatchMessage.Key.createdAt: Date().timeIntervalSince1970,
         ])
     }
 

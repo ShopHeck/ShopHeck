@@ -82,7 +82,7 @@ Optional smoke after those two:
 
 ---
 
-## Closed in the 2026-08-06 implementation pass (code)
+## Closed in the 2026-08-06 / 2026-08-07 implementation passes (code)
 
 - Canonical `schema.sql` ends with authorization hardening so a full re-run
   cannot undo RLS (verify: `tail supabase/schema.sql`).
@@ -95,6 +95,10 @@ Optional smoke after those two:
 - CocoaPods vs Bundler documented in `docs/ios-cocoapods.md`.
 - App Store screenshots + preview videos generated; `npm run verify:appstore`
   green locally.
+- Live Activity `end` enumerates system-held activities (process-restart orphan
+  cleanup); JS always calls native end when ending.
+- Watch commands carry `sessionId` + `seq` + `createdAt`; phone drops stale /
+  wrong-session queued commands (`WatchBridgePlugin`, `src/utils/watchCommand.ts`).
 
 ---
 

@@ -25,11 +25,16 @@ final class TimerModel: ObservableObject {
     private var ticker: Timer?
     /// Bell offsets already fired, so a re-render cannot double-ring.
     private var firedBells: Set<Int> = []
+    /// Shared with the phone so late transferUserInfo cannot hit another fight.
+    private var sessionId: String
+    /// Monotonic command counter for this sessionId.
+    private var commandSeq = 0
 
     private var engine: RoundEngine { RoundEngine(config: config) }
 
     init(config: WatchSessionConfig = .fallback) {
         self.config = config
+        self.sessionId = config.sessionId.isEmpty ? UUID().uuidString : config.sessionId
         self.snapshot = RoundEngine(config: config).snapshot(elapsed: 0)
 
         connectivity.onStartSession = { [weak self] pushed in
@@ -38,6 +43,10 @@ final class TimerModel: ObservableObject {
             // pushes a new configuration mid-session, adopting it silently
             // would leave the wrist counting a different fight to the phone.
             self.config = pushed
+            if !pushed.sessionId.isEmpty {
+                self.sessionId = pushed.sessionId
+                self.commandSeq = 0
+            }
             if !self.isRunning { self.snapshot = RoundEngine(config: pushed).snapshot(elapsed: 0) }
         }
         connectivity.onEndSession = { [weak self] in
@@ -53,6 +62,11 @@ final class TimerModel: ObservableObject {
 
     func start() {
         guard !isRunning else { return }
+        // A brand-new press after reset gets a fresh identity so a queued
+        // command from the previous session cannot collide with this one.
+        if startedAt == nil && pausedElapsed == 0 && commandSeq == 0 && config.sessionId.isEmpty {
+            sessionId = UUID().uuidString
+        }
         startedAt = Date().addingTimeInterval(-pausedElapsed)
         isRunning = true
         startTicking()
@@ -67,7 +81,7 @@ final class TimerModel: ObservableObject {
         // bundle declares workout-processing (see WatchApp/Info.plist), so
         // starting one here would fail at runtime even if it were wanted.
         Task { await heartRate.start() }
-        connectivity.send(command: .start)
+        sendCommand(.start)
     }
 
     func pause() {
@@ -76,7 +90,7 @@ final class TimerModel: ObservableObject {
         isRunning = false
         ticker?.invalidate()
         ticker = nil
-        connectivity.send(command: .pause)
+        sendCommand(.pause)
     }
 
     func reset() {
@@ -87,7 +101,10 @@ final class TimerModel: ObservableObject {
         pausedElapsed = 0
         firedBells.removeAll()
         snapshot = engine.snapshot(elapsed: 0)
-        connectivity.send(command: .reset)
+        sendCommand(.reset)
+        // Next start is a new session identity.
+        sessionId = UUID().uuidString
+        commandSeq = 0
         Task { await heartRate.stop() }
     }
 
@@ -96,7 +113,14 @@ final class TimerModel: ObservableObject {
         ticker = nil
         isRunning = false
         await heartRate.stop()
-        if notifyPhone { connectivity.send(command: .reset) }
+        if notifyPhone { sendCommand(.reset) }
+        sessionId = UUID().uuidString
+        commandSeq = 0
+    }
+
+    private func sendCommand(_ command: WatchMessage.Command) {
+        commandSeq += 1
+        connectivity.send(command: command, sessionId: sessionId, seq: commandSeq)
     }
 
     private func startTicking() {
