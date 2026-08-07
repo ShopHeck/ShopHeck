@@ -47,6 +47,20 @@ export const SCREENSHOT_TARGETS = {
     // order (which deliver derives from sorted filenames) doesn't shuffle.
     prefix: 'iphone69',
   },
+  // Still generated because ASC keeps a separate 6.5" media slot; leftover
+  // previews on that tab are not replaced by 6.9" uploads. Pixel size is the
+  // accepted 1284×2778 (XS Max / 11 Pro Max class).
+  'iphone-6.5': {
+    label: 'iPhone 6.5"',
+    width: 1284,
+    height: 2778,
+    alt: [[1242, 2688]],
+    viewport: { width: 428, height: 926 },
+    scale: 3,
+    mobile: true,
+    required: false,
+    prefix: 'iphone65',
+  },
   'ipad-13': {
     label: 'iPad 13"',
     width: 2064,

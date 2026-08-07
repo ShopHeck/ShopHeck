@@ -118,6 +118,7 @@ Since April 2025 Apple takes **one iPhone set and one iPad set** and derives eve
 |---|---|---|---|
 | Screenshot | iPhone 6.9" | **1320 × 2868** (or 1290 × 2796) | 3–10 |
 | Screenshot | iPad 13" | **2064 × 2752** (or 2048 × 2732) | 3–10 |
+| Screenshot | Apple Watch | **416 × 496** (Series 10/11 46mm; keep one size for all locales) | 1–10 |
 | App preview | iPhone 6.9" | **886 × 1920** (or 1080 × 1920) | up to 3 |
 | App preview | iPad 13" | **1200 × 1600** | up to 3 |
 
@@ -144,6 +145,7 @@ npm run appstore:assets      # screenshots + previews + verification
 |---|---|
 | `npm run screenshots` | 7 framed store images per display size → `ios/fastlane/screenshots/en-US/` |
 | `npm run preview:video` | one ~28 s app preview per display size, same folder |
+| `npm run screenshots:watch` | 4 Apple Watch faces (ready/work/rest/done) @ 416×496 |
 | `npm run verify:appstore` | checks every file against the spec; **exits non-zero** if anything would be rejected or degraded |
 
 `?shot=1` seeds a fully-populated demo camp with Pro unlocked (`src/utils/demoSeed.ts`) and exposes `window.__setView` / `window.__timerStartPause`, so the scripts drive the real app deterministically — no Mac, simulator, or device needed. The screenshots are composed with a marketing frame (brand lockup, headline, feature chips, device mockup) drawn entirely in CSS; edit the shot list and copy at the top of `scripts/screenshots.mjs`, and the preview scenes at the top of `scripts/app-preview.mjs`.

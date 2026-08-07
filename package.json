@@ -15,8 +15,9 @@
     "screenshots": "node scripts/screenshots.mjs",
     "screenshots:iap": "node scripts/iap-screenshots.mjs",
     "preview:video": "node scripts/app-preview.mjs",
+    "screenshots:watch": "node scripts/watch-screenshots.mjs",
     "verify:appstore": "node scripts/verify-appstore-assets.mjs",
-    "appstore:assets": "npm run screenshots && npm run preview:video && npm run verify:appstore",
+    "appstore:assets": "npm run screenshots && npm run preview:video && npm run screenshots:watch && npm run verify:appstore",
     "cap:sync": "npm run build && npx cap sync",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios"
   },

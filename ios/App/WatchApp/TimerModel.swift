@@ -19,6 +19,10 @@ final class TimerModel: ObservableObject {
     let heartRate = WorkoutHeartRate()
     let connectivity = WatchConnectivityClient()
 
+    /// When set (App Store screenshot mode only), the live sensor is ignored so
+    /// marketing captures show a believable BPM without HealthKit authorization.
+    private var shotBpm: Int?
+
     /// Wall-clock instant the session started, adjusted for time spent paused.
     private var startedAt: Date?
     private var pausedElapsed: TimeInterval = 0
@@ -58,7 +62,7 @@ final class TimerModel: ObservableObject {
         connectivity.activate()
     }
 
-    var bpm: Int? { heartRate.bpm }
+    var bpm: Int? { shotBpm ?? heartRate.bpm }
 
     func start() {
         guard !isRunning else { return }
@@ -165,5 +169,59 @@ final class TimerModel: ObservableObject {
                 WKInterfaceDevice.current().play(.notification)
             }
         }
+    }
+
+    // MARK: - App Store screenshot scenes
+    //
+    // Launch with `-shot work` (etc.) so scripts/watch-screenshots.mjs can
+    // capture frozen, marketing-ready states without HealthKit prompts or a
+    // running phone session. Production launches never pass -shot.
+
+    /// Freeze the face on a named scene for App Store captures.
+    func applyScreenshotScene(_ name: String) {
+        ticker?.invalidate()
+        ticker = nil
+        isRunning = false
+        startedAt = nil
+        pausedElapsed = 0
+        firedBells.removeAll()
+        config = WatchSessionConfig(
+            rounds: 12, workSec: 180, restSec: 60, prepSec: 10,
+            label: "Boxing", sessionId: "shot"
+        )
+        switch name.lowercased() {
+        case "idle", "ready":
+            snapshot = engine.snapshot(elapsed: 0)
+            isRunning = false
+            shotBpm = nil
+        case "prep":
+            snapshot = RoundSnapshot(
+                phase: .prep(round: 1), remaining: 7, progress: 0.3, totalRounds: 12
+            )
+            isRunning = true
+            shotBpm = 92
+        case "work", "round":
+            snapshot = RoundSnapshot(
+                phase: .work(round: 3), remaining: 97, progress: 0.46, totalRounds: 12
+            )
+            isRunning = true
+            shotBpm = 148
+        case "rest":
+            snapshot = RoundSnapshot(
+                phase: .rest(round: 3), remaining: 28, progress: 0.53, totalRounds: 12
+            )
+            isRunning = true
+            shotBpm = 126
+        case "done", "complete":
+            snapshot = RoundSnapshot(
+                phase: .done, remaining: 0, progress: 1, totalRounds: 12
+            )
+            isRunning = false
+            shotBpm = 118
+        default:
+            snapshot = engine.snapshot(elapsed: 0)
+            shotBpm = nil
+        }
+        objectWillChange.send()
     }
 }

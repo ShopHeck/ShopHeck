@@ -402,6 +402,10 @@ platform :ios do
         skip_app_version_update: true,
         submit_for_review: false,
         overwrite_screenshots: true,
+        # Replace leftover app previews on every display size (old UI videos
+        # otherwise stay on the 6.5" tab forever because 6.9" uploads never
+        # touch that slot).
+        overwrite_preview_videos: true,
         # deliver's own size check duplicates scripts/verify-appstore-assets.mjs;
         # leaving it on gives a second opinion before anything is transmitted.
         run_precheck_before_submit: false,
