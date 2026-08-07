@@ -1,18 +1,14 @@
 import Capacitor
 import HealthKit
 
-/// Writes workouts and body-mass samples to Apple Health.
+/// Reads and writes workouts and body-mass samples to Apple Health.
 ///
-/// Read access is intentionally NOT requested here — the app imports historical
-/// Health data via the manual export.xml flow (`AppleHealthSync`). This plugin is
-/// write-only ("share"), so a user can opt in to mirroring newly logged workouts
-/// and weigh-ins into Apple Health without granting read access.
+/// Write path mirrors newly logged app entries (optional). Read path powers
+/// one-tap import of recent weights/workouts into the active camp — the
+/// historical export.xml flow in AppleHealthSync remains for bulk Mac exports.
 ///
 /// CAPInstancePlugin: registered by instance from MainViewController's
-/// capacitorDidLoad (see AppDelegate.swift). Capacitor does NOT discover
-/// app-target plugins automatically — conforming to CAPBridgedPlugin alone is
-/// not enough, because only classes in the generated packageClassList (built
-/// from npm plugin packages) are auto-registered.
+/// capacitorDidLoad (see AppDelegate.swift).
 @objc(HealthKitPlugin)
 public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
     public let identifier = "HealthKitPlugin"
@@ -22,13 +18,22 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestAuthorization", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveWorkout",          returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveWeight",           returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "queryWeights",         returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "queryWorkouts",        returnType: CAPPluginReturnPromise),
     ]
 
     private let healthStore = HKHealthStore()
 
-    /// The sample types this plugin writes (workouts + body mass).
     private var shareTypes: Set<HKSampleType> {
         var types: Set<HKSampleType> = [HKObjectType.workoutType()]
+        if let bodyMass = HKQuantityType.quantityType(forIdentifier: .bodyMass) {
+            types.insert(bodyMass)
+        }
+        return types
+    }
+
+    private var readTypes: Set<HKObjectType> {
+        var types: Set<HKObjectType> = [HKObjectType.workoutType()]
         if let bodyMass = HKQuantityType.quantityType(forIdentifier: .bodyMass) {
             types.insert(bodyMass)
         }
@@ -39,16 +44,18 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         call.resolve(["available": HKHealthStore.isHealthDataAvailable()])
     }
 
-    /// Prompts for write ("share") permission. Note: Apple deliberately never
-    /// reveals whether write access was actually granted (privacy) — `success`
-    /// only means the prompt completed without error. Saves to a denied type fail
-    /// silently, which is acceptable for an optional mirror.
+    /// Prompts for share + read. Apple does not reveal write grant status;
+    /// `granted` means the prompt completed without error.
     @objc func requestAuthorization(_ call: CAPPluginCall) {
         guard HKHealthStore.isHealthDataAvailable() else {
             call.resolve(["granted": false])
             return
         }
-        healthStore.requestAuthorization(toShare: shareTypes, read: []) { success, error in
+        let read = call.getBool("read") ?? true
+        healthStore.requestAuthorization(
+            toShare: shareTypes,
+            read: read ? readTypes : []
+        ) { success, error in
             if let error = error {
                 call.reject(error.localizedDescription)
                 return
@@ -57,7 +64,6 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         }
     }
 
-    /// Maps the app's normalized activity string to a HealthKit activity type.
     private func activityType(for raw: String?) -> HKWorkoutActivityType {
         switch (raw ?? "").lowercased() {
         case "boxing":      return .boxing
@@ -69,6 +75,20 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         case "cycling":     return .cycling
         case "recovery":    return .preparationAndRecovery
         default:            return .martialArts
+        }
+    }
+
+    private func activityKey(for type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .boxing: return "boxing"
+        case .kickboxing: return "kickboxing"
+        case .martialArts: return "martialArts"
+        case .highIntensityIntervalTraining: return "hiit"
+        case .traditionalStrengthTraining, .functionalStrengthTraining: return "strength"
+        case .running: return "running"
+        case .cycling: return "cycling"
+        case .preparationAndRecovery, .mindAndBody: return "recovery"
+        default: return "other"
         }
     }
 
@@ -93,9 +113,6 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             energy = HKQuantity(unit: .kilocalorie(), doubleValue: kcal)
         }
 
-        // The simple initializer is deprecated on iOS 17 but remains functional on
-        // iOS 15+; HKWorkoutBuilder is the modern alternative if we later need
-        // per-sample data. WasUserEntered marks these as manual entries.
         let workout = HKWorkout(
             activityType: activityType(for: call.getString("activityType")),
             start: start,
@@ -144,5 +161,83 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             }
             call.resolve(["saved": success])
         }
+    }
+
+    /// Body-mass samples in [startMs, endMs], newest first, capped at `limit`.
+    @objc func queryWeights(_ call: CAPPluginCall) {
+        guard
+            HKHealthStore.isHealthDataAvailable(),
+            let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)
+        else {
+            call.resolve(["samples": []])
+            return
+        }
+        let startMs = call.getDouble("startMs") ?? (Date().timeIntervalSince1970 * 1000 - 90 * 86_400_000)
+        let endMs = call.getDouble("endMs") ?? (Date().timeIntervalSince1970 * 1000)
+        let limit = call.getInt("limit") ?? 200
+        let start = Date(timeIntervalSince1970: startMs / 1000)
+        let end = Date(timeIntervalSince1970: endMs / 1000)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        let query = HKSampleQuery(
+            sampleType: bodyMassType,
+            predicate: predicate,
+            limit: max(1, min(limit, 500)),
+            sortDescriptors: [sort]
+        ) { _, samples, error in
+            if let error = error {
+                call.reject(error.localizedDescription)
+                return
+            }
+            let kgUnit = HKUnit.gramUnit(with: .kilo)
+            let rows: [[String: Double]] = (samples as? [HKQuantitySample] ?? []).map { s in
+                [
+                    "dateMs": s.startDate.timeIntervalSince1970 * 1000,
+                    "kg": s.quantity.doubleValue(for: kgUnit),
+                ]
+            }
+            call.resolve(["samples": rows])
+        }
+        healthStore.execute(query)
+    }
+
+    /// Workouts in [startMs, endMs], newest first.
+    @objc func queryWorkouts(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            call.resolve(["samples": []])
+            return
+        }
+        let startMs = call.getDouble("startMs") ?? (Date().timeIntervalSince1970 * 1000 - 90 * 86_400_000)
+        let endMs = call.getDouble("endMs") ?? (Date().timeIntervalSince1970 * 1000)
+        let limit = call.getInt("limit") ?? 200
+        let start = Date(timeIntervalSince1970: startMs / 1000)
+        let end = Date(timeIntervalSince1970: endMs / 1000)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        let query = HKSampleQuery(
+            sampleType: HKObjectType.workoutType(),
+            predicate: predicate,
+            limit: max(1, min(limit, 500)),
+            sortDescriptors: [sort]
+        ) { [weak self] _, samples, error in
+            guard let self else { return }
+            if let error = error {
+                call.reject(error.localizedDescription)
+                return
+            }
+            let rows: [[String: Any]] = (samples as? [HKWorkout] ?? []).map { w in
+                var row: [String: Any] = [
+                    "dateMs": w.startDate.timeIntervalSince1970 * 1000,
+                    "durationSec": w.duration,
+                    "activityType": self.activityKey(for: w.workoutActivityType),
+                ]
+                if let src = w.sourceRevision.source.name as String? {
+                    row["sourceName"] = src
+                }
+                return row
+            }
+            call.resolve(["samples": rows])
+        }
+        healthStore.execute(query)
     }
 }

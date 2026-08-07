@@ -25,6 +25,9 @@ import { useHeartRate } from '../context/HeartRateContext';
 import { useMyZoneMEP } from '../hooks/useMyZoneMEP';
 import { syncLiveActivity, endLiveActivity } from '../utils/liveActivity';
 import { WatchBridge } from '../plugins/WatchBridge';
+import { shouldAcceptWatchCommand } from '../utils/watchCommand';
+import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 // Session id of the last completion we logged — makes the completion effect
 // idempotent across relaunches that restore a finished session.
@@ -346,6 +349,88 @@ export default function RoundTimer({ prefill, onPrefillConsumed }: RoundTimerPro
       // noise — Settings surfaces availability instead.
     });
   }, [sessionId, rounds, workSec, restSec, prepSec, presetLabel]);
+
+  // Apply wrist start/pause/reset to the phone clock. Commands are filtered by
+  // sessionId + seq + TTL (see shouldAcceptWatchCommand) so a queued transfer
+  // from a finished session cannot restart the next one.
+  const isRunningRef = React.useRef(isRunning);
+  const phaseRef = React.useRef(phase);
+  const startPauseRef = React.useRef(onStartPause);
+  const resetRef = React.useRef(reset);
+  const phoneSessionRef = React.useRef<string | null>(sessionId || null);
+  isRunningRef.current = isRunning;
+  phaseRef.current = phase;
+  startPauseRef.current = onStartPause;
+  resetRef.current = reset;
+  phoneSessionRef.current = sessionId || null;
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let active = true;
+    let handle: PluginListenerHandle | undefined;
+    // lastSeq is per accepted session; when the phone mints a new sessionId the
+    // filter switches active id via phoneSessionRef and seq restarts cleanly.
+    const ctx = { lastSeq: 0, watchSessionId: null as string | null, filterSessionId: null as string | null };
+
+    void WatchBridge.addListener('watchCommand', (event) => {
+      const createdAtMs = typeof event.createdAt === 'number'
+        ? event.createdAt * 1000
+        : NaN;
+      // Phone-minted id wins once a session is live on this device (watch adopts
+      // it via startSession push). Before that, accept the wrist-minted id.
+      const activeSessionId = phoneSessionRef.current ?? ctx.watchSessionId;
+      // Seq is per-session; when the phone takes over identity, restart seq.
+      if (activeSessionId !== ctx.filterSessionId) {
+        ctx.filterSessionId = activeSessionId;
+        ctx.lastSeq = 0;
+      }
+      const accept = shouldAcceptWatchCommand(
+        {
+          command: event.command,
+          sessionId: event.sessionId,
+          seq: event.seq,
+          createdAtMs,
+        },
+        { activeSessionId, lastSeq: ctx.lastSeq, nowMs: Date.now() },
+      );
+      if (!accept) return;
+
+      ctx.watchSessionId = (event.sessionId ?? '').trim() || null;
+      ctx.filterSessionId = phoneSessionRef.current ?? ctx.watchSessionId;
+      ctx.lastSeq = typeof event.seq === 'number' ? event.seq : ctx.lastSeq;
+
+      if (event.command === 'reset') {
+        resetRef.current();
+        ctx.watchSessionId = null;
+        ctx.filterSessionId = null;
+        ctx.lastSeq = 0;
+        return;
+      }
+      if (event.command === 'start') {
+        // Wrist start while phone is done → clear then start a fresh session.
+        if (phaseRef.current === 'done') {
+          resetRef.current();
+          // Let reset paint before start so we don't double-toggle pause.
+          queueMicrotask(() => startPauseRef.current());
+          return;
+        }
+        if (!isRunningRef.current) startPauseRef.current();
+        return;
+      }
+      if (event.command === 'pause' && isRunningRef.current) {
+        startPauseRef.current();
+      }
+    }).then(h => {
+      handle = h;
+      if (!active) void h.remove();
+    }).catch(() => {});
+
+    return () => {
+      active = false;
+      void handle?.remove();
+    };
+  }, []);
 
   // The push that matters most: the last foreground moment before WKWebView
   // suspends. Without it the activity would be one transition stale by the

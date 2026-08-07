@@ -1,12 +1,18 @@
 import { Capacitor } from '@capacitor/core';
 import { HealthKit } from '../plugins/HealthKit';
 import type { SessionType } from '../types';
+import {
+  mapHealthWeights,
+  mapHealthWorkouts,
+  type MappedWeight,
+  type MappedWorkout,
+} from './healthImport';
 
 /**
  * Optional, opt-in mirroring of newly logged workouts and weigh-ins into Apple
- * Health. Write-only — the historical import flow lives in AppleHealthSync. All
- * writers here no-op off-device or when disabled, and never throw, so call sites
- * can fire-and-forget without branching.
+ * Health, plus one-tap native import of recent samples. Write-only and read
+ * paths both no-op off-device; writers never throw so call sites can fire-and-
+ * forget. Historical export.xml import still lives in AppleHealthSync.
  */
 
 const PREF_KEY = 'fightcamp_healthkit_write';
@@ -28,7 +34,7 @@ export async function setHealthWriteEnabled(on: boolean): Promise<boolean> {
     try {
       const { available } = await HealthKit.isAvailable();
       if (!available) return false;
-      const { granted } = await HealthKit.requestAuthorization();
+      const { granted } = await HealthKit.requestAuthorization({ read: false });
       if (!granted) { localStorage.setItem(PREF_KEY, '0'); return false; }
     } catch {
       localStorage.setItem(PREF_KEY, '0');
@@ -46,7 +52,7 @@ const ACTIVITY_BY_SESSION: Record<SessionType, string | null> = {
   conditioning: 'hiit',
   strength: 'strength',
   recovery: 'recovery',
-  rest: null, // rest days aren't workouts
+  rest: null,
 };
 
 /** Noon (local) on a YYYY-MM-DD date + duration, clamped so we never write a future end time. */
@@ -79,5 +85,73 @@ export async function writeWeightToHealth(e: { date: string; weight: number }): 
     await HealthKit.saveWeight({ kg: +(e.weight * LBS_TO_KG).toFixed(2), dateMs });
   } catch {
     /* best-effort */
+  }
+}
+
+export interface NativeHealthImportResult {
+  available: boolean;
+  granted: boolean;
+  weights: MappedWeight[];
+  workouts: MappedWorkout[];
+  error?: string;
+}
+
+/**
+ * One-tap native import: request read permission, pull weights/workouts in the
+ * camp window, map + de-dupe against existing local rows. Does not dispatch —
+ * the caller applies LOG_WEIGHT / LOG_WORKOUT after the user confirms.
+ */
+export async function previewNativeHealthImport(opts: {
+  campStart: string;
+  campEnd: string;
+  existingWeightDates: Set<string>;
+  existingWorkoutKeys: Set<string>;
+}): Promise<NativeHealthImportResult> {
+  if (!Capacitor.isNativePlatform()) {
+    return { available: false, granted: false, weights: [], workouts: [] };
+  }
+  try {
+    const { available } = await HealthKit.isAvailable();
+    if (!available) {
+      return { available: false, granted: false, weights: [], workouts: [] };
+    }
+    const { granted } = await HealthKit.requestAuthorization({ read: true });
+    if (!granted) {
+      return { available: true, granted: false, weights: [], workouts: [] };
+    }
+
+    const startMs = new Date(`${opts.campStart}T00:00:00`).getTime();
+    const endMs = Math.min(
+      new Date(`${opts.campEnd}T23:59:59`).getTime(),
+      Date.now(),
+    );
+
+    const [wRes, woRes] = await Promise.all([
+      HealthKit.queryWeights({ startMs, endMs, limit: 300 }),
+      HealthKit.queryWorkouts({ startMs, endMs, limit: 300 }),
+    ]);
+
+    return {
+      available: true,
+      granted: true,
+      weights: mapHealthWeights(wRes.samples ?? [], {
+        campStart: opts.campStart,
+        campEnd: opts.campEnd,
+        existingDates: opts.existingWeightDates,
+      }),
+      workouts: mapHealthWorkouts(woRes.samples ?? [], {
+        campStart: opts.campStart,
+        campEnd: opts.campEnd,
+        existingKeys: opts.existingWorkoutKeys,
+      }),
+    };
+  } catch (err) {
+    return {
+      available: true,
+      granted: false,
+      weights: [],
+      workouts: [],
+      error: err instanceof Error ? err.message : 'Health import failed',
+    };
   }
 }
