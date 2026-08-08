@@ -111,7 +111,14 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         //
         // Same session → adopt the existing activity and update it in place.
         // A different (stale) session → end it first, then request fresh.
-        for existing in Activity<TimerActivityAttributes>.activities {
+        //
+        // Only ACTIVE activities can be adopted. `Activity.activities` keeps
+        // reporting one for a while after it is dismissed or ended, and
+        // adopting that corpse is how the update-failed path could loop: the
+        // web layer asks for a fresh activity, start() hands back the dead one
+        // it just failed to push into, and the Lock Screen stays empty.
+        for existing in Activity<TimerActivityAttributes>.activities
+        where existing.activityState == .active {
             if existing.attributes.sessionId == sessionId {
                 currentActivity = existing
                 Task {
@@ -143,7 +150,16 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
     }
 
     @objc func update(_ call: CAPPluginCall) {
-        guard #available(iOS 16.2, *), let activity = currentActivity as? Activity<TimerActivityAttributes> else {
+        guard #available(iOS 16.2, *) else {
+            call.resolve(["updated": false])
+            return
+        }
+        // updated=false is not "nothing to do" — it is the web layer's signal
+        // that the activity is gone and a fresh one must be requested. Without
+        // it, an activity the fighter swiped away (or one ActivityKit ended on
+        // its own) left every remaining push in the session writing into a
+        // dead handle, and the Lock Screen stayed empty until the next session.
+        guard let activity = liveActivity() else {
             call.resolve(["updated": false])
             return
         }
@@ -158,6 +174,26 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         } catch {
             call.reject(error.localizedDescription)
         }
+    }
+
+    /// The activity this plugin should push into, or nil when the system no
+    /// longer holds a live one.
+    ///
+    /// `currentActivity` is an in-memory handle: after a process restart it is
+    /// nil while ActivityKit may still be displaying the session, and after a
+    /// dismissal it is non-nil while the activity is already dead. Both cases
+    /// are resolved against `Activity.activities`, which is the system's own
+    /// answer.
+    @available(iOS 16.2, *)
+    private func liveActivity() -> Activity<TimerActivityAttributes>? {
+        if let current = currentActivity as? Activity<TimerActivityAttributes>,
+           current.activityState == .active {
+            return current
+        }
+        let recovered = Activity<TimerActivityAttributes>.activities
+            .first { $0.activityState == .active }
+        currentActivity = recovered
+        return recovered
     }
 
     @objc func end(_ call: CAPPluginCall) {

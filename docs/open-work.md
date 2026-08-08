@@ -66,6 +66,31 @@ Still open: upload the files under `ios/fastlane/screenshots/en-US/` in App
 Store Connect (that directory is gitignored; regenerate with
 `npm run appstore:assets` if missing).
 
+### Let round bells through Focus / Do Not Disturb
+
+`TimerBellSchedulerPlugin` already marks every round boundary
+`interruptionLevel = .timeSensitive`, which is the correct level for a bell the
+fighter is training to. iOS **ignores** that level unless the app carries the
+`com.apple.developer.usernotifications.time-sensitive` entitlement, so today a
+fighter training with a Focus on gets silent rounds.
+
+This is deliberately **not** in the diff, because adding the entitlement to a
+build whose App ID lacks the capability fails the archive at signing — and the
+bells work correctly without it in every other case. It needs both halves, in
+this order:
+
+1. Enable **Time Sensitive Notifications** on the `app.fightcamptraining` App ID
+   at <https://developer.apple.com/account/resources/identifiers/list> (and let
+   the `certs` lane regenerate profiles if the pipeline is on match).
+2. Add to `ios/App/App/App.entitlements`:
+   ```xml
+   <key>com.apple.developer.usernotifications.time-sensitive</key>
+   <true/>
+   ```
+
+Verify on device: set a Focus, start a session, lock the phone — the round
+bell should still ring.
+
 ---
 
 ## Closed — ops (2026-08-06, operator confirmed)

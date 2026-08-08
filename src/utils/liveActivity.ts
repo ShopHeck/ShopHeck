@@ -113,7 +113,14 @@ export async function syncLiveActivity(snapshot: LiveActivityTimerSnapshot, sess
       started = res.started;
       if (!started) return;
     } else {
-      await TimerLiveActivity.update(state);
+      const res = await TimerLiveActivity.update(state);
+      if (!res.updated) {
+        // The activity is gone — the fighter swiped it away, or ActivityKit
+        // ended it. `started` would otherwise stay true for the rest of the
+        // session and every later push would go nowhere, so mint a new one.
+        const restarted = await TimerLiveActivity.start({ ...state, sessionId });
+        started = restarted.started;
+      }
     }
   } catch {
     // Decoration, never the timer.

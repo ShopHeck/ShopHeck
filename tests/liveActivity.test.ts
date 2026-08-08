@@ -125,6 +125,111 @@ describe('buildSegments — Live Activity schedule geometry', () => {
   });
 });
 
+/**
+ * The widget's own phase lookup, mirrored.
+ *
+ * A Live Activity is not re-rendered on demand: the system builds one
+ * rendering per schedule entry ahead of time and replays them, so each
+ * rendering resolves "now" to its OWN entry date rather than to the wall clock
+ * of the moment it is shown. That makes the entry schedule part of the
+ * segment contract, not a widget implementation detail — keying it on segment
+ * ENDS put the first rendering (the one on screen from the push until the
+ * current segment finishes) a whole phase ahead of the fighter, showing REST
+ * mid-round and WORK mid-rest. These mirror TimerLiveActivityWidget.swift.
+ */
+function widgetEntryDates(segs: ReturnType<typeof buildSegments>): number[] {
+  const dates = segs.map(s => s.startMs);
+  const last = segs[segs.length - 1];
+  if (last) dates.push(last.endMs);
+  return dates;
+}
+
+function widgetResolvedSegment(segs: ReturnType<typeof buildSegments>, nowMs: number) {
+  // The +0.5ms mirrors segmentBoundaryToleranceMs.
+  return segs.find(s => s.endMs > nowMs + 0.5) ?? null;
+}
+
+describe('Live Activity widget phase resolution', () => {
+  const NOW = new Date('2026-08-04T12:00:00Z').getTime();
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the round that is actually live at the moment the app pushes', () => {
+    vi.setSystemTime(NOW);
+    // 90 seconds into a live 3-minute round 1 of a 12×3/1 boxing session.
+    const segs = buildSegments(snap({
+      phase: 'work', round: 1, rounds: 12,
+      deadlineMs: NOW + 90_000, phaseSec: 180, workSec: 180, restSec: 60,
+    }));
+
+    const first = widgetEntryDates(segs)[0];
+    const shown = widgetResolvedSegment(segs, first);
+
+    // The regression: this resolved to the 1-minute rest segment.
+    expect(shown).toMatchObject({ kind: 'work', round: 1 });
+    expect(shown!.endMs - shown!.startMs).toBe(180_000);
+  });
+
+  it('shows the rest that is actually live, not the round after it', () => {
+    vi.setSystemTime(NOW);
+    const segs = buildSegments(snap({
+      phase: 'rest', round: 1, rounds: 12,
+      deadlineMs: NOW + 30_000, phaseSec: 60, workSec: 180, restSec: 60,
+    }));
+
+    const shown = widgetResolvedSegment(segs, widgetEntryDates(segs)[0]);
+
+    expect(shown).toMatchObject({ kind: 'rest', round: 1 });
+  });
+
+  it('gives every entry the segment that entry is displayed for', () => {
+    vi.setSystemTime(NOW);
+    const segs = buildSegments(snap({
+      phase: 'prep', round: 1, rounds: 3,
+      deadlineMs: NOW + 5_000, phaseSec: 5, workSec: 180, restSec: 60,
+    }));
+    const entries = widgetEntryDates(segs);
+
+    // One entry per segment, plus the trailing end-of-session entry.
+    expect(entries).toHaveLength(segs.length + 1);
+    segs.forEach((segment, i) => {
+      expect(widgetResolvedSegment(segs, entries[i])).toBe(segment);
+      // ...and it still holds a hair after the entry, and right up to its end.
+      expect(widgetResolvedSegment(segs, entries[i] + 1)).toBe(segment);
+      expect(widgetResolvedSegment(segs, segment.endMs - 1)).toBe(segment);
+    });
+  });
+
+  it('resolves to nothing once the whole schedule has elapsed (DONE)', () => {
+    vi.setSystemTime(NOW);
+    const segs = buildSegments(snap({
+      phase: 'work', round: 3, rounds: 3, deadlineMs: NOW + 10_000,
+    }));
+    const entries = widgetEntryDates(segs);
+
+    // The trailing entry is what lets a session finishing while the app is
+    // suspended reach "DONE" instead of freezing on a 0:00 segment.
+    expect(widgetResolvedSegment(segs, entries[entries.length - 1])).toBeNull();
+  });
+
+  it('never resolves backwards at a boundary despite Double round-tripping', () => {
+    vi.setSystemTime(NOW);
+    const segs = buildSegments(snap({
+      phase: 'work', round: 1, rounds: 3, deadlineMs: NOW + 180_000,
+    }));
+
+    for (let i = 0; i < segs.length - 1; i++) {
+      const boundary = segs[i].endMs;
+      // Exactly on the boundary, and a fraction either side of it, the segment
+      // that is STARTING wins — never the one that just ended.
+      expect(widgetResolvedSegment(segs, boundary)).toBe(segs[i + 1]);
+      expect(widgetResolvedSegment(segs, boundary - 0.4)).toBe(segs[i + 1]);
+      expect(widgetResolvedSegment(segs, boundary + 0.4)).toBe(segs[i + 1]);
+    }
+  });
+});
+
 describe('shouldAcceptWatchCommand — stale command rejection', () => {
   // transferUserInfo can deliver a start/pause/reset minutes late, after the
   // fighter already finished a different session. Accepting those would restart

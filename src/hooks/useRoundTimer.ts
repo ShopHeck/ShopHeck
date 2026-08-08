@@ -6,7 +6,7 @@ import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import { getCustomBellDataUrl } from '../utils/customBell';
 import { nextPhaseDeadline } from '../utils/timerClock';
 import {
-  roundAlertsEnabled, setRoundAlertsEnabled,
+  roundAlertsEnabled, setRoundAlertsEnabled, ensureRoundAlertPermission,
   requestNotificationPermission, notificationsSupported,
 } from '../utils/notifications';
 import {
@@ -386,6 +386,27 @@ export function useRoundTimer() {
     return scheduleRevisionRef.current;
   }, []);
 
+  /**
+   * Secure the notification permission the closed-app bells run on, at the one
+   * moment its purpose is self-evident: the fighter starting a session.
+   * Asking at launch would spend the single prompt iOS ever grants on a screen
+   * that has nothing to do with rounds.
+   *
+   * The first schedule attempt of a session races the fighter answering the
+   * prompt, and a granted answer leaves `bgAlerts` exactly as it was — so the
+   * revision is bumped to re-run the reconcile effect, which would otherwise
+   * never queue the bells this session.
+   */
+  const ensureBgAlertDelivery = useCallback(() => {
+    void ensureRoundAlertPermission().then(granted => {
+      // A denial is reflected in the settings row but NOT persisted as an
+      // opt-out: the fighter may grant it later in iOS Settings, and the
+      // native scheduler already no-ops without authorization.
+      setBgAlertsState(granted && roundAlertsEnabled());
+      if (granted) bumpScheduleRevision();
+    });
+  }, [bumpScheduleRevision]);
+
   // Sync refs with state
   useEffect(() => { phaseRef.current     = phase;        }, [phase]);
   useEffect(() => { roundRef.current     = currentRound; }, [currentRound]);
@@ -616,13 +637,29 @@ export function useRoundTimer() {
   // Schedule while the app is still foregrounded. Waiting for a visibility
   // callback races iOS suspending WKWebView and is why closed-app bells used to
   // disappear. Every schedule-changing render replaces the session atomically.
+  //
+  // Deliberately NOT keyed on `timeLeft`. It changes once a second, and every
+  // run of this effect tears the whole native queue down and rebuilds it: iOS
+  // was being asked to remove and re-add up to 48 notification requests every
+  // second, leaving a window in each of those seconds where the session had NO
+  // bells queued at all. Background the app inside one of those windows — which
+  // is most of every second — and the rounds rang for nobody.
+  //
+  // The schedule is a function of the phase geometry alone, and `timeLeft` is
+  // not part of it: while running the deadline is authoritative, and while
+  // paused the reconciler emits no events at all, so the paused branch's
+  // deadline only has to be a positive instant. Every real mutation already has
+  // its own signal here — transitions move `phase`/`currentRound`, extensions
+  // move `phaseSec`, and skip/pause/resume bump `scheduleRevision`.
   useEffect(() => {
     if (!sessionId || phase === 'idle' || phase === 'done') return;
     void reconcileTimerBellSchedule({
       phase,
       round: currentRound,
       rounds,
-      deadlineMs: isRunning ? deadlineRef.current : nextPhaseDeadline(0, timeLeft),
+      deadlineMs: isRunning
+        ? deadlineRef.current
+        : nextPhaseDeadline(0, timeLeftRef.current),
       phaseSec,
       workSec,
       restSec,
@@ -630,7 +667,7 @@ export function useRoundTimer() {
     }, sessionId, scheduleRevision);
   }, [
     phase, currentRound, rounds, isRunning, sessionId, scheduleRevision,
-    phaseSec, workSec, restSec, timeLeft, bgAlerts,
+    phaseSec, workSec, restSec, bgAlerts,
   ]);
 
   // ── Page-visibility fast-forward ─────────────────────────────────────────
@@ -920,6 +957,8 @@ export function useRoundTimer() {
         scheduleRevisionRef.current = 1;
         setSessionId(newSessionId);
         setScheduleRevision(1);
+        // Rounds have to ring with the screen off; make sure iOS will let them.
+        ensureBgAlertDelivery();
         if (prepSecRef.current > 0) {
           // Start with prep countdown. No audio context is needed until a bell
           // actually fires (unless a custom file must be decoded in the effect).
@@ -952,7 +991,7 @@ export function useRoundTimer() {
   }, [
     phase, isRunning, workSec, timeLeft, reset, getAudioCtx,
     playRoundStartBell, scheduleCtxSuspend, flash, vibrate, speak, unlock,
-    bumpScheduleRevision,
+    bumpScheduleRevision, ensureBgAlertDelivery,
   ]);
 
   /**
