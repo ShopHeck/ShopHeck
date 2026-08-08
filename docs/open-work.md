@@ -66,31 +66,6 @@ Still open: upload the files under `ios/fastlane/screenshots/en-US/` in App
 Store Connect (that directory is gitignored; regenerate with
 `npm run appstore:assets` if missing).
 
-### Let round bells through Focus / Do Not Disturb
-
-`TimerBellSchedulerPlugin` already marks every round boundary
-`interruptionLevel = .timeSensitive`, which is the correct level for a bell the
-fighter is training to. iOS **ignores** that level unless the app carries the
-`com.apple.developer.usernotifications.time-sensitive` entitlement, so today a
-fighter training with a Focus on gets silent rounds.
-
-This is deliberately **not** in the diff, because adding the entitlement to a
-build whose App ID lacks the capability fails the archive at signing — and the
-bells work correctly without it in every other case. It needs both halves, in
-this order:
-
-1. Enable **Time Sensitive Notifications** on the `app.fightcamptraining` App ID
-   at <https://developer.apple.com/account/resources/identifiers/list> (and let
-   the `certs` lane regenerate profiles if the pipeline is on match).
-2. Add to `ios/App/App/App.entitlements`:
-   ```xml
-   <key>com.apple.developer.usernotifications.time-sensitive</key>
-   <true/>
-   ```
-
-Verify on device: set a Focus, start a session, lock the phone — the round
-bell should still ring.
-
 ---
 
 ## Closed — ops (2026-08-06, operator confirmed)
@@ -131,6 +106,17 @@ Optional smoke after those two:
   mode + larger planner CTAs; focus-visible rings; OffSeasonDashboard lazy-loaded.
 - Native Apple Health **read** import (one-tap on device) plus cut-rate safety
   warnings (`cutSafety.ts`) and phone timer applying filtered Watch commands.
+- Live Activity renders the phase that is actually live: the widget's timeline
+  schedule opens on the current segment's **start**, not its end, so the Lock
+  Screen no longer sits one phase ahead (`TimerLiveActivityWidget.swift`).
+- Background round bells survive backgrounding: the reconcile effect is keyed on
+  the phase geometry rather than `timeLeft` (it was tearing the whole queue down
+  and rebuilding it once a second), and a superseded native `replace` no longer
+  withdraws identifiers a newer same-revision run owns.
+- Round bells ring through a Focus — `com.apple.developer.usernotifications.time-sensitive`
+  on the App target, with `USERNOTIFICATIONS_TIMESENSITIVE` in the Fastfile's
+  `ENTITLEMENT_CAPABILITIES` so the portal capability and the profile stay in
+  step. Operator enabled the capability on the App ID 2026-08-08.
 
 ---
 
