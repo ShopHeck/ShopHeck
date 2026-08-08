@@ -17,5 +17,13 @@
 	<true/>
 	<key>com.apple.developer.healthkit.access</key>
 	<array/>
+	<!-- Round bells. TimerBellSchedulerPlugin marks every boundary
+	     `interruptionLevel = .timeSensitive`, which iOS ignores outright without
+	     this entitlement — so a fighter training with a Focus on got silent
+	     rounds. Needs the matching Time Sensitive Notifications capability on
+	     the App ID; ENTITLEMENT_CAPABILITIES in ios/fastlane/Fastfile enables
+	     it and cuts profiles that carry it. -->
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
 </dict>
 </plist>

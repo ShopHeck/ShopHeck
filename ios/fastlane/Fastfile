@@ -87,6 +87,12 @@ ENTITLEMENT_CAPABILITIES = {
   # land in the profile, and Xcode checks the profile for it by name.
   "com.apple.developer.healthkit.access" => { capability: nil },
   "aps-environment" => { capability: "PUSH_NOTIFICATIONS" },
+  # Round bells set interruptionLevel = .timeSensitive so they ring through a
+  # Focus. Independent of PUSH_NOTIFICATIONS: these are local notifications, and
+  # the level is ignored without this capability rather than rejected.
+  "com.apple.developer.usernotifications.time-sensitive" => {
+    capability: "USERNOTIFICATIONS_TIMESENSITIVE"
+  },
   "com.apple.security.application-groups" => { capability: "APP_GROUPS" },
   # Derived by Xcode from the team prefix. Not a portal capability, and not
   # something the profile has to spell out.
