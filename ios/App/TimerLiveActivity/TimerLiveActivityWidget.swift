@@ -79,6 +79,15 @@ struct TimerLiveActivityWidget: Widget {
 
 // ─── Shared rendering ──────────────────────────────────────────────────────
 
+/// Epoch milliseconds do not survive the round trip through `Date` exactly —
+/// `Date(timeIntervalSince1970: ms / 1000).timeIntervalSince1970 * 1000` can
+/// land a hair either side of the integer it started from. A rendering
+/// produced *on* a boundary must resolve to the segment that is starting, not
+/// the one that just ended, so the comparison is nudged forward by half a
+/// millisecond: far below the resolution of anything displayed, far above the
+/// Double error being absorbed.
+private let segmentBoundaryToleranceMs: Double = 0.5
+
 /// The segment currently on the clock: the first one whose end is still in
 /// the future. nil once the WHOLE schedule has elapsed — which happens when
 /// the app was suspended/killed and never got to call `end` (see
@@ -86,7 +95,7 @@ struct TimerLiveActivityWidget: Widget {
 /// last segment here would make those completion states unreachable and pin
 /// the activity on a 0:00 segment forever.
 private func currentSegment(_ state: TimerActivityAttributes.ContentState, now: Date) -> TimerActivityAttributes.ContentState.Segment? {
-    let nowMs = now.timeIntervalSince1970 * 1000
+    let nowMs = now.timeIntervalSince1970 * 1000 + segmentBoundaryToleranceMs
     return state.segments.first { $0.endMs > nowMs }
 }
 
@@ -102,10 +111,40 @@ private struct TimerTimelineView<Content: View>: View {
         if state.isPaused || state.segments.isEmpty {
             content(state, Date())
         } else {
-            TimelineView(.explicit(state.segments.map { Date(timeIntervalSince1970: $0.endMs / 1000) })) { timeline in
+            TimelineView(.explicit(entryDates)) { timeline in
                 content(state, timeline.date)
             }
         }
+    }
+
+    /// Every segment's START, then the end of the last one.
+    ///
+    /// The schedule has to OPEN on the instant the current segment began, not
+    /// on the instant it ends. A Live Activity is not re-rendered on demand —
+    /// the system prepares a rendering per schedule entry ahead of time and
+    /// replays them — and in that model a rendering resolves `now` to its own
+    /// entry's date rather than to the wall clock of the moment it is shown.
+    ///
+    /// Keying the schedule on segment ENDS therefore made the very first
+    /// rendering — the one displayed from the moment the app pushes until the
+    /// current segment actually ends — resolve `now` to that segment's end,
+    /// and every lookup ran one phase ahead of reality: REST and the rest
+    /// colour on the Lock Screen while the round was still live, WORK and the
+    /// full round duration while the fighter was resting.
+    ///
+    /// Opening at `segments[0].startMs` — already in the past by the time the
+    /// app pushes — makes entry *i* describe segment *i*, and the trailing end
+    /// entry is what gives a session finishing while suspended its "DONE"
+    /// state. Note this holds under the plain SwiftUI reading too, where a
+    /// schedule that has not reached its first entry renders against the
+    /// current date: `first { endMs > now }` picks the live segment either
+    /// way, so the fix does not rest on which of the two is in play.
+    private var entryDates: [Date] {
+        var dates = state.segments.map { Date(timeIntervalSince1970: $0.startMs / 1000) }
+        if let last = state.segments.last {
+            dates.append(Date(timeIntervalSince1970: last.endMs / 1000))
+        }
+        return dates
     }
 }
 

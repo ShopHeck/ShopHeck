@@ -305,12 +305,47 @@ export interface RoundAlert {
   body: string;
 }
 
+/**
+ * Background round bells are ON unless the fighter has explicitly turned them
+ * off.
+ *
+ * The bell IS the round timer: a fighter who pockets or locks the phone
+ * mid-session expects the rounds to keep ringing, and the in-app Web Audio
+ * bell cannot do that — WKWebView is suspended within seconds of backgrounding.
+ * Defaulting this off meant the timer silently stopped being a timer the
+ * moment the screen went dark, for everyone who never found the setting.
+ *
+ * Only the literal opt-out counts, so an unset preference reads as on while a
+ * deliberate "off" still survives. The OS permission is a separate gate the
+ * native scheduler enforces on its own — this is the fighter's preference, not
+ * a claim that bells can actually be delivered.
+ */
 export function roundAlertsEnabled(): boolean {
-  return localStorage.getItem(ROUND_ALERTS_KEY) === 'on';
+  return localStorage.getItem(ROUND_ALERTS_KEY) !== 'off';
 }
 
 export function setRoundAlertsEnabled(on: boolean): void {
   localStorage.setItem(ROUND_ALERTS_KEY, on ? 'on' : 'off');
+}
+
+/**
+ * Make sure the OS will actually deliver background round bells, asking for
+ * the notification permission if it has never been decided.
+ *
+ * Safe to call on every session start: iOS answers an already-decided
+ * permission from its own record without re-prompting, and a denial is
+ * reported rather than re-asked.
+ */
+export async function ensureRoundAlertPermission(): Promise<boolean> {
+  if (!notificationsSupported() || !roundAlertsEnabled()) return false;
+  try {
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display === 'granted') return true;
+    if (perm.display === 'denied') return false;
+    return await requestNotificationPermission();
+  } catch {
+    return false;
+  }
 }
 
 /**

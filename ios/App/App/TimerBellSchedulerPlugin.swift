@@ -172,12 +172,23 @@ public class TimerBellSchedulerPlugin: CAPInstancePlugin, CAPBridgedPlugin {
                     }
                     group.notify(queue: Self.replacementQueue) {
                         // A newer replacement may have landed while the center
-                        // was adding requests. Remove only this stale revision's
-                        // deterministic identifiers so it cannot ring later.
+                        // was adding requests, in which case this one is stale
+                        // and must not leave bells behind that could ring later.
                         guard Self.isCurrent(sessionId: sessionId, revision: revision, token: token) else {
-                            center.removePendingNotificationRequests(
-                                withIdentifiers: valid.map(\.identifier)
-                            )
+                            // ...but withdraw ONLY identifiers the winner cannot
+                            // own. They are derived from (sessionId, revision),
+                            // so a replacement that re-applied the SAME revision
+                            // of the same session produced byte-identical ones,
+                            // and the pending requests under them are now ITS
+                            // requests. Deleting them here is how a session ended
+                            // up with no bells at all: two replacements of one
+                            // revision overlap, the newer adds the queue, and the
+                            // older's completion promptly removes it again.
+                            if !Self.appliedOwns(sessionId: sessionId, revision: revision) {
+                                center.removePendingNotificationRequests(
+                                    withIdentifiers: valid.map(\.identifier)
+                                )
+                            }
                             call.resolve(["scheduled": 0])
                             return
                         }
@@ -261,6 +272,15 @@ public class TimerBellSchedulerPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         return state["sessionId"] as? String == sessionId
             && (state["revision"] as? NSNumber)?.intValue == revision
             && UserDefaults.standard.string(forKey: tokenKey) == token
+    }
+
+    /// Whether the applied schedule is the same (session, revision) as the
+    /// caller's — and therefore owns exactly the same request identifiers, even
+    /// though a newer token means the caller itself has been superseded.
+    private static func appliedOwns(sessionId: String, revision: Int) -> Bool {
+        guard let state = appliedState() else { return false }
+        return state["sessionId"] as? String == sessionId
+            && (state["revision"] as? NSNumber)?.intValue == revision
     }
 
     private static func nextRevision(for sessionId: String) -> Int {
