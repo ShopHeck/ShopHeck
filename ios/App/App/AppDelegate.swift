@@ -18,6 +18,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AppReviewPlugin())
         bridge?.registerPluginInstance(LiveActivityPlugin())
         bridge?.registerPluginInstance(WatchBridgePlugin())
+        bridge?.registerPluginInstance(TimerBellSchedulerPlugin())
     }
 }
 

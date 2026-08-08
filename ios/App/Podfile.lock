@@ -1,6 +1,8 @@
 PODS:
   - Capacitor (7.6.8):
     - CapacitorCordova
+  - CapacitorApp (7.1.2):
+    - Capacitor
   - CapacitorCommunityAppleSignIn (7.1.0):
     - Capacitor
   - CapacitorCommunityBluetoothLe (7.3.2):
@@ -25,6 +27,7 @@ PODS:
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCommunityBluetoothLe (from `../../node_modules/@capacitor-community/bluetooth-le`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
@@ -42,6 +45,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Capacitor:
     :path: "../../node_modules/@capacitor/ios"
+  CapacitorApp:
+    :path: "../../node_modules/@capacitor/app"
   CapacitorCommunityAppleSignIn:
     :path: "../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCommunityBluetoothLe:
@@ -63,6 +68,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Capacitor: ff6bf01336ac353098378828aff465095a89e459
+  CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
   CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
   CapacitorCommunityBluetoothLe: 9aa29c1555fbe797e6b595db824c2acd39a5bdf5
   CapacitorCordova: e61ee8c40101b8cd011d0224261606a290c082cf
@@ -74,6 +80,6 @@ SPEC CHECKSUMS:
   Sentry: 88746bf877eff714bc45315a39ad1d1efea2cdda
   SentryCapacitor: 1d620200b850ef6f4e7056f5e20d7860e7c04572
 
-PODFILE CHECKSUM: b3b3ba2008d8f4159603065d9d8b8d74d4821206
+PODFILE CHECKSUM: dec648422f1465912e7574892a9fd419ffda6c08
 
 COCOAPODS: 1.16.2

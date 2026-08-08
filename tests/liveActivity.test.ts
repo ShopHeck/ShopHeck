@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { buildSegments, type LiveActivityTimerSnapshot } from '../src/utils/liveActivity';
+import {
+  activityKitContentStateByteSize,
+  buildSegments,
+  type LiveActivityTimerSnapshot,
+} from '../src/utils/liveActivity';
 import { shouldAcceptWatchCommand } from '../src/utils/watchCommand';
 
 // The Live Activity keeps counting while the app is suspended because the
@@ -100,6 +104,24 @@ describe('buildSegments — Live Activity schedule geometry', () => {
     // Subsequent work rounds stay at the base duration.
     const nextWork = segs.find(x => x.kind === 'work' && x.round === 2);
     expect(nextWork!.endMs - nextWork!.startMs).toBe(180_000);
+  });
+
+  it('supports consecutive work rounds when a supplied plan has no rest', () => {
+    vi.setSystemTime(NOW);
+    const segs = buildSegments(snap({ restSec: 0, deadlineMs: NOW + 180_000 }));
+
+    expect(segs.map(x => `${x.kind}${x.round}`)).toEqual(['work1', 'work2', 'work3']);
+  });
+
+  it('keeps the compact 30-round state within ActivityKit’s 4 KB budget', () => {
+    vi.setSystemTime(NOW);
+    const state = snap({
+      rounds: 30,
+      deadlineMs: NOW + 180_000,
+      presetLabel: 'A'.repeat(20),
+    });
+
+    expect(activityKitContentStateByteSize(state)).toBeLessThan(4_096);
   });
 });
 

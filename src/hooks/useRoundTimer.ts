@@ -6,10 +6,13 @@ import { useVoiceAnnouncements } from './useVoiceAnnouncements';
 import { getCustomBellDataUrl } from '../utils/customBell';
 import { nextPhaseDeadline } from '../utils/timerClock';
 import {
-  scheduleRoundAlerts, cancelRoundAlerts, roundAlertsEnabled, setRoundAlertsEnabled,
+  roundAlertsEnabled, setRoundAlertsEnabled,
   requestNotificationPermission, notificationsSupported,
-  type RoundAlert,
 } from '../utils/notifications';
+import {
+  nextTimerScheduleRevision,
+  reconcileTimerBellSchedule,
+} from '../utils/timerBellScheduler';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -65,6 +68,8 @@ interface TimerSave {
    *  once even if the session finishes while the app is closed and is restored on
    *  a later launch (idempotency marker — see RoundTimer's completion effect). */
   sessionId: string;
+  /** Last native schedule mutation applied for this session. */
+  scheduleRevision: number;
 }
 
 const DEFAULTS: Partial<TimerSave> = {
@@ -124,8 +129,13 @@ function fastForward(s: TimerSave): TimerSave {
       if (currentRound >= rounds) {
         return { ...s, phase: 'done', currentRound, phaseDeadline, isRunning: false };
       }
-      phase = 'rest';
-      phaseDeadline += restSec * 1000;
+      if (restSec > 0) {
+        phase = 'rest';
+        phaseDeadline += restSec * 1000;
+      } else {
+        currentRound += 1;
+        phaseDeadline += workSec * 1000;
+      }
     } else if (phase === 'rest') {
       phase = 'work';
       currentRound += 1;
@@ -333,6 +343,9 @@ export function useRoundTimer() {
   const [isRunning,    setIsRunning]    = useState(false);
   // Identifies the current session for once-only completion logging.
   const [sessionId,    setSessionId]    = useState('');
+  // Monotonic within a session. Every schedule mutation gets a new revision so
+  // a slower obsolete native replace can never win over a newer one.
+  const [scheduleRevision, setScheduleRevision] = useState(0);
   /**
    * Nominal duration of the phase in progress. Distinct from the work/rest
    * SETTINGS because +30s extensions grow it mid-phase, and the progress ring
@@ -352,6 +365,8 @@ export function useRoundTimer() {
   const isRunningRef  = useRef(false);
   const timeLeftRef   = useRef(PRESETS[0].workSec);
   const deadlineRef   = useRef(0);
+  const sessionIdRef  = useRef('');
+  const scheduleRevisionRef = useRef(0);
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef      = useRef<AudioContext | null>(null);
   const suspendTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -363,6 +378,14 @@ export function useRoundTimer() {
   /** Set by skipPhase; the timing loop consumes it and transitions silently. */
   const skipRequestedRef = useRef(false);
 
+  /** Issue the next mutation revision synchronously. State is only the render
+   * signal; the ref remains authoritative across back-to-back actions. */
+  const bumpScheduleRevision = useCallback(() => {
+    scheduleRevisionRef.current = nextTimerScheduleRevision(scheduleRevisionRef.current);
+    setScheduleRevision(scheduleRevisionRef.current);
+    return scheduleRevisionRef.current;
+  }, []);
+
   // Sync refs with state
   useEffect(() => { phaseRef.current     = phase;        }, [phase]);
   useEffect(() => { roundRef.current     = currentRound; }, [currentRound]);
@@ -373,6 +396,7 @@ export function useRoundTimer() {
   useEffect(() => { warningSecRef.current = warningSec;  }, [warningSec]);
   useEffect(() => { isRunningRef.current = isRunning;    }, [isRunning]);
   useEffect(() => { timeLeftRef.current  = timeLeft;     }, [timeLeft]);
+  useEffect(() => { sessionIdRef.current = sessionId;    }, [sessionId]);
   useEffect(() => { voiceRef.current     = voiceEnabled; }, [voiceEnabled]);
   useEffect(() => { hapticRef.current    = hapticEnabled;}, [hapticEnabled]);
 
@@ -505,13 +529,13 @@ export function useRoundTimer() {
     saveTimer({
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor,
-      phase, currentRound, isRunning, sessionId,
+      phase, currentRound, isRunning, sessionId, scheduleRevision,
       phaseDeadline:  isRunning ? deadlineRef.current : 0,
       pausedTimeLeft: !isRunning ? timeLeft : 0,
       pausedPhaseSec: phaseSec,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentRound, isRunning, sessionId, phaseSec,
+  }, [phase, currentRound, isRunning, sessionId, scheduleRevision, phaseSec,
       selectedPreset, rounds, workSec, restSec, prepSec, warningSec,
       voiceEnabled, hapticEnabled, reactionMode, workColor, restColor]);
 
@@ -531,7 +555,12 @@ export function useRoundTimer() {
     setVoiceEnabled(saved.voiceEnabled);
     setHapticEnabled(saved.hapticEnabled);
     setReactionMode(saved.reactionMode);
-    setSessionId(saved.sessionId ?? '');
+    const restoredSessionId = saved.sessionId ?? '';
+    const restoredRevision = nextTimerScheduleRevision(saved.scheduleRevision);
+    sessionIdRef.current = restoredSessionId;
+    scheduleRevisionRef.current = restoredRevision;
+    setSessionId(restoredSessionId);
+    setScheduleRevision(restoredRevision);
     if (saved.workColor) setWorkColor(saved.workColor);
     if (saved.restColor) setRestColor(saved.restColor);
 
@@ -583,88 +612,26 @@ export function useRoundTimer() {
     }
   }, []);
 
-  /**
-   * Every remaining phase change from `deadline`, as wall-clock moments.
-   *
-   * Mirrors the state machine in the interval below exactly — prep ends into
-   * round 1, work ends into rest (or into "done" on the last round), rest ends
-   * into the next round — so the OS rings the same bells at the same instants
-   * the in-app timer would have.
-   */
-  const upcomingAlerts = useCallback((): RoundAlert[] => {
-    const alerts: RoundAlert[] = [];
-    let ph = phaseRef.current;
-    let round = roundRef.current;
-    let at = deadlineRef.current;
-    const total = roundsRef.current;
-
-    // Bounded by the phases actually left in the session, not by a while(true).
-    for (let i = 0; i < total * 2 + 2 && ph !== 'done'; i++) {
-      if (ph === 'prep') {
-        alerts.push({ at: new Date(at), title: 'Round 1', body: `Round 1 of ${total} — go.` });
-        ph = 'work';
-        at += workSecRef.current * 1000;
-      } else if (ph === 'work') {
-        if (round >= total) {
-          alerts.push({ at: new Date(at), title: 'Session complete', body: 'Great work.' });
-          ph = 'done';
-        } else {
-          alerts.push({ at: new Date(at), title: `End of round ${round}`, body: 'Rest.' });
-          ph = 'rest';
-          at += restSecRef.current * 1000;
-        }
-      } else {
-        round += 1;
-        alerts.push({
-          at: new Date(at),
-          title: round >= total ? 'Last round' : `Round ${round}`,
-          body: `Round ${round} of ${total} — go.`,
-        });
-        ph = 'work';
-        at += workSecRef.current * 1000;
-      }
-    }
-    return alerts;
-  }, []);
-
-  // ── Background round alerts ──────────────────────────────────────────────
-  // Handed to the OS only while the app is actually backgrounded, and revoked
-  // the moment it returns, so a notification and the in-app bell can never both
-  // fire for the same round.
-  // Bumped on every visibility change. Scheduling spans several awaits, so a
-  // quick background-then-foreground could otherwise let the schedule land
-  // after the cancel and ring every round twice.
-  const alertGenRef = useRef(0);
+  // ── Native absolute boundary schedule ────────────────────────────────────
+  // Schedule while the app is still foregrounded. Waiting for a visibility
+  // callback races iOS suspending WKWebView and is why closed-app bells used to
+  // disappear. Every schedule-changing render replaces the session atomically.
   useEffect(() => {
-    // Per-instance disposal flag. The cleanup must invalidate any schedule this
-    // listener initiated without reading a ref in the teardown closure: a
-    // schedule spans several awaits, and the flag makes its staleness check
-    // fail the moment this effect instance goes away.
-    let disposed = false;
-    const onVisibility = () => {
-      const gen = ++alertGenRef.current;
-      if (document.visibilityState === 'hidden' && isRunningRef.current) {
-        void scheduleRoundAlerts(upcomingAlerts(), () => !disposed && alertGenRef.current === gen);
-      } else {
-        void cancelRoundAlerts();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      disposed = true;
-      document.removeEventListener('visibilitychange', onVisibility);
-      void cancelRoundAlerts();
-    };
-  }, [upcomingAlerts]);
-
-  // Pausing, resetting or finishing while backgrounded must not leave bells
-  // queued for a session that is no longer running.
-  useEffect(() => {
-    if (!isRunning) {
-      alertGenRef.current++;
-      void cancelRoundAlerts();
-    }
-  }, [isRunning]);
+    if (!sessionId || phase === 'idle' || phase === 'done') return;
+    void reconcileTimerBellSchedule({
+      phase,
+      round: currentRound,
+      rounds,
+      deadlineMs: isRunning ? deadlineRef.current : nextPhaseDeadline(0, timeLeft),
+      phaseSec,
+      workSec,
+      restSec,
+      isRunning: isRunning && bgAlerts,
+    }, sessionId, scheduleRevision);
+  }, [
+    phase, currentRound, rounds, isRunning, sessionId, scheduleRevision,
+    phaseSec, workSec, restSec, timeLeft, bgAlerts,
+  ]);
 
   // ── Page-visibility fast-forward ─────────────────────────────────────────
   useEffect(() => {
@@ -684,8 +651,13 @@ export function useRoundTimer() {
           deadline += wSec * 1000;
         } else if (ph === 'work') {
           if (round >= rds) { ph = 'done'; break; }
-          ph = 'rest';
-          deadline += rSec * 1000;
+          if (rSec > 0) {
+            ph = 'rest';
+            deadline += rSec * 1000;
+          } else {
+            round += 1;
+            deadline += wSec * 1000;
+          }
         } else {
           ph = 'work';
           round += 1;
@@ -696,6 +668,7 @@ export function useRoundTimer() {
       deadlineRef.current = deadline;
       phaseRef.current    = ph;
       roundRef.current    = round;
+      bumpScheduleRevision();
       setPhase(ph);
       setCurrentRound(round);
       // The phase we landed in after fast-forwarding runs at its base duration.
@@ -714,7 +687,7 @@ export function useRoundTimer() {
 
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+  }, [bumpScheduleRevision]);
 
   // ── Main timing loop ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -770,19 +743,41 @@ export function useRoundTimer() {
             setIsRunning(false); isRunningRef.current = false;
             setPhase('done');    phaseRef.current = 'done';
             setTimeLeft(0);
+            bumpScheduleRevision();
           } else {
-            // End of round → rest
+            // End of round → rest, or directly into the next round for a
+            // supplied plan that intentionally has no rest interval.
             if (!skip) {
-              ringEndOfRound(ctx); scheduleCtxSuspend();
-              flash('bg-blue-500');
-              vibrate(HAPTIC.roundEnd);
-              if (voiceRef.current) speak('Rest');
+              if (restSecRef.current > 0) {
+                ringEndOfRound(ctx); scheduleCtxSuspend();
+                flash('bg-blue-500');
+                vibrate(HAPTIC.roundEnd);
+                if (voiceRef.current) speak('Rest');
+              } else {
+                playRoundStartBell(ctx); scheduleCtxSuspend();
+                flash('bg-brand-500');
+                vibrate(HAPTIC.roundStart);
+              }
             }
-            const newDeadline = nextPhaseDeadline(anchor, restSecRef.current);
-            deadlineRef.current = newDeadline;
-            setPhase('rest'); phaseRef.current = 'rest';
-            setPhaseSec(restSecRef.current);
-            setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
+            if (restSecRef.current <= 0) {
+              const newRound = round + 1;
+              const newDeadline = nextPhaseDeadline(anchor, workSecRef.current);
+              deadlineRef.current = newDeadline;
+              roundRef.current = newRound;
+              setCurrentRound(newRound);
+              setPhase('work'); phaseRef.current = 'work';
+              setPhaseSec(workSecRef.current);
+              setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
+              if (!skip && voiceRef.current) {
+                speak(newRound >= roundsRef.current ? 'Last round' : `Round ${newRound}`);
+              }
+            } else {
+              const newDeadline = nextPhaseDeadline(anchor, restSecRef.current);
+              deadlineRef.current = newDeadline;
+              setPhase('rest'); phaseRef.current = 'rest';
+              setPhaseSec(restSecRef.current);
+              setTimeLeft(Math.max(0, Math.ceil((newDeadline - Date.now()) / 1000)));
+            }
             warningFiredRef.current = false;
           }
         } else {
@@ -835,20 +830,55 @@ export function useRoundTimer() {
     }, 250);
 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, getAudioCtx, playRoundStartBell, flash, vibrate, speak, scheduleCtxSuspend]);
+  }, [
+    isRunning, getAudioCtx, playRoundStartBell, flash, vibrate, speak,
+    scheduleCtxSuspend, bumpScheduleRevision,
+  ]);
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
+    const previousSessionId = sessionIdRef.current;
+    const cancelRevision = scheduleRevisionRef.current + 1;
+    if (previousSessionId) {
+      void reconcileTimerBellSchedule({
+        phase: phaseRef.current,
+        round: roundRef.current,
+        rounds: roundsRef.current,
+        deadlineMs: Math.max(1, deadlineRef.current),
+        phaseSec: Math.max(1, timeLeftRef.current),
+        workSec: workSecRef.current,
+        restSec: restSecRef.current,
+        isRunning: false,
+      }, previousSessionId, cancelRevision);
+    }
     setIsRunning(false);  isRunningRef.current = false;
     setPhase('idle');     phaseRef.current = 'idle';
     setCurrentRound(1);   roundRef.current = 1;
     setTimeLeft(workSecRef.current);
     deadlineRef.current = 0;
+    sessionIdRef.current = '';
+    scheduleRevisionRef.current = 0;
+    setSessionId('');
+    setScheduleRevision(0);
     warningFiredRef.current = false;
     try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
   }, []);
 
   const selectPreset = useCallback((idx: number) => {
+    const previousSessionId = sessionIdRef.current;
+    const cancelRevision = scheduleRevisionRef.current + 1;
+    if (previousSessionId) {
+      void reconcileTimerBellSchedule({
+        phase: phaseRef.current,
+        round: roundRef.current,
+        rounds: roundsRef.current,
+        deadlineMs: Math.max(1, deadlineRef.current),
+        phaseSec: Math.max(1, timeLeftRef.current),
+        workSec: workSecRef.current,
+        restSec: restSecRef.current,
+        isRunning: false,
+      }, previousSessionId, cancelRevision);
+    }
     // Built-in presets carry their own numbers; custom presets live at indices
     // beyond the built-in list and are applied by the caller (it owns the
     // customPresets list). Guard the lookup so a custom index doesn't
@@ -867,6 +897,10 @@ export function useRoundTimer() {
     setCurrentRound(1);     roundRef.current   = 1;
     setIsRunning(false);    isRunningRef.current = false;
     deadlineRef.current = 0;
+    sessionIdRef.current = '';
+    scheduleRevisionRef.current = 0;
+    setSessionId('');
+    setScheduleRevision(0);
     warningFiredRef.current = false;
     try { localStorage.removeItem(TIMER_KEY); } catch { /* noop */ }
   }, []);
@@ -881,7 +915,11 @@ export function useRoundTimer() {
       if (phase === 'idle') {
         // New session — mint an id so the completion effect logs it exactly once,
         // even across an app relaunch that restores the finished session.
-        setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        const newSessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        sessionIdRef.current = newSessionId;
+        scheduleRevisionRef.current = 1;
+        setSessionId(newSessionId);
+        setScheduleRevision(1);
         if (prepSecRef.current > 0) {
           // Start with prep countdown. No audio context is needed until a bell
           // actually fires (unless a custom file must be decoded in the effect).
@@ -901,14 +939,20 @@ export function useRoundTimer() {
           deadlineRef.current = nextPhaseDeadline(0, workSec);
         }
       } else {
-        // Resume from pause
+        // Resume from pause. Every future boundary moves, so replace the native
+        // queue with a new revision before iOS can suspend the WebView again.
         deadlineRef.current = nextPhaseDeadline(0, timeLeft);
+        bumpScheduleRevision();
       }
+    } else {
+      // Pause replaces the native queue with zero events.
+      bumpScheduleRevision();
     }
     setIsRunning(r => !r);
   }, [
     phase, isRunning, workSec, timeLeft, reset, getAudioCtx,
     playRoundStartBell, scheduleCtxSuspend, flash, vibrate, speak, unlock,
+    bumpScheduleRevision,
   ]);
 
   /**
@@ -919,10 +963,11 @@ export function useRoundTimer() {
   const skipPhase = useCallback(() => {
     if (!isRunningRef.current) return;
     skipRequestedRef.current = true;
+    bumpScheduleRevision();
     // Confirm the tap with a light haptic even when phase haptics are disabled —
     // the button itself gave no other feedback.
     vibrate(HAPTIC.tick);
-  }, [vibrate]);
+  }, [vibrate, bumpScheduleRevision]);
 
   /**
    * Add 30 seconds to the phase in progress. Works running or paused: the
@@ -934,6 +979,7 @@ export function useRoundTimer() {
     setPhaseSec(s => s + sec);
     if (isRunningRef.current) {
       deadlineRef.current += sec * 1000;
+      bumpScheduleRevision();
       setTimeLeft(Math.max(1, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
     } else {
       // Paused: grow the stored remainder. timeLeftRef follows via its sync
@@ -941,7 +987,7 @@ export function useRoundTimer() {
       setTimeLeft(t => t + sec);
     }
     vibrate(HAPTIC.tick);
-  }, [vibrate]);
+  }, [vibrate, bumpScheduleRevision]);
 
   // Sync idle display when workSec changes.
   // No set-state-in-effect suppression needed any more: this write used to feed
@@ -961,13 +1007,27 @@ export function useRoundTimer() {
     if (!on) {
       setRoundAlertsEnabled(false);
       setBgAlertsState(false);
-      await cancelRoundAlerts();
+      const activeSessionId = sessionIdRef.current;
+      if (activeSessionId) {
+        bumpScheduleRevision();
+        await reconcileTimerBellSchedule({
+          phase: phaseRef.current,
+          round: roundRef.current,
+          rounds: roundsRef.current,
+          deadlineMs: Math.max(1, deadlineRef.current),
+          phaseSec: Math.max(1, timeLeftRef.current),
+          workSec: workSecRef.current,
+          restSec: restSecRef.current,
+          isRunning: false,
+        }, activeSessionId, scheduleRevisionRef.current);
+      }
       return;
     }
     const granted = await requestNotificationPermission();
     setRoundAlertsEnabled(granted);
     setBgAlertsState(granted);
-  }, []);
+    if (granted) bumpScheduleRevision();
+  }, [bumpScheduleRevision]);
 
   return {
     // Settings

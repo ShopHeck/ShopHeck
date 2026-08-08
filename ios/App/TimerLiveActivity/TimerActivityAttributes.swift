@@ -39,6 +39,13 @@ public struct TimerActivityAttributes: ActivityAttributes, Codable, Hashable {
                 self.startMs = startMs
                 self.endMs = endMs
             }
+
+            enum CodingKeys: String, CodingKey {
+                case kind = "k"
+                case round = "r"
+                case startMs = "s"
+                case endMs = "e"
+            }
         }
 
         /// Remaining schedule, current segment first.
@@ -68,6 +75,17 @@ public struct TimerActivityAttributes: ActivityAttributes, Codable, Hashable {
             self.pausedRemainingSec = pausedRemainingSec
             self.workColorHex = workColorHex
             self.restColorHex = restColorHex
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case segments = "s"
+            case round = "r"
+            case rounds = "n"
+            case presetLabel = "l"
+            case isPaused = "p"
+            case pausedRemainingSec = "t"
+            case workColorHex = "w"
+            case restColorHex = "c"
         }
     }
 

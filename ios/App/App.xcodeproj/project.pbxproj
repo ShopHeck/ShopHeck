@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		198D455388F4682B0B3A26A6 /* WatchConnectivityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB394C82B9B84ED9687535C5 /* WatchConnectivityClient.swift */; };
+		22F6AAF55CB909E60AA77937 /* round-end.wav in Resources */ = {isa = PBXBuildFile; fileRef = B1848A60DBFF25880D33EE01 /* round-end.wav */; };
 		23CF955D613E87F5791E4864 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 505E57AE1A90A9DA998DDE97 /* Foundation.framework */; };
 		2502D417B8163F8FA86FC3F6 /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
@@ -23,8 +24,10 @@
 		669BD44CE00BAC756D5230C7 /* TimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F253F8DADDB582C1BAFEFD /* TimerLiveActivityWidget.swift */; };
 		6A3F4515AB896BB3755C39B6 /* WatchMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE9476BB2FFE595B9EBB785 /* WatchMessages.swift */; };
 		6C9A49479E8A654E2BA9D797 /* WatchMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE9476BB2FFE595B9EBB785 /* WatchMessages.swift */; };
+		731DF467D0DF9A4577607E7C /* TimerBellSchedulerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5D9B2FDD125F1139CBA59F /* TimerBellSchedulerPlugin.swift */; };
 		75E14042856925AE71C93B07 /* FightCampWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5849AAAADC64B538DE8970 /* FightCampWatchApp.swift */; };
 		86864B78BB0545D5F08C6984 /* RoundTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7382490B8F1B5D4EAD7DD9B5 /* RoundTimerView.swift */; };
+		9376EA8F7084D84257CF1C9A /* round-start.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5F31916AF37CB308A345E345 /* round-start.wav */; };
 		953E1DD27732D4476046557B /* TimerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */; };
 		9CF14D258BF45FE74A282508 /* TimerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D14B10A9E483E3D00193B7 /* TimerModel.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
@@ -95,6 +98,7 @@
 		40D54048B6BB0EC59F9D4F8F /* Assets.xcassets */ = {isa = PBXFileReference; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
 		420543BDB3243A3C8A7FF5C7 /* FightCampWatch.entitlements */ = {isa = PBXFileReference; name = FightCampWatch.entitlements; path = FightCampWatch.entitlements; sourceTree = "<group>"; };
 		479574FF4BE6F947E7A4455C /* TimerActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimerActivityAttributes.swift; sourceTree = "<group>"; };
+		4F5D9B2FDD125F1139CBA59F /* TimerBellSchedulerPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimerBellSchedulerPlugin.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -106,6 +110,7 @@
 		505E57AE1A90A9DA998DDE97 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		52F253F8DADDB582C1BAFEFD /* TimerLiveActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimerLiveActivityWidget.swift; sourceTree = "<group>"; };
+		5F31916AF37CB308A345E345 /* round-start.wav */ = {isa = PBXFileReference; includeInIndex = 1; path = "round-start.wav"; sourceTree = "<group>"; };
 		6AF4799B99151E05DE8ABFBA /* TimerLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TimerLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7382490B8F1B5D4EAD7DD9B5 /* RoundTimerView.swift */ = {isa = PBXFileReference; name = RoundTimerView.swift; path = RoundTimerView.swift; sourceTree = "<group>"; };
 		8D5849AAAADC64B538DE8970 /* FightCampWatchApp.swift */ = {isa = PBXFileReference; name = FightCampWatchApp.swift; path = FightCampWatchApp.swift; sourceTree = "<group>"; };
@@ -113,6 +118,7 @@
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		AFE9476BB2FFE595B9EBB785 /* WatchMessages.swift */ = {isa = PBXFileReference; name = WatchMessages.swift; path = WatchMessages.swift; sourceTree = "<group>"; };
 		B1084935B83269FBFE19A4B3 /* WorkoutHeartRate.swift */ = {isa = PBXFileReference; name = WorkoutHeartRate.swift; path = WorkoutHeartRate.swift; sourceTree = "<group>"; };
+		B1848A60DBFF25880D33EE01 /* round-end.wav */ = {isa = PBXFileReference; includeInIndex = 1; path = "round-end.wav"; sourceTree = "<group>"; };
 		B5139CF4F8E593DA26E54168 /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
 		C7E94944E999E782E06E876A /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E1D14B10A9E483E3D00193B7 /* TimerModel.swift */ = {isa = PBXFileReference; name = TimerModel.swift; path = TimerModel.swift; sourceTree = "<group>"; };
@@ -122,6 +128,7 @@
 		FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
 		FC1A2B3C4D5E6A7B8C9D0F3A /* WatchBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridgePlugin.swift; sourceTree = "<group>"; };
+		FC1A2B3C4D5E6A7B8C9D0PRIVREF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		FCC0DEAD0000000000000001 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		FCC0DEAD0000000000000002 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
@@ -203,6 +210,9 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				4F5D9B2FDD125F1139CBA59F /* TimerBellSchedulerPlugin.swift */,
+				5F31916AF37CB308A345E345 /* round-start.wav */,
+				B1848A60DBFF25880D33EE01 /* round-end.wav */,
 				FC1A2B3C4D5E6A7B8C9D0PRIVREF /* PrivacyInfo.xcprivacy */,
 				FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */,
 				FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */,
@@ -382,6 +392,8 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				FC1A2B3C4D5E6A7B8C9D0PRIV /* PrivacyInfo.xcprivacy in Resources */,
+				9376EA8F7084D84257CF1C9A /* round-start.wav in Resources */,
+				22F6AAF55CB909E60AA77937 /* round-end.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,6 +465,7 @@
 				E23A4817B8B53BB552425619 /* LiveActivityPlugin.swift in Sources */,
 				2502D417B8163F8FA86FC3F6 /* TimerActivityAttributes.swift in Sources */,
 				6A3F4515AB896BB3755C39B6 /* WatchMessages.swift in Sources */,
+				731DF467D0DF9A4577607E7C /* TimerBellSchedulerPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

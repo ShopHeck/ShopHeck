@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { TimerLiveActivity, type TimerLiveActivitySegment } from '../plugins/TimerLiveActivity';
+import { buildTimerTimeline } from './timerTimeline';
 
 /**
  * Live Activity bridge for the round timer.
@@ -9,9 +10,9 @@ import { TimerLiveActivity, type TimerLiveActivitySegment } from '../plugins/Tim
  * or Dynamic Island honest on its own. Instead of pushing a ticking counter,
  * this module pushes the REMAINING SCHEDULE — absolute wall-clock segments
  * for every phase still to come — and the widget renders the countdown from
- * `Date()` itself. The app re-pushes on every transition it observes
- * (phase change, pause/resume, skip, +30s) and once more when backgrounding,
- * so the activity can lag the real session by at most one transition.
+ * `Date()` itself. Explicit widget timeline entries refresh the whole activity
+ * at each absolute boundary, while the app re-pushes only when that schedule is
+ * mutated (pause/resume, skip, extension, reset, or foreground reconciliation).
  *
  * Everything is best-effort: a Live Activity failure must never affect the
  * timer itself — the bells and the clock are the product, the activity is
@@ -59,54 +60,38 @@ export async function liveActivitySupported(): Promise<boolean> {
  * present as the current phase (it is consumed at session start otherwise).
  */
 export function buildSegments(s: LiveActivityTimerSnapshot): TimerLiveActivitySegment[] {
-  const segments: TimerLiveActivitySegment[] = [];
+  return buildTimerTimeline({
+    phase: s.phase,
+    round: s.round,
+    rounds: s.rounds,
+    deadlineMs: s.deadlineMs,
+    phaseSec: s.phaseSec,
+    workSec: s.workSec,
+    restSec: s.restSec,
+    isRunning: s.isRunning,
+  }).map(({ kind, round, startMs, endMs }) => ({ kind, round, startMs, endMs }));
+}
 
-  // Current segment: anchored on the live deadline so the widget's countdown
-  // matches the app's clock exactly.
-  const currentEnd = s.deadlineMs;
-  const currentStart = Math.min(currentEnd - 1, currentEnd - s.phaseSec * 1000);
-  const currentKind = s.phase === 'work' || s.phase === 'rest' || s.phase === 'prep' ? s.phase : 'work';
-  segments.push({ kind: currentKind, round: s.round, startMs: currentStart, endMs: currentEnd });
-
-  let at = currentEnd;
-  let round = s.round;
-
-  // Walk the rest of the session from the current phase.
-  let next: string =
-    currentKind === 'prep' ? 'work' :
-    currentKind === 'work' ? 'rest' :
-    'work';
-  if (currentKind === 'prep') round = 1;
-  // Mid-rest: the rest we are IN follows round s.round, so the work it leads
-  // into is round s.round + 1. (When currentKind is 'work' the loop enters
-  // its rest branch first, where the increment belongs.)
-  if (currentKind === 'rest') round = s.round + 1;
-
-  // Bounded: at most two segments per remaining round. Rest follows the round
-  // it comes after, so the round counter advances in the REST branch — the
-  // work segment after a rest belongs to the next round.
-  for (let i = 0; i < s.rounds * 2 + 2; i++) {
-    if (next === 'rest') {
-      if (round >= s.rounds) break; // no rest after the final round
-      const end = at + s.restSec * 1000;
-      segments.push({ kind: 'rest', round, startMs: at, endMs: end });
-      at = end;
-      next = 'work';
-      round += 1;
-    } else {
-      // work
-      const end = at + s.workSec * 1000;
-      segments.push({ kind: 'work', round, startMs: at, endMs: end });
-      at = end;
-      if (round >= s.rounds) break; // session ends with the final work round
-      next = 'rest';
-    }
-  }
-
-  // A paused session carries no future wall clock — keep only the frozen
-  // current segment; the widget renders the stored remainder as plain text.
-  if (!s.isRunning) return [segments[0]];
-  return segments;
+/** ActivityKit serializes ContentState with the CodingKeys declared in Swift.
+ * Keep this mirror in tests so the maximum supported timer remains under the
+ * platform's roughly 4 KB dynamic-state budget. */
+export function activityKitContentStateByteSize(snapshot: LiveActivityTimerSnapshot): number {
+  const state = {
+    s: buildSegments(snapshot).map(segment => ({
+      k: segment.kind,
+      r: segment.round,
+      s: segment.startMs,
+      e: segment.endMs,
+    })),
+    r: snapshot.round,
+    n: snapshot.rounds,
+    l: snapshot.presetLabel,
+    p: !snapshot.isRunning,
+    t: snapshot.pausedTimeLeft,
+    w: snapshot.workColorHex,
+    c: snapshot.restColorHex,
+  };
+  return new TextEncoder().encode(JSON.stringify(state)).byteLength;
 }
 
 /** Push the current timer state to the Live Activity (start or update). */
