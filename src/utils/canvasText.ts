@@ -129,10 +129,16 @@ export function fitText(text: string, measure: Measure, opts: FitOptions): Fitte
 
   let lines: string[] = [];
   let fontSize = maxSize;
-  for (let size = maxSize; size >= minSize; size -= step) {
+  // The last step lands exactly on `minSize` rather than striding past it.
+  // A plain `size -= step` skips the floor whenever the range isn't a multiple
+  // of the step — the milestone headline (116→58 by 6) stopped measuring at
+  // 62px — and clipping text that would have fitted one step lower is the
+  // opposite of what the floor is for.
+  for (let size = maxSize; ; size = Math.max(minSize, size - step)) {
     fontSize = size;
     lines = wrapText(trimmed, measure, size, maxWidth);
     if (lines.length <= maxLines) return { lines, fontSize: size, truncated: false };
+    if (size === minSize) break;
   }
 
   // Even at the floor the wrap overruns its budget. Keep the budget and clip:

@@ -87,6 +87,39 @@ describe('fitText', () => {
     expect(tight.truncated).toBe(false);
   });
 
+  it('measures the floor size before giving up on it', () => {
+    // The milestone headline steps 116 → 58 by 6, which strides straight past
+    // the floor: a plain `size -= step` last measured 62px and then clipped.
+    const seen = new Set<number>();
+    const spy: Measure = (text, fontSize) => {
+      seen.add(fontSize);
+      return measure(text, fontSize);
+    };
+    // Long enough that no size fits, so the search runs the whole ladder down.
+    fitText(
+      'Fifteen rounds of southpaw counter sparring with the visiting camp plus conditioning intervals and a long cool down',
+      spy,
+      { maxWidth: CARD_W, maxSize: 116, minSize: 58, maxLines: 3, step: 6 },
+    );
+    expect(seen.has(58)).toBe(true);
+    // …and never below it.
+    expect(Math.min(...seen)).toBe(58);
+  });
+
+  it('uses the floor size rather than clipping one step above it', () => {
+    // Wraps to four lines at 62px but three at 58px — the size the old loop
+    // never reached.
+    const fitted = fitText(
+      'SPARRING ROUNDS COMPLETED TODAY AND HARD CONDITIONING WORK DONE ALSO STRENGTH BLOCK FINISHED',
+      measure,
+      { maxWidth: CARD_W, maxSize: 116, minSize: 58, maxLines: 3, step: 6 },
+    );
+    expect(fitted.fontSize).toBe(58);
+    expect(fitted.lines).toHaveLength(3);
+    expect(fitted.truncated).toBe(false);
+    expect(widest(fitted.lines, fitted.fontSize)).toBeLessThanOrEqual(CARD_W);
+  });
+
   it('clips to the line budget rather than overflowing at the floor size', () => {
     const fitted = fitText(
       'Fifteen rounds of southpaw counter sparring with the visiting camp plus conditioning intervals and a long cool down',
