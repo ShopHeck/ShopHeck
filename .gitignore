@@ -29,3 +29,6 @@ ios/fastlane/screenshots/
 *.njsproj
 *.sln
 *.sw?
+
+# Share-card previews (node scripts/share-card-preview.mjs)
+share-card-preview/

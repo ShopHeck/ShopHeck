@@ -20,8 +20,8 @@ const SHARE_EMOJI: Partial<Record<CelebrationEvent['kind'], string>> = {
 
 function toMilestone(event: CelebrationEvent): MilestoneShare {
   return {
-    // "Blue Belt unlocked!" → "BLUE BELT UNLOCKED" — the canvas headline
-    // shrinks to fit, so long PR titles are fine.
+    // "Blue Belt unlocked!" → "BLUE BELT UNLOCKED" — the canvas headline wraps
+    // and shrinks to fit, so long PR titles are fine.
     title: event.title.replace(/!+$/, '').toUpperCase(),
     subtitle: event.subtitle,
     emoji: SHARE_EMOJI[event.kind] ?? '🏆',
