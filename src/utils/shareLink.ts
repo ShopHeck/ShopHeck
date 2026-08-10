@@ -15,9 +15,6 @@
 export const APP_SHARE_DOMAIN = 'fightcamp.netlify.app';
 export const APP_SHARE_URL = `https://${APP_SHARE_DOMAIN}`;
 
-/** Kicker printed above the link on the card. */
-export const APP_SHARE_CTA = 'TRAIN WITH ME';
-
 /**
  * Caption for the share sheet: what was achieved, then where to get the app.
  *

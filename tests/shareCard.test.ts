@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blockHeight, fitText, truncateToWidth, wrapText, type Measure } from '../src/utils/canvasText';
 import { APP_SHARE_URL, buildShareMessage } from '../src/utils/shareLink';
+import { milestoneFacts } from '../src/utils/shareCardCanvas';
 
 /**
  * Stand-in for `ctx.measureText`: a monospace face at half the em width. The
@@ -153,6 +154,56 @@ describe('fitText', () => {
     const fitted = fitText('', measure, { maxWidth: CARD_W, maxSize: 54, minSize: 36 });
     expect(fitted.lines).toEqual([]);
     expect(blockHeight(fitted)).toBe(0);
+  });
+});
+
+describe('milestoneFacts', () => {
+  it('uses the structured slots a caller supplies', () => {
+    const facts = milestoneFacts({
+      title: 'NEW PR: MOST WORKOUTS IN A WEEK',
+      subtitle: '5 sessions (was 4)',
+      slug: 'pr-workouts',
+      headline: 'New PR',
+      descriptor: 'Most workouts in a week',
+      statValue: '5',
+      statLabel: 'Sessions',
+      footnote: 'Previous best: 4',
+    });
+    expect(facts).toMatchObject({
+      headline: 'New PR',
+      descriptor: 'Most workouts in a week',
+      statValue: '5',
+      statLabel: 'Sessions',
+      footnote: 'Previous best: 4',
+    });
+  });
+
+  it('splits the title on its colon when the slots are missing', () => {
+    // The shape every generated milestone title already has, so a caller that
+    // predates the structured fields still gets a headline and a descriptor
+    // rather than one run-on line in the display slot.
+    const facts = milestoneFacts({
+      title: 'NEW PR: HIGHEST WEEKLY MEP',
+      subtitle: '482 MEP (was 431)',
+      slug: 'pr-mep',
+    });
+    expect(facts.headline).toBe('NEW PR');
+    expect(facts.descriptor).toBe('HIGHEST WEEKLY MEP');
+    expect(facts.footnote).toBe('482 MEP (was 431)');
+    expect(facts.statValue).toBeUndefined();
+  });
+
+  it('falls back to the subtitle as the descriptor when there is no colon', () => {
+    const facts = milestoneFacts({
+      title: 'VICTORY',
+      subtitle: 'UD · R3 · vs J. Smith',
+      slug: 'fight-win',
+    });
+    expect(facts.headline).toBe('VICTORY');
+    expect(facts.descriptor).toBe('UD · R3 · vs J. Smith');
+    // Already spent on the descriptor — repeating it under the stat would be
+    // the same sentence twice.
+    expect(facts.footnote).toBeUndefined();
   });
 });
 

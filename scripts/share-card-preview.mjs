@@ -42,21 +42,63 @@ const CASES = [
     milestone: {
       title: 'NEW PR: MOST WORKOUTS IN A WEEK',
       subtitle: '5 sessions (was 4)',
-      emoji: '📈',
       slug: 'pr-workouts',
+      headline: 'New PR',
+      descriptor: 'Most workouts in a week',
+      statValue: '5',
+      statLabel: 'Sessions',
+      footnote: 'Previous best: 4',
     },
   },
-  { name: 'milestone-belt', kind: 'milestone', milestone: { title: 'BLUE BELT UNLOCKED', subtitle: 'New rank earned', emoji: '🥋', slug: 'belt-blue' } },
-  { name: 'milestone-streak', kind: 'milestone', milestone: { title: '14-DAY STREAK', subtitle: 'Two weeks without a missed session', emoji: '🔥', slug: 'streak-14' } },
-  { name: 'milestone-victory', kind: 'milestone', milestone: { title: 'VICTORY', subtitle: 'UD · R3 · vs J. Smith', emoji: '🏆', slug: 'fight-win' } },
+  {
+    name: 'milestone-belt',
+    kind: 'milestone',
+    milestone: {
+      title: 'BLUE BELT UNLOCKED', subtitle: 'New rank earned', slug: 'belt-blue',
+      headline: 'Blue Belt', descriptor: 'New rank earned', footnote: 'Keep grinding',
+    },
+  },
+  {
+    name: 'milestone-streak',
+    kind: 'milestone',
+    milestone: {
+      title: '14-DAY STREAK', subtitle: 'Two weeks without a missed session', slug: 'streak-14',
+      headline: 'Streak', descriptor: 'Consecutive training days',
+      statValue: '14', statLabel: 'Days', footnote: 'Currently on 14',
+    },
+  },
+  {
+    name: 'milestone-victory',
+    kind: 'milestone',
+    milestone: {
+      title: 'VICTORY', subtitle: 'UD · R3 · vs J. Smith', slug: 'fight-win',
+      headline: 'Victory', descriptor: 'vs J. Smith',
+      statValue: '3', statLabel: 'Round', footnote: 'TKO · R3',
+    },
+  },
+  {
+    // No structured slots at all — proves the title/subtitle fallback still
+    // produces a coherent card for any caller that hasn't been updated.
+    name: 'milestone-derived',
+    kind: 'milestone',
+    milestone: {
+      title: 'NEW PR: HIGHEST WEEKLY MEP',
+      subtitle: '482 MEP (was 431)',
+      slug: 'pr-mep',
+    },
+  },
   {
     name: 'milestone-overflow',
     kind: 'milestone',
     milestone: {
       title: 'NEW PR: MOST SPARRING ROUNDS COMPLETED IN A SINGLE WEEK OF FIGHT CAMP',
       subtitle: 'Forty-two rounds across five sessions, beating the previous best of thirty-eight',
-      emoji: '🥊',
       slug: 'pr-sparring',
+      headline: 'New Personal Record',
+      descriptor: 'Most sparring rounds completed in a single week of fight camp',
+      statValue: '42',
+      statLabel: 'Rounds completed',
+      footnote: 'Beating the previous best of thirty-eight rounds across five sessions',
     },
   },
   { name: 'session', kind: 'session', log: { title: 'Heavy Bag Intervals', sessionType: 'conditioning', duration: 60, rpe: 8 } },
@@ -115,9 +157,9 @@ async function main() {
     for (const testCase of CASES) {
       const dataUrl = await page.evaluate(async (c) => {
         const { drawSessionCard, drawMilestoneCard } = await import('/src/utils/shareCardCanvas.ts');
-        const user = { name: 'Mike Heckert' };
+        const user = { name: 'Mike' };
         if (c.kind === 'milestone') {
-          return drawMilestoneCard(c.milestone, user).toDataURL('image/png');
+          return (await drawMilestoneCard(c.milestone, user)).toDataURL('image/png');
         }
         const camp = {
           startDate: '2026-07-01',
@@ -127,7 +169,7 @@ async function main() {
           ...(c.camp ?? {}),
         };
         const log = { date: '2026-08-09', ...c.log };
-        return drawSessionCard(log, camp, user).toDataURL('image/png');
+        return (await drawSessionCard(log, camp, user)).toDataURL('image/png');
       }, testCase);
 
       const file = join(OUT, `${testCase.name}.png`);

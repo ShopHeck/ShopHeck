@@ -45,22 +45,29 @@ export default function ShareCard({ content, user, onClose }: Props) {
   const shareText = buildShareMessage(shareTitle, shareDetail);
 
   useEffect(() => {
-    const canvas =
+    // The generators await their fonts and the brand mark before the first
+    // stroke — canvas doesn't participate in CSS font loading, so drawing
+    // eagerly would render the card in whatever face happened to be ready.
+    //
+    // The encode is async too (toBlob's callback, not a sync toDataURL) so the
+    // state update can't cascade into the same render pass; the object URL is
+    // also far lighter than a multi-MB base64 data URL for a 1080×1920 PNG.
+    // The blob is kept so Share and Download reuse this encode.
+    let url: string | null = null;
+    let cancelled = false;
+    const drawing =
       content.kind === 'session'
         ? drawSessionCard(content.log, content.camp, user)
         : drawMilestoneCard(content.milestone, user);
-    // Async on purpose (toBlob's callback, not a sync toDataURL) so the state
-    // update can't cascade into the same render pass; the object URL is also
-    // far lighter than a multi-MB base64 data URL for a 1080×1920 PNG. The blob
-    // is kept so Share and Download reuse this encode instead of re-running it.
-    let url: string | null = null;
-    let cancelled = false;
-    canvas.toBlob(blob => {
-      if (!blob || cancelled) return;
-      blobRef.current = blob;
-      url = URL.createObjectURL(blob);
-      setDataUrl(url);
-    }, 'image/png');
+    void drawing.then(canvas => {
+      if (cancelled) return;
+      canvas.toBlob(blob => {
+        if (!blob || cancelled) return;
+        blobRef.current = blob;
+        url = URL.createObjectURL(blob);
+        setDataUrl(url);
+      }, 'image/png');
+    });
     return () => {
       cancelled = true;
       // The blob is deliberately left in place. `content` is a fresh object on
