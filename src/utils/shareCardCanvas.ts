@@ -136,22 +136,30 @@ const CONTENT_W = W - PAD * 2;
 const DISPLAY_W = W - 120;
 const CX = W / 2;
 
-const LOGO_TOP = 84;
-const LOGO_SIZE = 132;
-const BRAND_TOP = 246;
-const NAME_TOP = 330;
-/** The headline is bottom-anchored here, growing upward as it wraps. */
-const DISPLAY_BOTTOM = 690;
-const DISPLAY_TOP = 404;
-const MEDAL_CY = 880;
-const MEDAL_R = 195;
+const LOGO_TOP = 78;
+const LOGO_SIZE = 128;
+const BRAND_TOP = 238;
+const NAME_TOP = 322;
+/**
+ * The headline sits *behind* the medallion, which is what gives the card its
+ * depth — so a single line is anchored low enough for the bezel to cut across
+ * its baseline. A wrapped headline is anchored above the medallion instead:
+ * a second line hidden behind the bezel is a lost word, not a composition.
+ */
+const DISPLAY_BOTTOM = 800;
+const DISPLAY_TOP = 420;
+const MEDAL_CY = 940;
+const MEDAL_R = 265;
+const DISPLAY_WRAP_BOTTOM = MEDAL_CY - MEDAL_R - 6;
 /** Banner → stat → label → footnote, centred in this band. */
-const STACK_TOP = 1120;
-const STACK_BOTTOM = 1600;
-const RULE_Y = H - 296;
-const DIAMOND_CY = H - 252;
-const DATE_TOP = H - 212;
-const LINK_TOP = H - 128;
+const STACK_TOP = 1240;
+const STACK_BOTTOM = 1668;
+const RULE_Y = 1706;
+const SPARKLE_CY = 1748;
+const DATE_TOP = 1784;
+const LINK_TOP = 1850;
+/** Below this the figure stops reading as the card's headline number. */
+const STAT_FLOOR = 56;
 
 const UI_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
 
@@ -247,6 +255,24 @@ function roundRectPath(
   ctx.arcTo(x, y + h, x, y, radius);
   ctx.arcTo(x, y, x + w, y, radius);
   ctx.closePath();
+}
+
+/**
+ * A tiny deterministic PRNG (mulberry32).
+ *
+ * The ember field and the burst rays want scatter, not randomness: two runs of
+ * the preview script have to produce byte-identical PNGs or "did that change?"
+ * stops being answerable by looking. Seeded, the sparks land in the same place
+ * every time.
+ */
+function rng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /** Runs `paint` with a glow, then restores. Canvas shadow state is sticky. */
@@ -367,51 +393,39 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, c: Palette) {
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
 
+  // Halftone field. Faded out near the medallion so it reads as texture at the
+  // card's edges rather than as noise behind the artwork.
+  const step = 22;
+  for (let y = step; y < H; y += step) {
+    for (let x = step; x < W; x += step) {
+      const d = Math.hypot(x - CX, y - MEDAL_CY);
+      const reveal = Math.min(1, Math.max(0, (d - 340) / 420));
+      if (reveal <= 0.02) continue;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+      ctx.fillStyle = withAlpha(c.flame, 0.085 * reveal);
+      ctx.fill();
+    }
+  }
+
   // Concentric rings — the widest reach past the frame, which is what makes
   // the composition feel bigger than the card.
-  for (let i = 0; i < 16; i++) {
-    const r = 150 + i * 68;
+  for (let i = 0; i < 14; i++) {
+    const r = MEDAL_R + 40 + i * 74;
     ctx.beginPath();
     ctx.arc(CX, MEDAL_CY, r, 0, Math.PI * 2);
-    ctx.strokeStyle = withAlpha(c.flame, i % 4 === 0 ? 0.075 : 0.032);
+    ctx.strokeStyle = withAlpha(c.flame, i % 4 === 0 ? 0.08 : 0.03);
     ctx.lineWidth = i % 4 === 0 ? 2 : 1;
     ctx.stroke();
   }
 
-  // Dial ticks: a dense ring of short radial marks, every sixth one longer.
-  ctx.save();
-  ctx.translate(CX, MEDAL_CY);
-  for (let i = 0; i < 144; i++) {
-    const angle = (i / 144) * Math.PI * 2;
-    const long = i % 6 === 0;
-    const inner = MEDAL_R + 54;
-    const outer = inner + (long ? 42 : 20);
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
-    ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-    ctx.strokeStyle = withAlpha(c.flame, long ? 0.3 : 0.13);
-    ctx.lineWidth = long ? 2.5 : 1.5;
-    ctx.stroke();
-  }
-  ctx.restore();
-
   // Core glow behind the medallion.
-  const glow = ctx.createRadialGradient(CX, MEDAL_CY, 20, CX, MEDAL_CY, 560);
-  glow.addColorStop(0, withAlpha(c.flame, 0.34));
-  glow.addColorStop(0.45, withAlpha(c.flame, 0.09));
+  const glow = ctx.createRadialGradient(CX, MEDAL_CY, 20, CX, MEDAL_CY, 620);
+  glow.addColorStop(0, withAlpha(c.flame, 0.36));
+  glow.addColorStop(0.45, withAlpha(c.flame, 0.1));
   glow.addColorStop(1, withAlpha(c.flame, 0));
   ctx.fillStyle = glow;
-  ctx.fillRect(0, MEDAL_CY - 560, W, 1120);
-
-  // Lens streaks through the medallion's centre line.
-  for (const [half, alpha] of [[46, 0.1], [4, 0.5]] as const) {
-    const streak = ctx.createLinearGradient(0, 0, W, 0);
-    streak.addColorStop(0, withAlpha(c.flame, 0));
-    streak.addColorStop(0.5, withAlpha(c.gold, alpha));
-    streak.addColorStop(1, withAlpha(c.flame, 0));
-    ctx.fillStyle = streak;
-    ctx.fillRect(0, MEDAL_CY - half, W, half * 2);
-  }
+  ctx.fillRect(0, MEDAL_CY - 620, W, 1240);
 
   // Vignette last, so it sits over the rings and pulls the eye inward.
   const vignette = ctx.createRadialGradient(CX, H * 0.46, H * 0.2, CX, H * 0.46, H * 0.72);
@@ -485,92 +499,292 @@ function paintDisplay(ctx: CanvasRenderingContext2D, c: Palette, text: string) {
   const single = fit(ctx, text.toUpperCase(), spec, {
     maxSize: 224, minSize: 128, step: 8, maxWidth: DISPLAY_W,
   });
-  const fitted = single.truncated
+  const wrapped = single.truncated;
+  const fitted = wrapped
     ? fit(ctx, text.toUpperCase(), spec, {
-        maxSize: 120, minSize: 64, maxLines: 2, step: 6, maxWidth: DISPLAY_W,
+        maxSize: 104, minSize: 60, maxLines: 2, step: 6, maxWidth: DISPLAY_W,
       })
     : single;
   if (!fitted.lines.length) return;
 
   const height = blockHeight(fitted);
-  const top = Math.max(DISPLAY_TOP, DISPLAY_BOTTOM - height);
+  const bottom = wrapped ? DISPLAY_WRAP_BOTTOM : DISPLAY_BOTTOM;
+  const top = Math.max(DISPLAY_TOP, bottom - height);
 
   const grad = ctx.createLinearGradient(0, top, 0, top + height);
-  grad.addColorStop(0, mix(c.flame, c.gold, 0.62));
-  grad.addColorStop(0.42, c.flame);
-  grad.addColorStop(1, mix(c.crimson, '#000000', 0.3));
+  grad.addColorStop(0, mix(c.flame, c.gold, 0.66));
+  grad.addColorStop(0.38, c.flame);
+  grad.addColorStop(1, mix(c.crimson, '#000000', 0.42));
 
-  // Bloom first, then the crisp pass on top: one heavily-blurred draw reads as
-  // light coming off the letterforms, where a single shadowed draw just looks
-  // soft-focused.
-  withGlow(ctx, withAlpha(c.flame, 0.75), 90, () => {
-    drawBlock(ctx, fitted, spec, top, withAlpha(c.flame, 0.55));
+  // Bloom, then the extrusion, then the face. One heavily-blurred pass reads
+  // as light coming off the letterforms, where a single shadowed draw just
+  // looks soft-focused.
+  withGlow(ctx, withAlpha(c.flame, 0.8), 110, () => {
+    drawBlock(ctx, fitted, spec, top, withAlpha(c.flame, 0.5));
+  });
+
+  // The extrusion: the same block restruck downward in a dark face, deepest
+  // first, so the letters read as cut from a solid rather than printed on one.
+  const depth = Math.max(6, Math.round(fitted.fontSize * 0.075));
+  const side = mix(c.crimson, '#000000', 0.76);
+  for (let i = depth; i >= 1; i--) {
+    drawBlock(ctx, fitted, spec, top + i * 1.7, side);
+  }
+  drawBlock(ctx, fitted, spec, top, grad);
+
+  // A hairline of hot light along the top edge, which is what sells the bevel.
+  withGlow(ctx, withAlpha(c.gold, 0.6), 12, () => {
+    drawBlock(ctx, fitted, spec, top - 2.5, mix(c.gold, '#FFFFFF', 0.45));
   });
   drawBlock(ctx, fitted, spec, top, grad);
 }
 
 /**
- * The fist mark, drawn as vector paths.
+ * The glove, drawn as filled vector paths: a dark mitt lit along its leading
+ * edge, thrown forward out of the medallion.
  *
- * Deliberately not an emoji. The old card drew one at 340px and it landed as a
- * tofu box on the reporter's device — a platform font is not something a brand
- * artifact should depend on. Coordinates are a 0–100 box, scaled to `size`.
+ * Deliberately not an emoji. The card that shipped drew one at 340px and it
+ * landed as a tofu box on the device that reported this — a platform font is
+ * not something a brand artifact should depend on. Coordinates are a 0–100
+ * box, scaled to `size`.
  */
-function paintFist(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+/** The knuckle mass: wide across the top, tapering into the wrist. */
+function mittPath(ctx: CanvasRenderingContext2D) {
+  ctx.beginPath();
+  ctx.moveTo(26, 40);
+  ctx.bezierCurveTo(28, 20, 48, 10, 68, 13);
+  ctx.bezierCurveTo(84, 16, 92, 30, 91, 45);
+  ctx.bezierCurveTo(90, 58, 82, 68, 68, 71);
+  ctx.bezierCurveTo(52, 74, 34, 68, 27, 56);
+  ctx.closePath();
+}
+
+/** The thumb, wrapping across the heel of the hand. */
+function thumbPath(ctx: CanvasRenderingContext2D) {
+  ctx.beginPath();
+  ctx.moveTo(32, 44);
+  ctx.bezierCurveTo(17, 44, 7, 54, 9, 66);
+  ctx.bezierCurveTo(11, 77, 24, 82, 34, 75);
+  ctx.bezierCurveTo(41, 70, 40, 54, 36, 46);
+  ctx.closePath();
+}
+
+/**
+ * A boxing glove: dark body, lit down its leading edge by the core behind it.
+ *
+ * No outline all the way round — an even stroke flattens a solid into a
+ * sticker. The light lands only where the core would actually throw it: the
+ * top of the knuckles, the left of the thumb, the underside of the cuff.
+ */
+function paintGlove(ctx: CanvasRenderingContext2D, c: Palette, cx: number, cy: number, size: number) {
   const u = size / 100;
   ctx.save();
   ctx.translate(cx - size / 2, cy - size / 2);
   ctx.scale(u, u);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.lineWidth = 6;
 
-  // Knuckle mass.
-  roundRectPath(ctx, 16, 20, 68, 46, 16);
+  const body = ctx.createLinearGradient(20, 10, 80, 95);
+  body.addColorStop(0, '#333944');
+  body.addColorStop(0.42, '#161a22');
+  body.addColorStop(1, '#06080c');
+  const edge = mix(c.gold, '#FFFFFF', 0.35);
+
+  const outline = 'rgba(0, 0, 0, 0.5)';
+
+  // Cuff behind, tucked under the mitt so the two read as one object rather
+  // than a mitt sitting on a box.
+  ctx.fillStyle = body;
+  roundRectPath(ctx, 44, 58, 38, 36, 10);
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
   ctx.stroke();
-  // Finger separations across the top face.
-  for (const x of [33, 50, 67]) {
+
+  // Mitt.
+  mittPath(ctx);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  // Knuckle seams, cut into the top face before the thumb goes over it.
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.lineWidth = 2.4;
+  for (const [x, y] of [[45, 17], [59, 14], [73, 17]]) {
     ctx.beginPath();
-    ctx.moveTo(x, 24);
-    ctx.lineTo(x, 44);
+    ctx.moveTo(x, y);
+    ctx.bezierCurveTo(x + 2, y + 14, x + 2, y + 22, x + 1, y + 28);
     ctx.stroke();
   }
-  // Thumb, wrapping the lower left.
-  roundRectPath(ctx, 10, 48, 46, 26, 13);
+
+  // Thumb in front, where it is the single clearest signal that this is a
+  // glove and not a helmet — behind the mitt it was a crescent.
+  thumbPath(ctx);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 1.8;
   ctx.stroke();
-  // Wrist cuff.
-  roundRectPath(ctx, 22, 74, 56, 18, 8);
+
+  // Rim light, one edge at a time.
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = 3.4;
+  ctx.beginPath();
+  ctx.moveTo(29, 34);
+  ctx.bezierCurveTo(30, 18, 49, 9, 69, 12);
+  ctx.bezierCurveTo(80, 14, 87, 22, 90, 33);
+  ctx.stroke();
+
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(32, 44);
+  ctx.bezierCurveTo(17, 44, 7, 54, 9, 66);
+  ctx.bezierCurveTo(10, 72, 15, 77, 21, 79);
+  ctx.stroke();
+
+  ctx.strokeStyle = withAlpha(c.flame, 0.7);
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(48, 93);
+  ctx.lineTo(78, 91);
   ctx.stroke();
   ctx.restore();
 }
 
+/**
+ * The medallion: a machined bezel around a glowing core, with light thrown out
+ * behind it. Built back to front — rays, embers, bezel, rings, glove, flare —
+ * because each layer has to be occluded by the next.
+ */
 function paintMedallion(ctx: CanvasRenderingContext2D, c: Palette) {
-  // Inner disc, so the glyph has something to sit on rather than floating in
-  // the ring field.
-  const disc = ctx.createRadialGradient(CX, MEDAL_CY, 0, CX, MEDAL_CY, MEDAL_R);
-  disc.addColorStop(0, withAlpha(c.crimson, 0.28));
-  disc.addColorStop(0.7, withAlpha(c.obsidian, 0.85));
-  disc.addColorStop(1, withAlpha(c.obsidian, 0.4));
+  const random = rng(0x5150);
+
+  // Burst rays, radiating from behind the bezel.
+  ctx.save();
+  ctx.translate(CX, MEDAL_CY);
+  // Each ray is a triangle with its apex *outward* and its base hidden behind
+  // the bezel, so it tapers to a point like thrown light. Constant-width
+  // wedges, which is what a naive fan gives you, read as solid bars.
+  const rayFade = ctx.createRadialGradient(0, 0, MEDAL_R * 0.9, 0, 0, MEDAL_R * 1.95);
+  rayFade.addColorStop(0, withAlpha(c.gold, 0.42));
+  rayFade.addColorStop(0.3, withAlpha(c.flame, 0.2));
+  rayFade.addColorStop(1, withAlpha(c.flame, 0));
+  ctx.fillStyle = rayFade;
+  const base = MEDAL_R * 0.9;
+  for (let i = 0; i < 72; i++) {
+    const angle = (i / 72) * Math.PI * 2 + random() * 0.04;
+    const reach = MEDAL_R * (1.12 + random() * random() * 0.85);
+    const halfWidth = 0.008 + random() * 0.018;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * reach, Math.sin(angle) * reach);
+    ctx.lineTo(Math.cos(angle - halfWidth) * base, Math.sin(angle - halfWidth) * base);
+    ctx.lineTo(Math.cos(angle + halfWidth) * base, Math.sin(angle + halfWidth) * base);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Embers thrown clear of the bezel.
+  for (let i = 0; i < 130; i++) {
+    const angle = random() * Math.PI * 2;
+    const d = MEDAL_R * (1.02 + random() * random() * 1.1);
+    const size = 1.4 + random() * 3.4;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * d, Math.sin(angle) * d, size, 0, Math.PI * 2);
+    ctx.fillStyle = withAlpha(mix(c.flame, c.gold, random()), 0.25 + random() * 0.6);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Machined bezel: an opaque metal band, so the headline behind it is cut
+  // cleanly rather than showing through.
+  const bandInner = MEDAL_R - 52;
+  const metal = ctx.createLinearGradient(0, MEDAL_CY - MEDAL_R, 0, MEDAL_CY + MEDAL_R);
+  metal.addColorStop(0, '#3b414d');
+  metal.addColorStop(0.35, '#191d26');
+  metal.addColorStop(0.62, '#0d1016');
+  metal.addColorStop(1, '#2b303a');
   ctx.beginPath();
   ctx.arc(CX, MEDAL_CY, MEDAL_R, 0, Math.PI * 2);
-  ctx.fillStyle = disc;
-  ctx.fill();
+  ctx.arc(CX, MEDAL_CY, bandInner, 0, Math.PI * 2, true);
+  ctx.fillStyle = metal;
+  ctx.fill('evenodd');
 
-  for (const [r, alpha, width] of [
-    [MEDAL_R, 0.55, 3],
-    [MEDAL_R - 26, 0.22, 1.5],
-    [MEDAL_R - 44, 0.12, 1],
+  // Slots cut through the band, with a few lit in brand orange.
+  ctx.save();
+  ctx.translate(CX, MEDAL_CY);
+  for (let i = 0; i < 28; i++) {
+    const a0 = (i / 28) * Math.PI * 2;
+    const a1 = a0 + (Math.PI * 2) / 28 * 0.62;
+    const lit = i % 7 === 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, MEDAL_R - 16, a0, a1);
+    ctx.arc(0, 0, bandInner + 16, a1, a0, true);
+    ctx.closePath();
+    ctx.fillStyle = lit ? withAlpha(c.flame, 0.75) : 'rgba(0, 0, 0, 0.55)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Bezel edges.
+  for (const [r, color, width] of [
+    [MEDAL_R, withAlpha('#FFFFFF', 0.16), 2],
+    [bandInner, withAlpha('#FFFFFF', 0.1), 1.5],
   ] as const) {
     ctx.beginPath();
     ctx.arc(CX, MEDAL_CY, r, 0, Math.PI * 2);
-    ctx.strokeStyle = withAlpha(c.flame, alpha);
+    ctx.strokeStyle = color;
     ctx.lineWidth = width;
     ctx.stroke();
   }
 
-  ctx.strokeStyle = mix(c.flame, c.gold, 0.45);
-  withGlow(ctx, c.flame, 55, () => paintFist(ctx, CX, MEDAL_CY, 190));
-  withGlow(ctx, c.flame, 18, () => paintFist(ctx, CX, MEDAL_CY, 190));
+  // Core: dark inside, lit at the rim.
+  const disc = ctx.createRadialGradient(CX, MEDAL_CY, 0, CX, MEDAL_CY, bandInner);
+  disc.addColorStop(0, withAlpha(c.crimson, 0.34));
+  disc.addColorStop(0.62, 'rgba(8, 9, 13, 0.94)');
+  disc.addColorStop(1, 'rgba(8, 9, 13, 0.99)');
+  ctx.beginPath();
+  ctx.arc(CX, MEDAL_CY, bandInner, 0, Math.PI * 2);
+  ctx.fillStyle = disc;
+  ctx.fill();
+
+  // The hot rings.
+  for (const [r, width, alpha] of [
+    [bandInner - 4, 6, 0.95],
+    [bandInner - 34, 3, 0.55],
+    [bandInner - 58, 1.5, 0.28],
+  ] as const) {
+    withGlow(ctx, c.flame, 30, () => {
+      ctx.beginPath();
+      ctx.arc(CX, MEDAL_CY, r, 0, Math.PI * 2);
+      ctx.strokeStyle = withAlpha(mix(c.flame, c.gold, 0.25), alpha);
+      ctx.lineWidth = width;
+      ctx.stroke();
+    });
+  }
+
+  // The bloom the glove is silhouetted against.
+  const core = ctx.createRadialGradient(CX, MEDAL_CY, 0, CX, MEDAL_CY, bandInner * 0.95);
+  core.addColorStop(0, withAlpha(c.gold, 0.5));
+  core.addColorStop(0.3, withAlpha(c.flame, 0.32));
+  core.addColorStop(1, withAlpha(c.flame, 0));
+  ctx.beginPath();
+  ctx.arc(CX, MEDAL_CY, bandInner, 0, Math.PI * 2);
+  ctx.fillStyle = core;
+  ctx.fill();
+
+  withGlow(ctx, c.flame, 40, () => paintGlove(ctx, c, CX, MEDAL_CY, 250));
+
+  // Lens flare across the medallion's centre line, over everything.
+  for (const [half, alpha] of [[42, 0.09], [3, 0.55]] as const) {
+    const streak = ctx.createLinearGradient(0, 0, W, 0);
+    streak.addColorStop(0, withAlpha(c.flame, 0));
+    streak.addColorStop(0.5, withAlpha(c.gold, alpha));
+    streak.addColorStop(1, withAlpha(c.flame, 0));
+    ctx.fillStyle = streak;
+    ctx.fillRect(0, MEDAL_CY - half, W, half * 2);
+  }
 }
 
 const BANNER_SPEC = { weight: 700, tracking: 0.08 } as const;
@@ -687,12 +901,19 @@ function paintFooter(ctx: CanvasRenderingContext2D, c: Palette, dateText: string
   ctx.lineTo(W - PAD, RULE_Y);
   ctx.stroke();
 
-  ctx.save();
-  ctx.translate(CX, DIAMOND_CY);
-  ctx.rotate(Math.PI / 4);
+  // A four-point sparkle rather than a plain diamond — the concave sides read
+  // as light, which is the language the rest of the card is speaking.
+  const r = 17;
+  const k = r * 0.14;
+  ctx.beginPath();
+  ctx.moveTo(CX, SPARKLE_CY - r);
+  ctx.quadraticCurveTo(CX + k, SPARKLE_CY - k, CX + r, SPARKLE_CY);
+  ctx.quadraticCurveTo(CX + k, SPARKLE_CY + k, CX, SPARKLE_CY + r);
+  ctx.quadraticCurveTo(CX - k, SPARKLE_CY + k, CX - r, SPARKLE_CY);
+  ctx.quadraticCurveTo(CX - k, SPARKLE_CY - k, CX, SPARKLE_CY - r);
+  ctx.closePath();
   ctx.fillStyle = c.flame;
-  withGlow(ctx, c.flame, 20, () => ctx.fillRect(-11, -11, 22, 22));
-  ctx.restore();
+  withGlow(ctx, c.flame, 22, () => ctx.fill());
 
   const dateSpec = { weight: 600, tracking: 0.22 } as const;
   drawBlock(ctx, fit(ctx, dateText, dateSpec, { maxSize: 32, minSize: 24 }), dateSpec, DATE_TOP, c.tertiary);
@@ -722,48 +943,57 @@ function paintStack(ctx: CanvasRenderingContext2D, c: Palette, facts: CardFacts)
   const footFit = facts.footnote
     ? fit(ctx, facts.footnote.toUpperCase(), footSpec, { maxSize: 34, minSize: 24, maxLines: 2 })
     : null;
+  // One line only: this is context, and an ellipsised opponent name costs less
+  // than a second line pushing the stack through the footer rule.
   const accentFit = facts.accent
-    ? fit(ctx, facts.accent.toUpperCase(), accentSpec, { maxSize: 40, minSize: 26, maxLines: 2 })
+    ? fit(ctx, facts.accent.toUpperCase(), accentSpec, { maxSize: 40, minSize: 26 })
     : null;
 
   const bannerH = bannerFit.lines.length ? blockHeight(bannerFit) + 46 : 0;
 
-  // The figure is sized to the room the rest of the stack leaves, not to a
-  // fixed maximum. Everything else here is either short or already capped at
-  // two lines, so the figure is the one element that can be asked to give way
-  // — and a session card (which also carries a countdown line) has meaningfully
-  // less room for it than a PR card does.
-  const fixedH =
+  /**
+   * The figure gets what the rest of the stack leaves, and drops out if that
+   * isn't enough to read as a headline number.
+   *
+   * Everything else here is capped at one or two lines, so their combined
+   * height is bounded below the region — which makes the stack unable to reach
+   * the footer no matter what it is handed. Sizing the figure to a fixed
+   * maximum instead is what ran a session card (which carries a countdown line
+   * a PR card doesn't) straight through the rule.
+   */
+  const region = STACK_BOTTOM - STACK_TOP;
+  const outsideStat =
     bannerH +
-    (labelFit ? blockHeight(labelFit) + 6 : 0) +
     (footFit ? blockHeight(footFit) + 26 : 0) +
     (accentFit ? blockHeight(accentFit) + 22 : 0);
-  const valueBudget = STACK_BOTTOM - STACK_TOP - fixedH - 30;
-  const valueFit = facts.statValue
-    ? fit(ctx, facts.statValue, valueSpec, {
-        maxSize: Math.min(200, Math.floor(valueBudget / LINE_HEIGHT_RATIO)),
-        minSize: 72,
-        maxWidth: DISPLAY_W,
+  const labelH = labelFit ? blockHeight(labelFit) + 6 : 0;
+  const valueMax = Math.floor((region - outsideStat - labelH - 24) / LINE_HEIGHT_RATIO);
+  const showStat = !!facts.statValue && valueMax >= STAT_FLOOR;
+  const valueFit = showStat
+    ? fit(ctx, facts.statValue!, valueSpec, {
+        maxSize: Math.min(200, valueMax), minSize: STAT_FLOOR, maxWidth: DISPLAY_W,
       })
     : null;
 
   // Biased above centre: a card with no figure (a belt) is short, and dead
   // space reads better under the stack than as a gap below the medallion.
-  const total = fixedH + (valueFit ? blockHeight(valueFit) + 30 : 0);
-  let y = STACK_TOP + Math.max(0, (STACK_BOTTOM - STACK_TOP - total) * 0.32);
+  const statH = valueFit ? blockHeight(valueFit) + 24 + labelH : 0;
+  const total = outsideStat + statH;
+  let y = STACK_TOP + Math.max(0, (region - total) * 0.32);
 
   if (bannerH) {
     paintBanner(ctx, c, facts.descriptor, y);
     y += bannerH;
   }
   if (valueFit) {
-    y += 30;
+    y += 24;
     withGlow(ctx, withAlpha(c.white, 0.45), 44, () => {
       drawBlock(ctx, valueFit, valueSpec, y, c.white);
     });
     y += blockHeight(valueFit);
   }
-  if (labelFit) {
+  // The label names the figure, so it goes when the figure does.
+  if (labelFit && valueFit) {
     y += 6;
     const labelMid = y + blockHeight(labelFit) / 2;
     setFont(ctx, { ...labelSpec, size: labelFit.fontSize });
