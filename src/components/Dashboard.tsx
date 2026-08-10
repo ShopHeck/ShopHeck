@@ -5,7 +5,7 @@ import { isPro } from '../utils/subscription';
 import { getDaysUntilFight, getCurrentWeekNumber, getCampProgress } from '../utils/campGenerator';
 import { computeReadiness } from '../utils/readiness';
 import { todayISO } from '../utils/dates';
-import { weekAdherence } from '../utils/adherence';
+import { sessionKey, weekAdherence } from '../utils/adherence';
 import { toDisplayWeight, formatWeight } from '../utils/units';
 import { format, parseISO } from 'date-fns';
 import ProgressWidget from './gamification/ProgressWidget';
@@ -15,10 +15,9 @@ import { fightCta } from '../utils/fightDayCta';
 import GlassSurface from './shared/GlassSurface';
 import ToolTile from './shared/ToolTile';
 import GlassMetricTile from './shared/GlassMetricTile';
-import DurationBadge from './shared/DurationBadge';
+import TodaySessionRow from './shared/TodaySessionRow';
 import FightCountdownCard from './shared/FightCountdownCard';
 import FightReadinessGauge from './shared/FightReadinessGauge';
-import { SESSION_COLORS, SESSION_ICONS } from '../utils/sessionVisuals';
 import { readinessColor, tint } from '../utils/designTokens';
 import { timerPrefillForDay, type TimerPrefill } from '../utils/timerSession';
 
@@ -449,40 +448,20 @@ export default function Dashboard({ onNavigate, onShowFightBreakdown, onStartTim
           ) : (
             <div className="space-y-2">
               {todaySessions.sessions.map((session, i) => {
-                // The five-way ternary chain this replaces carried its own copy
-                // of the session→color mapping, one of three that had already
-                // drifted from each other. SESSION_COLORS is now the only one.
-                const accent = SESSION_COLORS[session.type];
-                const Icon = SESSION_ICONS[session.type];
+                const key = sessionKey(activeCamp.id, currentWeekNum, todayDayOfWeek, i);
                 return (
-                  <GlassSurface key={i} cornerRadius="md" className="flex items-center gap-3 p-4">
-                    <div
-                      className="w-10 h-10 flex items-center justify-center flex-shrink-0"
-                      style={{
-                        backgroundColor: tint(accent, 0.16),
-                        borderRadius: 'var(--radius-sm)',
-                        color: accent,
-                      }}
-                    >
-                      <Icon size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{session.title}</p>
-                    </div>
-                    <DurationBadge minutes={session.duration} sessionType={session.type} />
-                    <button
-                      onClick={() => onNavigate('log', {
-                        sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                        title: session.title,
-                        duration: session.duration,
-                      })}
-                      aria-label={`Log ${session.title}`}
-                      className="text-xs font-semibold flex-shrink-0 -m-2 p-2"
-                      style={{ color: 'var(--accent-flame)' }}
-                    >
-                      Log
-                    </button>
-                  </GlassSurface>
+                  <TodaySessionRow
+                    key={i}
+                    session={session}
+                    done={!!completedSessions[key]}
+                    logColor="var(--accent-flame)"
+                    onLog={() => onNavigate('log', {
+                      sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                      title: session.title,
+                      duration: session.duration,
+                      sessionKey: key,
+                    })}
+                  />
                 );
               })}
             </div>

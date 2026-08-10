@@ -52,6 +52,13 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [wDuration, setWDuration] = useState('60');
   const [wRpe, setWRpe] = useState('7');
   const [wNotes, setWNotes] = useState('');
+  /**
+   * Scheduled session this modal was opened for, if any. Held until save (not
+   * read off `prefill`, which AppShell clears as soon as it is consumed) and
+   * dropped whenever the modal closes, so a later ad-hoc log cannot tick a
+   * session the fighter never claimed.
+   */
+  const [wSessionKey, setWSessionKey] = useState<string | null>(null);
 
   // Sparring form
   const [sDate, setSDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -70,6 +77,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       setWType(prefill.sessionType);
       setWTitle(prefill.title);
       setWDuration(String(prefill.duration));
+      setWSessionKey(prefill.sessionKey ?? null);
       setShowModal(true);
       onPrefillConsumed?.();
     }
@@ -126,8 +134,18 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       completed: true,
     };
     dispatch({ type: 'LOG_WORKOUT', payload });
+    // Logging a scheduled session IS completing it — the planner tick and the
+    // log used to be independent, so a fighter who logged from Today still saw
+    // the session sitting unchecked on the plan.
+    if (wSessionKey) dispatch({ type: 'SET_SESSION_COMPLETE', payload: wSessionKey });
     void writeWorkoutToHealth(payload);
-    setWTitle(''); setWNotes(''); setShowModal(false);
+    setWTitle(''); setWNotes(''); closeWorkoutModal();
+  }
+
+  /** Closing always drops the session link — see `wSessionKey`. */
+  function closeWorkoutModal() {
+    setWSessionKey(null);
+    setShowModal(false);
   }
 
   function logSparring() {
@@ -327,7 +345,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
 
       {/* Log Workout Modal */}
       {showModal && (
-        <Modal title="Log Workout" onClose={() => setShowModal(false)} footer={
+        <Modal title="Log Workout" onClose={closeWorkoutModal} footer={
           <button onClick={logWorkout} disabled={!wTitle.trim()} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
         }>
           <div className="space-y-4">

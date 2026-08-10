@@ -3,14 +3,14 @@ import { useApp } from '../context/AppContext';
 import { isPro } from '../utils/subscription';
 import { toDisplayWeight, formatWeight, formatWeightDelta } from '../utils/units';
 import { getCurrentWeekNumber, getCurrentOffSeasonCycle } from '../utils/campGenerator';
-import { weekAdherence } from '../utils/adherence';
+import { sessionKey, weekAdherence } from '../utils/adherence';
 import { format, parseISO } from 'date-fns';
 import type { LogPrefill } from '../App';
 import type { SessionType } from '../types';
 import ProgressWidget from './gamification/ProgressWidget';
 import GlassSurface from './shared/GlassSurface';
 import GlassMetricTile from './shared/GlassMetricTile';
-import DurationBadge from './shared/DurationBadge';
+import TodaySessionRow from './shared/TodaySessionRow';
 import OffSeasonHeroCard from './shared/OffSeasonHeroCard';
 import ToolTile from './shared/ToolTile';
 import { SESSION_COLORS, SESSION_ICONS, SESSION_LABELS } from '../utils/sessionVisuals';
@@ -281,41 +281,21 @@ export default function OffSeasonDashboard({ onNavigate }: Props) {
           ) : (
             <div className="space-y-2">
               {todaySessions.sessions.map((session, i) => {
-                // Was the same five-way ternary chain the fight-camp dashboard
-                // carried, with its own copy of the colour mapping.
-                const accent = SESSION_COLORS[session.type];
-                const Icon = SESSION_ICONS[session.type];
+                const key = sessionKey(activeCamp.id, currentWeekNum, todayDayOfWeek, i);
+                const loggable = session.type !== 'rest' && session.duration > 0;
                 return (
-                  <GlassSurface key={i} cornerRadius="md" className="flex items-center gap-3 p-4">
-                    <div
-                      className="w-10 h-10 flex items-center justify-center flex-shrink-0"
-                      style={{
-                        backgroundColor: tint(accent, 0.16),
-                        borderRadius: 'var(--radius-sm)',
-                        color: accent,
-                      }}
-                    >
-                      <Icon size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{session.title}</p>
-                    </div>
-                    <DurationBadge minutes={session.duration} sessionType={session.type} />
-                    {session.type !== 'rest' && session.duration > 0 && (
-                      <button
-                        onClick={() => onNavigate('log', {
-                          sessionType: session.type === 'rest' ? 'recovery' : session.type,
-                          title: session.title,
-                          duration: session.duration,
-                        })}
-                        aria-label={`Log ${session.title}`}
-                        className="text-xs font-semibold flex-shrink-0 -m-2 p-2"
-                        style={{ color: 'var(--accent-teal)' }}
-                      >
-                        Log
-                      </button>
-                    )}
-                  </GlassSurface>
+                  <TodaySessionRow
+                    key={i}
+                    session={session}
+                    done={!!completedSessions[key]}
+                    logColor="var(--accent-teal)"
+                    onLog={loggable ? () => onNavigate('log', {
+                      sessionType: session.type === 'rest' ? 'recovery' : session.type,
+                      title: session.title,
+                      duration: session.duration,
+                      sessionKey: key,
+                    }) : undefined}
+                  />
                 );
               })}
             </div>
