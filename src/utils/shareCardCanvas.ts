@@ -150,6 +150,12 @@ const DISPLAY_BOTTOM = 800;
 const DISPLAY_TOP = 420;
 const MEDAL_CY = 940;
 const MEDAL_R = 265;
+/**
+ * The flame's lit height. Its artwork is roughly 3:5, so this also fixes the
+ * width at ~0.61 of it — sized so the whole lit box clears the inner bezel
+ * (radius 213) on the diagonal rather than only on the axes.
+ */
+const FLAME_H = 330;
 const DISPLAY_WRAP_BOTTOM = MEDAL_CY - MEDAL_R - 6;
 /** Banner → stat → label → footnote, centred in this band. */
 const STACK_TOP = 1240;
@@ -291,7 +297,21 @@ function withGlow(
  */
 type LogoSource = CanvasImageSource | null;
 
-let assetsPromise: Promise<{ logo: LogoSource }> | null = null;
+interface CardAssets {
+  logo: LogoSource;
+  flame: LogoSource;
+}
+
+let assetsPromise: Promise<CardAssets> | null = null;
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
 
 /**
  * Knocks the mark's background tile out by luminance.
@@ -331,19 +351,17 @@ function knockOutTile(img: HTMLImageElement): CanvasImageSource {
   }
 }
 
-export function ensureCardAssets(): Promise<{ logo: LogoSource }> {
+export function ensureCardAssets(): Promise<CardAssets> {
   assetsPromise ??= (async () => {
     const fonts = [400, 500, 600, 700, 800, 900].map(w =>
       document.fonts?.load(`${w} 100px Inter`).catch(() => []),
     );
-    const logo = new Promise<HTMLImageElement | null>(resolve => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = '/fc-mark-192.png';
-    });
-    const [, loaded] = await Promise.all([Promise.all(fonts), logo]);
-    return { logo: loaded ? knockOutTile(loaded) : null };
+    const [, logo, flame] = await Promise.all([
+      Promise.all(fonts),
+      loadImage('/fc-mark-192.png'),
+      loadImage(FLAME_SRC),
+    ]);
+    return { logo: logo ? knockOutTile(logo) : null, flame };
   })();
   return assetsPromise;
 }
@@ -526,78 +544,48 @@ function paintDisplay(ctx: CanvasRenderingContext2D, c: Palette, text: string) {
 }
 
 /**
- * The glove, drawn as filled vector paths: a dark mitt lit along its leading
- * edge, thrown forward out of the medallion.
+ * The medallion's flame, drawn from artwork rather than from vector paths.
  *
- * Deliberately not an emoji. The card that shipped drew one at 340px and it
- * landed as a tofu box on the device that reported this — a platform font is
- * not something a brand artifact should depend on. Coordinates are a 0–100
- * box, scaled to `size`.
+ * The two-bezier flame this replaces had to imply fire with a silhouette and a
+ * gradient, and at 216px it read as a lick of orange jelly. Photographic fire
+ * is all detail the pen tool cannot reach — the smoke off the tip, the sparks,
+ * the way the core goes white — so the glyph is now a real image.
+ *
+ * Still deliberately not an emoji, for the reason the vector version existed:
+ * the card that shipped before drew one at 340px and it landed as a tofu box
+ * on the device that reported it. A platform font is not something a brand
+ * artifact should depend on; an asset in `public/` is.
  */
-/**
- * The outer flame: a tip that leans, a bulged right flank, and a lick rising
- * up the left side. The asymmetry is the whole job — a symmetrical taper reads
- * as a water droplet, not fire.
- */
-function flameOuterPath(ctx: CanvasRenderingContext2D) {
-  ctx.beginPath();
-  ctx.moveTo(54, 2);
-  ctx.bezierCurveTo(53, 21, 69, 29, 76, 43);
-  ctx.bezierCurveTo(85, 62, 75, 84, 56, 92);
-  ctx.bezierCurveTo(37, 99, 16, 87, 15, 66);
-  ctx.bezierCurveTo(14, 51, 24, 41, 31, 30);
-  ctx.bezierCurveTo(34, 43, 40, 48, 45, 53);
-  ctx.bezierCurveTo(42, 34, 45, 16, 54, 2);
-  ctx.closePath();
-}
-
-/** The hot core, sitting low in the flame where it would actually burn. */
-function flameInnerPath(ctx: CanvasRenderingContext2D) {
-  ctx.beginPath();
-  ctx.moveTo(55, 36);
-  ctx.bezierCurveTo(57, 49, 66, 55, 66, 67);
-  ctx.bezierCurveTo(66, 79, 56, 87, 46, 86);
-  ctx.bezierCurveTo(35, 85, 29, 75, 31, 65);
-  ctx.bezierCurveTo(33, 55, 46, 50, 55, 36);
-  ctx.closePath();
-}
+const FLAME_SRC = '/fc-flame-360.png';
 
 /**
- * The medallion's flame.
+ * Where the lit pixels actually sit inside that square, measured off the file's
+ * alpha rather than eyeballed: the flame spans the full height but only the
+ * middle 61% of the width, and its mass sits a hair left of centre.
  *
- * Deliberately vector, not an emoji: the card that shipped drew one at 340px
- * and it landed as a tofu box on the device that reported this, and a platform
- * font is not something a brand artifact should depend on. Coordinates are a
- * 0–100 box, scaled to `size`.
- *
- * Unlike the silhouette it replaces, this glyph *is* the light source, so it
- * carries its own bloom and the core behind it is dialled back to let it read.
+ * Without this the drawn square is what gets centred, which leaves the flame
+ * itself visibly off to one side in a medallion whose whole job is symmetry.
  */
-function paintFlame(ctx: CanvasRenderingContext2D, c: Palette, cx: number, cy: number, size: number) {
-  const u = size / 100;
-  ctx.save();
-  ctx.translate(cx - size / 2, cy - size / 2);
-  ctx.scale(u, u);
-  ctx.lineJoin = 'round';
+const FLAME_BOX = { left: 0.172, right: 0.783, top: 0, bottom: 1 } as const;
+const FLAME_CX = (FLAME_BOX.left + FLAME_BOX.right) / 2;
+const FLAME_CY_FRAC = (FLAME_BOX.top + FLAME_BOX.bottom) / 2;
 
-  const outer = ctx.createLinearGradient(0, 2, 0, 96);
-  outer.addColorStop(0, mix(c.crimson, c.flame, 0.5));
-  outer.addColorStop(0.45, c.flame);
-  outer.addColorStop(1, mix(c.flame, c.gold, 0.6));
-
-  const inner = ctx.createLinearGradient(0, 34, 0, 90);
-  inner.addColorStop(0, c.gold);
-  inner.addColorStop(1, mix(c.gold, '#FFFFFF', 0.8));
-
-  flameOuterPath(ctx);
-  ctx.fillStyle = outer;
-  ctx.fill();
-
-  flameInnerPath(ctx);
-  ctx.fillStyle = inner;
-  ctx.fill();
-
-  ctx.restore();
+/**
+ * Draws the flame so that its *lit* box — not the transparent square around it
+ * — is `height` tall and centred on (cx, cy).
+ */
+function paintFlame(
+  ctx: CanvasRenderingContext2D,
+  flame: LogoSource,
+  cx: number,
+  cy: number,
+  height: number,
+) {
+  if (!flame) return;
+  // The lit box is the full height of a square source, so the square is drawn
+  // at `height` on both axes; only the centring differs per axis.
+  const side = height / (FLAME_BOX.bottom - FLAME_BOX.top);
+  ctx.drawImage(flame, cx - FLAME_CX * side, cy - FLAME_CY_FRAC * side, side, side);
 }
 
 /**
@@ -605,7 +593,7 @@ function paintFlame(ctx: CanvasRenderingContext2D, c: Palette, cx: number, cy: n
  * behind it. Built back to front — rays, embers, bezel, rings, glove, flare —
  * because each layer has to be occluded by the next.
  */
-function paintMedallion(ctx: CanvasRenderingContext2D, c: Palette) {
+function paintMedallion(ctx: CanvasRenderingContext2D, c: Palette, flame: LogoSource) {
   const random = rng(0x5150);
 
   // Burst rays, radiating from behind the bezel.
@@ -722,10 +710,14 @@ function paintMedallion(ctx: CanvasRenderingContext2D, c: Palette) {
   ctx.fillStyle = core;
   ctx.fill();
 
-  // Twice: a wide soft pass for the light it throws, then a tight one to keep
-  // the silhouette crisp inside its own glow.
-  withGlow(ctx, c.flame, 90, () => paintFlame(ctx, c, CX, MEDAL_CY, 216));
-  withGlow(ctx, withAlpha(c.gold, 0.8), 26, () => paintFlame(ctx, c, CX, MEDAL_CY, 216));
+  // One soft pass for the light it throws into the medallion, then the artwork
+  // itself. The vector flame needed a second tight pass to stay crisp inside
+  // its own glow; a photograph carries its own edge and only loses it if you
+  // blur it twice.
+  withGlow(ctx, withAlpha(c.flame, 0.55), 70, () => {
+    paintFlame(ctx, flame, CX, MEDAL_CY, FLAME_H);
+  });
+  paintFlame(ctx, flame, CX, MEDAL_CY, FLAME_H);
 
   // Lens flare across the medallion's centre line, over everything.
   for (const [half, alpha] of [[42, 0.09], [3, 0.55]] as const) {
@@ -965,19 +957,25 @@ function paintStack(ctx: CanvasRenderingContext2D, c: Palette, facts: CardFacts)
 }
 
 /** Paints a whole card from its filled slots. */
-function paintCard(facts: CardFacts, user: FighterProfile, logo: LogoSource): HTMLCanvasElement {
+function paintCard(facts: CardFacts, user: FighterProfile, assets: CardAssets): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
   const c = palette();
 
+  // Scenery first, then every word on top of it. The medallion used to be
+  // painted after the headline — its opaque bezel deliberately cut across the
+  // baseline for depth, and its lens flare ran the full width of the card over
+  // whatever was there. Depth is not worth a headline you cannot read, so the
+  // ordering is now simply: art below, type above, no exceptions.
   paintBackdrop(ctx, c);
-  paintLogo(ctx, c, logo);
+  paintMedallion(ctx, c, assets.flame);
+
+  paintLogo(ctx, c, assets.logo);
   paintBrand(ctx, c);
   paintNameRule(ctx, c, user.name);
   paintDisplay(ctx, c, facts.headline);
-  paintMedallion(ctx, c);
   paintStack(ctx, c, facts);
   paintFooter(ctx, c, facts.dateText);
   return canvas;
@@ -1060,14 +1058,14 @@ export async function drawSessionCard(
   camp: FightCamp,
   user: FighterProfile,
 ): Promise<HTMLCanvasElement> {
-  const { logo } = await ensureCardAssets();
-  return paintCard(sessionFacts(log, camp, palette()), user, logo);
+  const assets = await ensureCardAssets();
+  return paintCard(sessionFacts(log, camp, palette()), user, assets);
 }
 
 export async function drawMilestoneCard(
   m: MilestoneShare,
   user: FighterProfile,
 ): Promise<HTMLCanvasElement> {
-  const { logo } = await ensureCardAssets();
-  return paintCard(milestoneFacts(m), user, logo);
+  const assets = await ensureCardAssets();
+  return paintCard(milestoneFacts(m), user, assets);
 }
