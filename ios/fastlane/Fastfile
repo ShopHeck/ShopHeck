@@ -212,6 +212,9 @@ end
 APPROVED_VERSION_STATES = [
   # appStoreState
   "READY_FOR_SALE",
+  # Approved and on sale for pre-order ahead of its release date. Reads as
+  # unreleased and is easy to mistake for an open train; it is not one.
+  "PREORDER_READY_FOR_SALE",
   "PENDING_APPLE_RELEASE",
   "PENDING_DEVELOPER_RELEASE",
   "PROCESSING_FOR_APP_STORE",
