@@ -94,6 +94,13 @@ export interface LogPrefill {
   sessionType: SessionType;
   title: string;
   duration: number;
+  /**
+   * The scheduled session this log is being written against, if it came from
+   * the planner or a dashboard's Today card. Saving the workout ticks it
+   * complete, so logging and checking off are the same act rather than two
+   * separate chores that can disagree.
+   */
+  sessionKey?: string;
 }
 
 const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
