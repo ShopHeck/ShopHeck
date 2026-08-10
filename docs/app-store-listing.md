@@ -204,10 +204,7 @@ Order of operations:
 3. **Actions → App Store Media** with `publish` ticked — the screenshots now have an editable version to land on.
 4. In App Store Connect: attach the build, drag in the preview videos if the lane didn't take them, choose poster frames, and submit for review.
 
-If you get the number wrong, the lane stops before the archive and names both the
-version it was about to build and the approved one blocking it. Apple's own
-version of the same complaint arrives only at the end of the upload — several
-minutes in — as:
+If you skip step 1 or get the number wrong, the upload fails *after* the archive — several minutes in — with:
 
 ```
 90062  CFBundleShortVersionString [1.0] ... must contain a higher version
@@ -218,10 +215,14 @@ minutes in — as:
 
 Both mean the same thing: once a version is approved, its train closes and every later build needs a higher marketing version.
 
-The preflight check only stops a build when App Store Connect positively reports
-an approved version at or above the one being built. If it cannot reach App Store
-Connect, or sees a version state it doesn't recognise, it says so and builds
-anyway — the upload is still the authority.
+> **Don't try to pre-empt this by comparing version strings against App Store
+> Connect.** A preflight check that did exactly that was added and reverted on
+> 2026-08-10: App Store Connect still holds a version record numbered `1.03`,
+> and every ordering that treats a version as dotted integers reads that as
+> **1.3** — above the 1.0.x line the app actually ships on. The check blocked a
+> perfectly good 1.0.4 build on its first real run. Apple compares against the
+> *latest approved* version (it named 1.0.3, not 1.03), so any replacement has
+> to ask which version is live rather than sorting the whole history.
 
 Passing `version:` overrides the build only — it deliberately does **not** commit. Once a version ships, bump `MARKETING_VERSION` in the project so the committed baseline matches what's live.
 
