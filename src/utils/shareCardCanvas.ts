@@ -243,20 +243,6 @@ function drawBlock(
   return top + fitted.lines.length * lineHeight;
 }
 
-function roundRectPath(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
-) {
-  const radius = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + w, y, x + w, y + h, radius);
-  ctx.arcTo(x + w, y + h, x, y + h, radius);
-  ctx.arcTo(x, y + h, x, y, radius);
-  ctx.arcTo(x, y, x + w, y, radius);
-  ctx.closePath();
-}
-
 /**
  * A tiny deterministic PRNG (mulberry32).
  *
@@ -548,108 +534,69 @@ function paintDisplay(ctx: CanvasRenderingContext2D, c: Palette, text: string) {
  * not something a brand artifact should depend on. Coordinates are a 0–100
  * box, scaled to `size`.
  */
-/** The knuckle mass: wide across the top, tapering into the wrist. */
-function mittPath(ctx: CanvasRenderingContext2D) {
+/**
+ * The outer flame: a tip that leans, a bulged right flank, and a lick rising
+ * up the left side. The asymmetry is the whole job — a symmetrical taper reads
+ * as a water droplet, not fire.
+ */
+function flameOuterPath(ctx: CanvasRenderingContext2D) {
   ctx.beginPath();
-  ctx.moveTo(26, 40);
-  ctx.bezierCurveTo(28, 20, 48, 10, 68, 13);
-  ctx.bezierCurveTo(84, 16, 92, 30, 91, 45);
-  ctx.bezierCurveTo(90, 58, 82, 68, 68, 71);
-  ctx.bezierCurveTo(52, 74, 34, 68, 27, 56);
+  ctx.moveTo(54, 2);
+  ctx.bezierCurveTo(53, 21, 69, 29, 76, 43);
+  ctx.bezierCurveTo(85, 62, 75, 84, 56, 92);
+  ctx.bezierCurveTo(37, 99, 16, 87, 15, 66);
+  ctx.bezierCurveTo(14, 51, 24, 41, 31, 30);
+  ctx.bezierCurveTo(34, 43, 40, 48, 45, 53);
+  ctx.bezierCurveTo(42, 34, 45, 16, 54, 2);
   ctx.closePath();
 }
 
-/** The thumb, wrapping across the heel of the hand. */
-function thumbPath(ctx: CanvasRenderingContext2D) {
+/** The hot core, sitting low in the flame where it would actually burn. */
+function flameInnerPath(ctx: CanvasRenderingContext2D) {
   ctx.beginPath();
-  ctx.moveTo(32, 44);
-  ctx.bezierCurveTo(17, 44, 7, 54, 9, 66);
-  ctx.bezierCurveTo(11, 77, 24, 82, 34, 75);
-  ctx.bezierCurveTo(41, 70, 40, 54, 36, 46);
+  ctx.moveTo(55, 36);
+  ctx.bezierCurveTo(57, 49, 66, 55, 66, 67);
+  ctx.bezierCurveTo(66, 79, 56, 87, 46, 86);
+  ctx.bezierCurveTo(35, 85, 29, 75, 31, 65);
+  ctx.bezierCurveTo(33, 55, 46, 50, 55, 36);
   ctx.closePath();
 }
 
 /**
- * A boxing glove: dark body, lit down its leading edge by the core behind it.
+ * The medallion's flame.
  *
- * No outline all the way round — an even stroke flattens a solid into a
- * sticker. The light lands only where the core would actually throw it: the
- * top of the knuckles, the left of the thumb, the underside of the cuff.
+ * Deliberately vector, not an emoji: the card that shipped drew one at 340px
+ * and it landed as a tofu box on the device that reported this, and a platform
+ * font is not something a brand artifact should depend on. Coordinates are a
+ * 0–100 box, scaled to `size`.
+ *
+ * Unlike the silhouette it replaces, this glyph *is* the light source, so it
+ * carries its own bloom and the core behind it is dialled back to let it read.
  */
-function paintGlove(ctx: CanvasRenderingContext2D, c: Palette, cx: number, cy: number, size: number) {
+function paintFlame(ctx: CanvasRenderingContext2D, c: Palette, cx: number, cy: number, size: number) {
   const u = size / 100;
   ctx.save();
   ctx.translate(cx - size / 2, cy - size / 2);
   ctx.scale(u, u);
   ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
 
-  const body = ctx.createLinearGradient(20, 10, 80, 95);
-  body.addColorStop(0, '#333944');
-  body.addColorStop(0.42, '#161a22');
-  body.addColorStop(1, '#06080c');
-  const edge = mix(c.gold, '#FFFFFF', 0.35);
+  const outer = ctx.createLinearGradient(0, 2, 0, 96);
+  outer.addColorStop(0, mix(c.crimson, c.flame, 0.5));
+  outer.addColorStop(0.45, c.flame);
+  outer.addColorStop(1, mix(c.flame, c.gold, 0.6));
 
-  const outline = 'rgba(0, 0, 0, 0.5)';
+  const inner = ctx.createLinearGradient(0, 34, 0, 90);
+  inner.addColorStop(0, c.gold);
+  inner.addColorStop(1, mix(c.gold, '#FFFFFF', 0.8));
 
-  // Cuff behind, tucked under the mitt so the two read as one object rather
-  // than a mitt sitting on a box.
-  ctx.fillStyle = body;
-  roundRectPath(ctx, 44, 58, 38, 36, 10);
+  flameOuterPath(ctx);
+  ctx.fillStyle = outer;
   ctx.fill();
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 2;
-  ctx.stroke();
 
-  // Mitt.
-  mittPath(ctx);
-  ctx.fillStyle = body;
+  flameInnerPath(ctx);
+  ctx.fillStyle = inner;
   ctx.fill();
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
 
-  // Knuckle seams, cut into the top face before the thumb goes over it.
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.lineWidth = 2.4;
-  for (const [x, y] of [[45, 17], [59, 14], [73, 17]]) {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.bezierCurveTo(x + 2, y + 14, x + 2, y + 22, x + 1, y + 28);
-    ctx.stroke();
-  }
-
-  // Thumb in front, where it is the single clearest signal that this is a
-  // glove and not a helmet — behind the mitt it was a crescent.
-  thumbPath(ctx);
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Rim light, one edge at a time.
-  ctx.strokeStyle = edge;
-  ctx.lineWidth = 3.4;
-  ctx.beginPath();
-  ctx.moveTo(29, 34);
-  ctx.bezierCurveTo(30, 18, 49, 9, 69, 12);
-  ctx.bezierCurveTo(80, 14, 87, 22, 90, 33);
-  ctx.stroke();
-
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(32, 44);
-  ctx.bezierCurveTo(17, 44, 7, 54, 9, 66);
-  ctx.bezierCurveTo(10, 72, 15, 77, 21, 79);
-  ctx.stroke();
-
-  ctx.strokeStyle = withAlpha(c.flame, 0.7);
-  ctx.lineWidth = 2.6;
-  ctx.beginPath();
-  ctx.moveTo(48, 93);
-  ctx.lineTo(78, 91);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -764,17 +711,21 @@ function paintMedallion(ctx: CanvasRenderingContext2D, c: Palette) {
     });
   }
 
-  // The bloom the glove is silhouetted against.
+  // Dialled back from what a dark silhouette needed behind it: the flame is
+  // the light source now, and a hot core would swallow it.
   const core = ctx.createRadialGradient(CX, MEDAL_CY, 0, CX, MEDAL_CY, bandInner * 0.95);
-  core.addColorStop(0, withAlpha(c.gold, 0.5));
-  core.addColorStop(0.3, withAlpha(c.flame, 0.32));
+  core.addColorStop(0, withAlpha(c.flame, 0.26));
+  core.addColorStop(0.3, withAlpha(c.flame, 0.16));
   core.addColorStop(1, withAlpha(c.flame, 0));
   ctx.beginPath();
   ctx.arc(CX, MEDAL_CY, bandInner, 0, Math.PI * 2);
   ctx.fillStyle = core;
   ctx.fill();
 
-  withGlow(ctx, c.flame, 40, () => paintGlove(ctx, c, CX, MEDAL_CY, 250));
+  // Twice: a wide soft pass for the light it throws, then a tight one to keep
+  // the silhouette crisp inside its own glow.
+  withGlow(ctx, c.flame, 90, () => paintFlame(ctx, c, CX, MEDAL_CY, 216));
+  withGlow(ctx, withAlpha(c.gold, 0.8), 26, () => paintFlame(ctx, c, CX, MEDAL_CY, 216));
 
   // Lens flare across the medallion's centre line, over everything.
   for (const [half, alpha] of [[42, 0.09], [3, 0.55]] as const) {
