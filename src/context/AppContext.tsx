@@ -21,6 +21,7 @@ import {
   deleteCamp,
   setSchedule,
   toggleSessionComplete,
+  setSessionComplete,
   saveGamePlan,
   upsertNutritionLog,
   deleteNutritionLog,
@@ -83,6 +84,7 @@ export type Action =
   | { type: 'DELETE_CONDITIONING'; payload: string }
   | { type: 'DELETE_WEIGHT'; payload: string }
   | { type: 'TOGGLE_SESSION'; payload: string }
+  | { type: 'SET_SESSION_COMPLETE'; payload: string }
   | { type: 'TOGGLE_DAY_OVERRIDE'; payload: string }
   | { type: 'SAVE_GAME_PLAN'; payload: GamePlan }
   | { type: 'LOG_NUTRITION'; payload: Omit<NutritionLog, 'id' | 'createdAt'> }
@@ -206,6 +208,9 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'DELETE_WEIGHT':
       return deleteWeightEntry(state, action.payload);
+
+    case 'SET_SESSION_COMPLETE':
+      return setSessionComplete(state, action.payload);
 
     case 'TOGGLE_SESSION':
       return toggleSessionComplete(state, action.payload);

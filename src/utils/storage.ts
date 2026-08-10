@@ -201,6 +201,18 @@ export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs
   };
 }
 
+/**
+ * Marks a scheduled session complete, idempotently.
+ *
+ * Deliberately NOT `toggleSessionComplete`: logging a workout against a session
+ * asserts "this happened", and a toggle would silently UN-tick a session the
+ * fighter logs twice (or logs after already ticking it in the planner).
+ */
+export function setSessionComplete(state: AppState, key: string): AppState {
+  if (state.completedSessions[key]) return state;
+  return { ...state, completedSessions: { ...state.completedSessions, [key]: true } };
+}
+
 export function toggleSessionComplete(state: AppState, key: string): AppState {
   return {
     ...state,

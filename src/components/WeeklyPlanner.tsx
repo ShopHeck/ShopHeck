@@ -370,6 +370,7 @@ export default function WeeklyPlanner({ onLogSession, onStartTimer }: Props) {
                                   sessionType: session.type === 'rest' ? 'recovery' : session.type,
                                   title: session.title,
                                   duration: session.duration,
+                                  sessionKey: key,
                                 })}
                                 className={`text-sm font-semibold min-h-[44px] bg-black/30 hover:bg-black/50 px-4 py-2.5 rounded-xl transition-all border ${
                                   isOffSeason
