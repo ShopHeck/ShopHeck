@@ -199,6 +199,101 @@ def sanitize_match_env!
   end
 end
 
+# App Store Connect version states that mean the version has been approved, and
+# so that its pre-release train is closed to new builds.
+#
+# Apple renamed this field: older responses carry `appStoreState`, newer ones
+# `appVersionState`, with a different vocabulary for the same idea. Both spellings
+# live here because which one arrives depends on the API version the installed
+# fastlane asks for, and the Gemfile pins no version.
+#
+# Only states that unambiguously mean "approved" belong here. An unknown state is
+# read as "still open" on purpose — see version_train_closed_by below.
+APPROVED_VERSION_STATES = [
+  # appStoreState
+  "READY_FOR_SALE",
+  "PENDING_APPLE_RELEASE",
+  "PENDING_DEVELOPER_RELEASE",
+  "PROCESSING_FOR_APP_STORE",
+  "REPLACED_BY_NEW_VERSION",
+  "REMOVED_FROM_SALE",
+  "DEVELOPER_REMOVED_FROM_SALE",
+  # appVersionState
+  "ACCEPTED",
+  "READY_FOR_DISTRIBUTION",
+  "PROCESSING_FOR_DISTRIBUTION",
+  "REPLACED_WITH_NEW_VERSION"
+].freeze
+
+# The marketing version the archive will actually carry — read back from the
+# project rather than from the `version:` option, so it is right whether the
+# build is using the committed MARKETING_VERSION or one set_marketing_version
+# just wrote over it.
+def project_marketing_version
+  require "xcodeproj"
+
+  project = Xcodeproj::Project.open(XCODEPROJ_PATH)
+  app_target = project.targets.find { |target| target.name == "App" }
+  UI.user_error!("No 'App' target in #{XCODEPROJ_PATH}") if app_target.nil?
+
+  release = app_target.build_configurations.find { |config| config.name == "Release" }
+  release&.build_settings&.[]("MARKETING_VERSION").to_s.strip
+end
+
+# The highest already-approved version that blocks `version` from being uploaded,
+# or nil if nothing does.
+#
+# Apple's rule is that CFBundleShortVersionString has to be strictly higher than
+# the previously approved version, so an approved version equal to or above ours
+# is what closes the train.
+#
+# Returns nil rather than raising when App Store Connect cannot be reached or
+# answers in a shape this does not recognise. The upload itself is still checked
+# by Apple, so a check that cannot run costs nothing beyond the twenty minutes it
+# was meant to save — whereas one that guesses would block builds that are fine.
+def version_train_closed_by(version)
+  require "spaceship"
+
+  return nil unless version.match?(/\A\d+(\.\d+)*\z/)
+
+  app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+  if app.nil?
+    UI.important("App Store Connect has no app for #{APP_IDENTIFIER} yet — skipping the version check.")
+    return nil
+  end
+
+  approved = app.get_app_store_versions.filter_map do |app_store_version|
+    state = version_state(app_store_version)
+    next unless APPROVED_VERSION_STATES.include?(state)
+
+    candidate = app_store_version.version_string.to_s.strip
+    next unless candidate.match?(/\A\d+(\.\d+)*\z/)
+
+    candidate
+  end
+
+  blocking = approved.select { |candidate| Gem::Version.new(candidate) >= Gem::Version.new(version) }
+  blocking.max_by { |candidate| Gem::Version.new(candidate) }
+rescue StandardError => e
+  UI.important("Could not ask App Store Connect which versions are approved (#{e.message}) — leaving the check to the upload.")
+  nil
+end
+
+def version_state(app_store_version)
+  state = app_store_version.app_version_state if app_store_version.respond_to?(:app_version_state)
+  state = app_store_version.app_store_state if state.nil? && app_store_version.respond_to?(:app_store_state)
+  state.to_s.upcase
+end
+
+# The obvious next version after this one, for suggesting in an error message.
+# Which version actually ships is a product decision, so this only ever appears
+# as an example.
+def next_patch_version(version)
+  parts = version.split(".")
+  parts[-1] = (parts[-1].to_i + 1).to_s
+  parts.join(".")
+end
+
 # The entitlement keys a target actually ships, read out of the project rather
 # than restated here. A hand-kept list beside the real one is a second place to
 # remember, and forgetting is the exact failure this whole path exists to remove.
@@ -345,6 +440,7 @@ platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do |options|
     set_marketing_version(options)
+    verify_version_train_open
     bump_build_number
     archive_app
     upload_to_testflight(
@@ -355,6 +451,7 @@ platform :ios do
 
   desc "Build and submit to the App Store"
   lane :release do
+    verify_version_train_open
     bump_build_number
     archive_app
     # Metadata, screenshots, and the App Privacy questionnaire are managed in
@@ -480,6 +577,56 @@ platform :ios do
       version_number: version
     )
     UI.important("Marketing version set to #{version} for this build (not committed).")
+  end
+
+  # Refuse to archive for a marketing version App Store Connect has already
+  # approved — before the archive rather than after it.
+  #
+  # The comment above spells out what Apple does with one: 90062 and 90186, both
+  # raised by altool at the *end* of the run. That is what happened to the build
+  # of 2026-08-10, which spent 225s archiving and 90s uploading before Apple
+  # said the 1.0.3 train had closed. Nothing about the failure needed the binary;
+  # the version was already wrong when the lane started.
+  #
+  # This asks the same question first, and answers it in about a second. It only
+  # stops the build on a positive answer — a version App Store Connect reports as
+  # approved, at or above the one about to be built. Anything else (no network,
+  # an unfamiliar state, a version string that isn't dotted numbers) goes through
+  # to the upload, which is where the authority has always been.
+  private_lane :verify_version_train_open do
+    version = project_marketing_version
+    if version.empty?
+      UI.important("No MARKETING_VERSION on the App target's Release configuration — skipping the version check.")
+      next
+    end
+
+    approved = version_train_closed_by(version)
+    next if approved.nil?
+
+    UI.user_error!(<<~MSG)
+      Marketing version #{version} cannot be uploaded — App Store Connect has already
+      approved #{approved}, which closes that train to new builds.
+
+      Apple rejects this at the end of the upload, after the archive, as:
+
+        90186  Invalid Pre-Release Train. The train version '#{version}' is closed
+               for new build submissions
+        90062  CFBundleShortVersionString [#{version}] ... must contain a higher
+               version than that of the previously approved version [#{approved}]
+
+      Ship it as a higher version instead:
+
+        1. App Store Connect → #{APP_IDENTIFIER} → the "+" beside iOS App in the
+           sidebar → enter the next version (e.g. #{next_patch_version(approved)}).
+        2. Set MARKETING_VERSION in ios/App/App.xcodeproj/project.pbxproj to the
+           same number and commit it — Info.plist only holds the
+           $(MARKETING_VERSION) placeholder, so editing the plist does nothing.
+
+      To build one without committing it, re-run this workflow with the version
+      field set: it overrides MARKETING_VERSION for that build only.
+
+      See docs/app-store-listing.md § Shipping a new version.
+    MSG
   end
 
   # Set the build number to one above the highest build already on TestFlight
