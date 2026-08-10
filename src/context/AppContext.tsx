@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibrarySessionEntry, LibraryResult } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
@@ -35,6 +35,13 @@ import {
   deleteFightResult,
   applyFactorWeights,
   setDashboardPrefs,
+  toggleLibraryFavorite,
+  queueLibraryItem,
+  updateQueueEntry,
+  removeQueueEntry,
+  clearLibraryQueue,
+  addLibraryResult,
+  deleteLibraryResult,
   saveAiAnalysis,
   acceptAdaptation,
   revertAdaptation,
@@ -103,6 +110,13 @@ export type Action =
   | { type: 'COMPLETE_CORNER_SESSION'; payload: string }
   | { type: 'CONSUME_CORNER_SESSION'; payload: string }
   | { type: 'DISCARD_CORNER_SESSION'; payload: string }
+  | { type: 'TOGGLE_LIBRARY_FAVORITE'; payload: string }
+  | { type: 'QUEUE_LIBRARY_ITEM'; payload: Omit<LibrarySessionEntry, 'id' | 'addedAt'> }
+  | { type: 'UPDATE_QUEUE_ENTRY'; payload: LibrarySessionEntry }
+  | { type: 'REMOVE_QUEUE_ENTRY'; payload: string }
+  | { type: 'CLEAR_LIBRARY_QUEUE'; payload: string }
+  | { type: 'LOG_LIBRARY_RESULT'; payload: Omit<LibraryResult, 'id' | 'createdAt'> }
+  | { type: 'DELETE_LIBRARY_RESULT'; payload: string }
   | { type: 'RESET' };
 
 /** Actions whose payloads can shift streaks/belts/achievements/PRs/challenges. */
@@ -255,6 +269,27 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'SET_DASHBOARD_PREF':
       return setDashboardPrefs(state, action.payload);
+
+    case 'TOGGLE_LIBRARY_FAVORITE':
+      return toggleLibraryFavorite(state, action.payload);
+
+    case 'QUEUE_LIBRARY_ITEM':
+      return queueLibraryItem(state, action.payload);
+
+    case 'UPDATE_QUEUE_ENTRY':
+      return updateQueueEntry(state, action.payload);
+
+    case 'REMOVE_QUEUE_ENTRY':
+      return removeQueueEntry(state, action.payload);
+
+    case 'CLEAR_LIBRARY_QUEUE':
+      return clearLibraryQueue(state, action.payload);
+
+    case 'LOG_LIBRARY_RESULT':
+      return addLibraryResult(state, action.payload);
+
+    case 'DELETE_LIBRARY_RESULT':
+      return deleteLibraryResult(state, action.payload);
 
     case 'SAVE_AI_ANALYSIS':
       return saveAiAnalysis(state, action.payload);

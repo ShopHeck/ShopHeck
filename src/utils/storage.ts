@@ -1,4 +1,4 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibraryState, LibrarySessionEntry, LibraryResult } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 import { defaultGamificationState } from './gamification';
 import { upsertCornerRound } from './cornerMode';
@@ -33,6 +33,7 @@ export function createDefaultState(): AppState {
     campAdaptations: [],
     dismissedAdaptations: [],
     cornerSessions: [],
+    library: { favorites: [], queue: [], results: [] },
   };
 }
 
@@ -487,10 +488,17 @@ export function deleteCamp(state: AppState, campId: string): AppState {
     ),
   );
 
+  // Library results carry an optional campId — drop the ones belonging to this
+  // camp, keep results logged outside any camp.
+  const library = state.library
+    ? { ...state.library, results: state.library.results.filter(r => r.campId !== campId) }
+    : state.library;
+
   return {
     ...state,
     camps,
     activeCamp,
+    library,
     workoutLogs: state.workoutLogs.filter(l => l.campId !== campId),
     sparringLogs: state.sparringLogs.filter(l => l.campId !== campId),
     conditioningTests: state.conditioningTests.filter(t => t.campId !== campId),
@@ -603,6 +611,60 @@ export function applyFactorWeights(state: AppState, fighterId: string, weights: 
     coaches: state.coaches.map(updateFn),
     currentUser: state.currentUser?.id === fighterId ? updateFn(state.currentUser) : state.currentUser,
   };
+}
+
+// ─── Training Library ─────────────────────────────────────────────────────
+
+/**
+ * Every library transition reads through this rather than `state.library`
+ * directly: the field is optional so a state saved before the library shipped
+ * (or a cloud pull, which has no column for it) still resolves to an empty
+ * library instead of throwing.
+ */
+function currentLibrary(state: AppState): LibraryState {
+  return state.library ?? { favorites: [], queue: [], results: [] };
+}
+
+function withLibrary(state: AppState, patch: Partial<LibraryState>): AppState {
+  return { ...state, library: { ...currentLibrary(state), ...patch } };
+}
+
+export function toggleLibraryFavorite(state: AppState, itemId: string): AppState {
+  const { favorites } = currentLibrary(state);
+  return withLibrary(state, {
+    favorites: favorites.includes(itemId)
+      ? favorites.filter(id => id !== itemId)
+      : [...favorites, itemId],
+  });
+}
+
+export function queueLibraryItem(state: AppState, entry: Omit<LibrarySessionEntry, 'id' | 'addedAt'>): AppState {
+  const newEntry: LibrarySessionEntry = { ...entry, id: generateId(), addedAt: new Date().toISOString() };
+  return withLibrary(state, { queue: [...currentLibrary(state).queue, newEntry] });
+}
+
+export function updateQueueEntry(state: AppState, entry: LibrarySessionEntry): AppState {
+  return withLibrary(state, {
+    queue: currentLibrary(state).queue.map(q => q.id === entry.id ? entry : q),
+  });
+}
+
+export function removeQueueEntry(state: AppState, entryId: string): AppState {
+  return withLibrary(state, { queue: currentLibrary(state).queue.filter(q => q.id !== entryId) });
+}
+
+/** Clears one day's queue, leaving anything planned for another date alone. */
+export function clearLibraryQueue(state: AppState, date: string): AppState {
+  return withLibrary(state, { queue: currentLibrary(state).queue.filter(q => q.date !== date) });
+}
+
+export function addLibraryResult(state: AppState, result: Omit<LibraryResult, 'id' | 'createdAt'>): AppState {
+  const newResult: LibraryResult = { ...result, id: generateId(), createdAt: new Date().toISOString() };
+  return withLibrary(state, { results: [newResult, ...currentLibrary(state).results] });
+}
+
+export function deleteLibraryResult(state: AppState, id: string): AppState {
+  return withLibrary(state, { results: currentLibrary(state).results.filter(r => r.id !== id) });
 }
 
 // ─── Custom Timer Presets ─────────────────────────────────────────────────

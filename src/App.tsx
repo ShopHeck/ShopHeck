@@ -111,7 +111,7 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   health:           { title: 'Apple Health',        subtitle: 'Sync & Export' },
   readiness:        { title: 'Fight Readiness',     subtitle: 'Camp Analysis' },
   trackers:         { title: 'Fitness Trackers',    subtitle: 'HR · HRV · Recovery' },
-  'workout-library': { title: 'Workout Library',   subtitle: 'Exercises & Drills' },
+  'workout-library': { title: 'Training Library',  subtitle: 'Exercises & Techniques' },
   'meal-library':   { title: 'Meal Library',        subtitle: 'Plans & Generator' },
   'fight-log':      { title: 'Log Fight Result',    subtitle: 'Post-Fight Breakdown' },
   'fight-breakdown': { title: 'Fight Breakdown',    subtitle: 'KPIs & Analysis' },
@@ -349,7 +349,7 @@ function AppShell() {
             {view === 'health'          && <ProGate required="fighter_pro" page feature="Apple Health Sync" featureDescription="Keep your training in one place across apps." bullets={['Import workouts & weight from Apple Health', 'Write logged sessions back to Health', 'Export your full camp data']}><AppleHealthSync /></ProGate>}
             {view === 'readiness'       && <FightReadiness />}
             {view === 'trackers'        && <FitnessTrackerHub onNavigate={v => navigate(v as View)} />}
-            {view === 'workout-library' && <WorkoutLibrary />}
+            {view === 'workout-library' && <WorkoutLibrary onLogSession={(prefill) => navigateToLog(prefill)} />}
             {view === 'meal-library'    && <MealLibrary />}
             {view === 'camp-history'    && (
               <CampComparison

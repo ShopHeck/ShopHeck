@@ -428,6 +428,72 @@ export interface CelebrationEvent {
   };
 }
 
+// ─── Training Library ─────────────────────────────────────────────────────
+
+/**
+ * Coach/fighter adjustments layered on a library item's default prescription.
+ * Only the fields actually changed are stored, so a library update still flows
+ * through to anything the user didn't override.
+ */
+export interface LibraryPrescriptionOverride {
+  sets?: number;
+  reps?: number;
+  rounds?: number;
+  workSeconds?: number;
+  restSeconds?: number;
+  distanceMeters?: number;
+  load?: string;
+  targetRpe?: number;
+  notes?: string;
+}
+
+/** A library item queued into a training session. */
+export interface LibrarySessionEntry {
+  id: string;
+  /** Id of the item in the library (see src/data/library). */
+  itemId: string;
+  /** YYYY-MM-DD the entry is planned for. */
+  date: string;
+  override: LibraryPrescriptionOverride;
+  addedAt: string;
+}
+
+/** How much the movement hurt — distinct from how hard it was. */
+export type DiscomfortLevel = 0 | 1 | 2 | 3;
+
+/**
+ * What actually happened on one library item.
+ *
+ * Kept separate from WorkoutLog on purpose: a WorkoutLog is the session (and
+ * feeds streaks, belts, PRs and Apple Health), while this is the per-item
+ * detail underneath it. `workoutLogId` links the two when they were logged
+ * together.
+ */
+export interface LibraryResult {
+  id: string;
+  itemId: string;
+  /** YYYY-MM-DD */
+  date: string;
+  campId?: string;
+  /** What was actually completed, e.g. '4 × 5 @ 275 lb' or '6 rounds'. */
+  actualWork: string;
+  /** 1–10. */
+  rpe: number;
+  discomfort: DiscomfortLevel;
+  /** 1–5 self-rated technical quality. */
+  technicalConfidence: 1 | 2 | 3 | 4 | 5;
+  notes: string;
+  workoutLogId?: string;
+  createdAt: string;
+}
+
+export interface LibraryState {
+  /** Library item ids the user starred. */
+  favorites: string[];
+  queue: LibrarySessionEntry[];
+  results: LibraryResult[];
+}
+
 export interface DashboardPrefs {
   progressWidgetCollapsed: boolean;
   progressWidgetHidden: boolean;
@@ -607,4 +673,10 @@ export interface AppState {
   dismissedAdaptations?: string[];
   /** Fights scored live from the corner — see CornerSession. */
   cornerSessions?: CornerSession[];
+  /**
+   * Training-library favourites, session queue and per-item results.
+   * Device-local: `pushState` has no table for it, so it persists through
+   * localStorage but does not travel with cloud sync yet.
+   */
+  library?: LibraryState;
 }
