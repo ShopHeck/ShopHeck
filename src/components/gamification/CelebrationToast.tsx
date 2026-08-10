@@ -12,20 +12,18 @@ const DISMISS_MS = 4000;
 // The kinds worth broadcasting — belts, streaks, and PRs are the app's
 // combat-sports bragging rights. Achievements/challenges stay toast-only so
 // the share offer keeps meaning.
-const SHARE_EMOJI: Partial<Record<CelebrationEvent['kind'], string>> = {
-  belt: '🥋',
-  streak_milestone: '🔥',
-  pr: '📈',
-};
+const SHAREABLE: ReadonlyArray<CelebrationEvent['kind']> = ['belt', 'streak_milestone', 'pr'];
 
 function toMilestone(event: CelebrationEvent): MilestoneShare {
   return {
-    // "Blue Belt unlocked!" → "BLUE BELT UNLOCKED" — the canvas headline
-    // shrinks to fit, so long PR titles are fine.
+    // "Blue Belt unlocked!" → "BLUE BELT UNLOCKED" — the card uppercases its
+    // own text, but this string is also the share sheet's title.
     title: event.title.replace(/!+$/, '').toUpperCase(),
     subtitle: event.subtitle,
-    emoji: SHARE_EMOJI[event.kind] ?? '🏆',
     slug: event.id,
+    // The card's real slots, when the source filled them in. Without these it
+    // falls back to splitting the title, which can only guess.
+    ...event.share,
   };
 }
 
@@ -55,7 +53,7 @@ export default function CelebrationToast() {
     return () => clearTimeout(id);
   }, [event?.id, shareMilestone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const shareable = !!event && event.kind in SHARE_EMOJI && !!state.currentUser;
+  const shareable = !!event && SHAREABLE.includes(event.kind) && !!state.currentUser;
 
   function openShare() {
     if (!event) return;

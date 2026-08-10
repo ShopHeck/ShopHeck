@@ -31,6 +31,7 @@ you need; each block documents what it turns on.
 | `npm run quality` | The gate CI runs. Nothing merges red. |
 | `npm test` | Vitest, 288 tests |
 | `npm run cap:ios` | Build, sync, open Xcode |
+| `npm run share-cards` | Render every share-card variant to PNG for a look |
 | `npm run screenshots` | Regenerate all 14 App Store captures |
 | `npm run preview:video` | Generate App Store preview videos |
 | `npm run verify:appstore` | Check the App Store asset set |

@@ -410,6 +410,22 @@ export interface CelebrationEvent {
   /** Lucide icon name. */
   icon: string;
   ts: string;
+  /**
+   * Structured facts for the share card, when the source has them.
+   *
+   * The toast only ever shows `title`/`subtitle`, but the card lays out a
+   * headline, a descriptor, a figure and its unit as separate elements — and
+   * a PR knows all four before they are flattened into "New PR: Most workouts
+   * in a week" / "5 sessions (was 4)". Passing them through beats parsing the
+   * sentences back apart at the point of drawing.
+   */
+  share?: {
+    headline?: string;
+    descriptor?: string;
+    statValue?: string;
+    statLabel?: string;
+    footnote?: string;
+  };
 }
 
 export interface DashboardPrefs {

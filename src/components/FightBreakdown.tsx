@@ -16,10 +16,10 @@ import { formatWeightDelta } from '../utils/units';
 // headline states the outcome plainly (a loss shared is a comeback story, not
 // a boast — the copy stays respectful).
 const SHARE_META = {
-  win: { emoji: '🏆', title: 'VICTORY' },
-  loss: { emoji: '🛡️', title: 'LESSONS TAKEN' },
-  draw: { emoji: '🤝', title: 'DRAW' },
-  'no-contest': { emoji: '⚖️', title: 'NO CONTEST' },
+  win: { title: 'VICTORY' },
+  loss: { title: 'LESSONS TAKEN' },
+  draw: { title: 'DRAW' },
+  'no-contest': { title: 'NO CONTEST' },
 } as const;
 
 interface Props {
@@ -137,11 +137,19 @@ export default function FightBreakdown({ fightId, onBack, onEdit }: Props) {
 
   function shareResult() {
     const meta = SHARE_META[fightRef.outcome];
+    const opponent = fightRef.opponent || 'Opponent';
+    const method = `${fightRef.method}${fightRef.roundStopped ? ` · R${fightRef.roundStopped}` : ''}`;
     setShareMilestone({
       title: meta.title,
-      subtitle: `${fightRef.method}${fightRef.roundStopped ? ` · R${fightRef.roundStopped}` : ''} · vs ${fightRef.opponent || 'Opponent'}`,
-      emoji: meta.emoji,
+      subtitle: `${method} · vs ${opponent}`,
       slug: `fight-${fightRef.outcome}`,
+      // The outcome is the headline; the round it ended in is the only figure
+      // a fight card has, and only when it ended early.
+      headline: meta.title,
+      descriptor: `vs ${opponent}`,
+      statValue: fightRef.roundStopped ? String(fightRef.roundStopped) : undefined,
+      statLabel: fightRef.roundStopped ? 'Round' : undefined,
+      footnote: method,
     });
   }
 

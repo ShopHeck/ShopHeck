@@ -4,6 +4,7 @@ import { CHART_SERIES, resolveToken } from '../utils/designTokens';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { weeklyAdherenceSeries } from '../utils/adherence';
+import { APP_SHARE_DOMAIN, buildShareMessage } from '../utils/shareLink';
 import {
   LineChart,
   Line,
@@ -140,22 +141,34 @@ function shareStats(opts: {
   ctx.font = '12px system-ui, sans-serif';
   ctx.fillText(`Camp Progress: ${opts.progress}%`, 40, H - 20);
 
-  // Brand watermark — the shared image is the app's only outbound artifact.
-  ctx.fillStyle = dim;
+  // Brand watermark — the shared image is the app's only outbound artifact, so
+  // it carries the link in the pixels as well as in the caption below.
+  ctx.fillStyle = flame;
   ctx.textAlign = 'right';
-  ctx.fillText('fightcamp.netlify.app', W - 40, H - 20);
+  ctx.fillText(APP_SHARE_DOMAIN, W - 40, H - 20);
   ctx.textAlign = 'left';
+
+  const title = `${opts.name}'s Fight Camp Stats`;
+  const text = buildShareMessage(title, `${opts.sessions} sessions · ${opts.hours}h · ${opts.adherence}% adherence`);
 
   canvas.toBlob(async blob => {
     if (!blob) return;
     const file = new File([blob], 'fight-camp-stats.png', { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: `${opts.name}'s Fight Camp Stats` });
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'fight-camp-stats.png'; a.click();
-      URL.revokeObjectURL(url);
+    try {
+      if (navigator.canShare?.({ files: [file], title, text })) {
+        await navigator.share({ files: [file], title, text });
+      } else if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'fight-camp-stats.png'; a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      // Dismissing the share sheet rejects with AbortError — a decision, not a
+      // failure, and nothing to fall back from.
+      if ((err as Error | undefined)?.name !== 'AbortError') throw err;
     }
   }, 'image/png');
 }

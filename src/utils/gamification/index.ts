@@ -53,9 +53,10 @@ function makeCelebration(
   id: string,
   title: string,
   subtitle: string,
-  icon: string
+  icon: string,
+  share?: CelebrationEvent['share']
 ): CelebrationEvent {
-  return { id, kind, title, subtitle, icon, ts: new Date().toISOString() };
+  return { id, kind, title, subtitle, icon, ts: new Date().toISOString(), share };
 }
 
 function beltCelebrations(
@@ -72,7 +73,10 @@ function beltCelebrations(
           `belt-${tier}`,
           `${BELT_LABELS[tier]} unlocked!`,
           'New rank earned. Keep grinding.',
-          'Award'
+          'Award',
+          // A rank has no figure to put on the card — the belt name is the
+          // headline and carries the moment on its own.
+          { headline: BELT_LABELS[tier], descriptor: 'New rank earned', footnote: 'Keep grinding' }
         )
       );
     }
@@ -90,7 +94,14 @@ function streakCelebrations(prevBest: number, newBest: number, currentStreak: nu
           `streak-${ms}`,
           `${ms}-day streak!`,
           currentStreak >= ms ? 'You\'re on fire — keep showing up.' : 'Personal best set.',
-          'Flame'
+          'Flame',
+          {
+            headline: 'Streak',
+            descriptor: 'Consecutive training days',
+            statValue: String(ms),
+            statLabel: 'Days',
+            footnote: currentStreak >= ms ? `Currently on ${currentStreak}` : 'Personal best set',
+          }
         )
       );
     }
@@ -105,7 +116,14 @@ function prCelebrations(newlyBroken: PersonalRecord[]): CelebrationEvent[] {
       `pr-${r.type}-${r.achievedAt}`,
       `New PR: ${PR_LABELS[r.type]}`,
       `${r.value} ${PR_UNITS[r.type]} (was ${r.previousValue ?? 0})`,
-      'TrendingUp'
+      'TrendingUp',
+      {
+        headline: 'New PR',
+        descriptor: PR_LABELS[r.type],
+        statValue: String(r.value),
+        statLabel: PR_UNITS[r.type],
+        footnote: `Previous best: ${r.previousValue ?? 0}`,
+      }
     )
   );
 }
