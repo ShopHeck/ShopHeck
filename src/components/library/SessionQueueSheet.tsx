@@ -1,20 +1,28 @@
-import { Trash2, ClipboardCheck, Pencil } from 'lucide-react';
+import { Trash2, ClipboardCheck, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Modal from '../shared/Modal';
 import { useApp } from '../../context/AppContext';
 import { getLibraryItem, type LibraryItem } from '../../data/library';
 import { entryPrescriptionText, isAdjusted, queueMinutes, queueToPrefill } from '../../utils/library';
+import { todayISO } from '../../utils/dates';
 import type { LibrarySessionEntry } from '../../types';
 import type { LogPrefill } from '../../App';
 
 interface Props {
   date: string;
+  /** Every date with queued entries, ascending — the days this sheet can step between. */
+  dates: string[];
   entries: LibrarySessionEntry[];
+  onDateChange: (date: string) => void;
   onClose: () => void;
   /** Hands the whole session to the workout logger. Absent = no logger available. */
   onLogSession?: (prefill: LogPrefill) => void;
-  /** Opens the per-item result sheet (the parent owns it, so sheets don't stack). */
-  onLogItem: (item: LibraryItem) => void;
+  /**
+   * Opens the per-item result sheet (the parent owns it, so sheets don't stack).
+   * `prefillWork` carries the entry's ADJUSTED prescription, so logging from a
+   * queued session doesn't hand back the unadjusted library default.
+   */
+  onLogItem: (item: LibraryItem, prefillWork: string) => void;
 }
 
 /**
@@ -25,10 +33,20 @@ interface Props {
  * exactly like a manually logged one. The queue is deliberately left in place
  * afterwards — it's the plan to compare completed work against.
  */
-export default function SessionQueueSheet({ date, entries, onClose, onLogSession, onLogItem }: Props) {
+export default function SessionQueueSheet({
+  date, dates, entries, onDateChange, onClose, onLogSession, onLogItem,
+}: Props) {
   const { state, dispatch } = useApp();
   const minutes = queueMinutes(entries);
   const hasCamp = !!state.activeCamp;
+
+  // A session can be queued for any day, so the sheet has to be able to reach
+  // every day that has one — otherwise a future entry is invisible until it
+  // arrives and a past one can never be cleared.
+  const index = dates.indexOf(date);
+  const prevDate = index > 0 ? dates[index - 1] : null;
+  const nextDate = index >= 0 && index < dates.length - 1 ? dates[index + 1] : null;
+  const isPast = date < todayISO();
 
   function logSession() {
     const prefill = queueToPrefill(entries);
@@ -58,6 +76,36 @@ export default function SessionQueueSheet({ date, entries, onClose, onLogSession
         </div>
       }
     >
+      {dates.length > 1 && (
+        <div className="flex items-center justify-between mb-3 bg-dark-600 rounded-xl px-1 py-1">
+          <button
+            onClick={() => prevDate && onDateChange(prevDate)}
+            disabled={!prevDate}
+            aria-label="Previous queued day"
+            className="p-2 text-gray-400 disabled:opacity-30 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-xs font-semibold text-white">
+            Day {index + 1} of {dates.length}
+          </span>
+          <button
+            onClick={() => nextDate && onDateChange(nextDate)}
+            disabled={!nextDate}
+            aria-label="Next queued day"
+            className="p-2 text-gray-400 disabled:opacity-30 hover:text-white transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      {isPast && entries.length > 0 && (
+        <p className="text-xs text-amber-300 mb-3">
+          Planned for a day that has passed — log it or clear it.
+        </p>
+      )}
+
       {entries.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-6">
           Nothing queued for this day yet.
@@ -105,7 +153,7 @@ export default function SessionQueueSheet({ date, entries, onClose, onLogSession
                   </button>
                 </div>
                 <button
-                  onClick={() => { onLogItem(item); onClose(); }}
+                  onClick={() => { onLogItem(item, entryPrescriptionText(entry)); onClose(); }}
                   className="mt-2 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors"
                 >
                   Log result for this item

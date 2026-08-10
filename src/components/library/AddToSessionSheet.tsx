@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { format } from 'date-fns';
 import Modal from '../shared/Modal';
 import { useApp } from '../../context/AppContext';
 import { formatPrescription, type LibraryItem } from '../../data/library';
 import { resolvePrescription } from '../../utils/library';
+import { todayISO } from '../../utils/dates';
 import type { LibraryPrescriptionOverride } from '../../types';
 
 /**
@@ -38,7 +38,9 @@ export default function AddToSessionSheet({ item, onClose }: Props) {
   const { dispatch } = useApp();
   const base = item.prescription;
 
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // No `max` here, unlike the loggers: this is a plan, not a record, so
+  // queueing tomorrow's session is the point.
+  const [date, setDate] = useState(todayISO());
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       FIELDS.filter(f => base[f.key] !== undefined).map(f => [f.key, String(base[f.key])]),

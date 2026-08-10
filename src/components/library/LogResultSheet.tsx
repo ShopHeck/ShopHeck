@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
 import Modal from '../shared/Modal';
 import { useApp } from '../../context/AppContext';
 import { formatPrescription, type LibraryItem } from '../../data/library';
+import { todayISO, isFutureISODate } from '../../utils/dates';
 import type { DiscomfortLevel } from '../../types';
 
 const DISCOMFORT: { value: DiscomfortLevel; label: string; color: string }[] = [
@@ -22,6 +22,12 @@ const CONFIDENCE_LABELS: Record<number, string> = {
 
 interface Props {
   item: LibraryItem;
+  /**
+   * Work to prefill instead of the library default — the resolved prescription
+   * when this is logged from a queued session, so an adjusted plan doesn't come
+   * back as the unadjusted original.
+   */
+  prefillWork?: string;
   onClose: () => void;
 }
 
@@ -30,17 +36,22 @@ interface Props {
  * prescription. Separate from the workout log: this is the per-item detail that
  * makes "what keeps failing?" and spaced review answerable.
  */
-export default function LogResultSheet({ item, onClose }: Props) {
+export default function LogResultSheet({ item, prefillWork, onClose }: Props) {
   const { state, dispatch } = useApp();
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [actualWork, setActualWork] = useState(formatPrescription(item.prescription));
+  const [date, setDate] = useState(todayISO());
+  const [actualWork, setActualWork] = useState(prefillWork ?? formatPrescription(item.prescription));
   const [rpe, setRpe] = useState('7');
   const [discomfort, setDiscomfort] = useState<DiscomfortLevel>(0);
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5>(3);
   const [notes, setNotes] = useState('');
 
+  const invalidDate = isFutureISODate(date);
+
   function save() {
-    if (!actualWork.trim()) return;
+    // A result is a record of training that happened. A future date would also
+    // read as the item's most recent session, suppressing its review status
+    // until that date passes.
+    if (!actualWork.trim() || invalidDate) return;
     dispatch({
       type: 'LOG_LIBRARY_RESULT',
       payload: {
@@ -62,7 +73,7 @@ export default function LogResultSheet({ item, onClose }: Props) {
       title={`Log — ${item.name}`}
       onClose={onClose}
       footer={
-        <button onClick={save} disabled={!actualWork.trim()} className="btn-primary w-full disabled:opacity-50">
+        <button onClick={save} disabled={!actualWork.trim() || invalidDate} className="btn-primary w-full disabled:opacity-50">
           Save Result
         </button>
       }
@@ -70,7 +81,7 @@ export default function LogResultSheet({ item, onClose }: Props) {
       <div className="space-y-4">
         <label className="block">
           <span className="label">Date</span>
-          <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <input className="input" type="date" value={date} max={todayISO()} onChange={e => setDate(e.target.value)} />
         </label>
 
         <label className="block">

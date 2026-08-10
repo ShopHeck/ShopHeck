@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Search, Dumbbell, Star, SlidersHorizontal, History, ClipboardList, X } from 'lucide-react';
 import {
   CAMP_PHASE_LABELS, ENERGY_SYSTEM_LABELS, EXERCISE_CATEGORY_LABELS, EXERCISE_EQUIPMENT,
@@ -11,6 +11,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { EMPTY_LIBRARY, matchesQuery, queueMinutes, reviewInfo } from '../utils/library';
 import { DIFFICULTY_COLORS } from '../utils/designTokens';
+import { todayISO } from '../utils/dates';
 import LibraryCard from './library/LibraryCard';
 import AddToSessionSheet from './library/AddToSessionSheet';
 import LogResultSheet from './library/LogResultSheet';
@@ -68,11 +69,26 @@ export default function WorkoutLibrary({ onLogSession }: Props) {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [addItem, setAddItem] = useState<LibraryItem | null>(null);
-  const [logItem, setLogItem] = useState<LibraryItem | null>(null);
+  const [logItem, setLogItem] = useState<{ item: LibraryItem; prefillWork?: string } | null>(null);
   const [showQueue, setShowQueue] = useState(false);
+  /** Day the queue sheet is showing. null = follow `focusDate`. */
+  const [queueDate, setQueueDate] = useState<string | null>(null);
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const todayQueue = useMemo(() => queue.filter(q => q.date === today), [queue, today]);
+  const today = todayISO();
+
+  // Sessions can be queued for any day, so the bar tracks every pending one:
+  // today's if there is one, otherwise the soonest other day. Showing only
+  // today's would strand a session planned for tomorrow — and permanently hide
+  // one whose day has passed.
+  // Not wrapped in useMemo: the React Compiler memoizes this itself, and a
+  // manual memo around the in-place sort is one it cannot preserve.
+  const queueDates = [...new Set(queue.map(q => q.date))].sort();
+  const focusDate = queueDates.includes(today) ? today : (queueDates[0] ?? today);
+  const activeQueueDate = queueDate && queueDates.includes(queueDate) ? queueDate : focusDate;
+  const activeQueue = useMemo(
+    () => queue.filter(q => q.date === activeQueueDate),
+    [queue, activeQueueDate],
+  );
 
   // Switching libraries resets the filters that only exist on one of them, so a
   // stale technique filter can't silently empty the exercise list.
@@ -296,17 +312,21 @@ export default function WorkoutLibrary({ onLogSession }: Props) {
       )}
 
       {/* Today's session — pinned so the queue is never lost while browsing. */}
-      {todayQueue.length > 0 && (
+      {activeQueue.length > 0 && (
         <div className="sticky top-0 z-20 mt-3 bg-dark-900/95 backdrop-blur border-y border-dark-600">
           <button
-            onClick={() => setShowQueue(true)}
+            onClick={() => { setQueueDate(activeQueueDate); setShowQueue(true); }}
             className="w-full flex items-center gap-2 text-left px-4 py-2.5"
           >
             <ClipboardList size={16} className="text-brand-400 flex-shrink-0" />
             <span className="text-xs font-semibold text-white">
-              Today&rsquo;s session · {todayQueue.length} item{todayQueue.length !== 1 ? 's' : ''}
+              {activeQueueDate === today ? 'Today\u2019s session' : format(parseISO(activeQueueDate), 'EEE d MMM')}
+              {' · '}{activeQueue.length} item{activeQueue.length !== 1 ? 's' : ''}
             </span>
-            <span className="text-xs text-gray-400">~{queueMinutes(todayQueue)} min</span>
+            <span className="text-xs text-gray-400">~{queueMinutes(activeQueue)} min</span>
+            {queueDates.length > 1 && (
+              <span className="text-xs text-gray-400">+{queueDates.length - 1} more day{queueDates.length > 2 ? 's' : ''}</span>
+            )}
             <span className="ml-auto text-xs font-semibold text-brand-400">Review</span>
           </button>
         </div>
@@ -348,21 +368,29 @@ export default function WorkoutLibrary({ onLogSession }: Props) {
               expanded={expandedId === item.id}
               onToggle={() => setExpandedId(id => (id === item.id ? null : item.id))}
               onAddToSession={() => setAddItem(item)}
-              onLogResult={() => setLogItem(item)}
+              onLogResult={() => setLogItem({ item })}
             />
           ))
         )}
       </div>
 
       {addItem && <AddToSessionSheet item={addItem} onClose={() => setAddItem(null)} />}
-      {logItem && <LogResultSheet item={logItem} onClose={() => setLogItem(null)} />}
+      {logItem && (
+        <LogResultSheet
+          item={logItem.item}
+          prefillWork={logItem.prefillWork}
+          onClose={() => setLogItem(null)}
+        />
+      )}
       {showQueue && (
         <SessionQueueSheet
-          date={today}
-          entries={todayQueue}
+          date={activeQueueDate}
+          dates={queueDates}
+          entries={activeQueue}
+          onDateChange={setQueueDate}
           onClose={() => setShowQueue(false)}
           onLogSession={onLogSession}
-          onLogItem={setLogItem}
+          onLogItem={(item, prefillWork) => setLogItem({ item, prefillWork })}
         />
       )}
     </div>
