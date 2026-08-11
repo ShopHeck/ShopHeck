@@ -445,6 +445,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           macros: Json | null
+          meals: Json | null
           meal_ratings: Json | null
           notes: string | null
           updated_at: string
@@ -458,6 +459,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           macros?: Json | null
+          meals?: Json | null
           meal_ratings?: Json | null
           notes?: string | null
           updated_at?: string
@@ -471,6 +473,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           macros?: Json | null
+          meals?: Json | null
           meal_ratings?: Json | null
           notes?: string | null
           updated_at?: string

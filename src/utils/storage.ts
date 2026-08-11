@@ -1,8 +1,9 @@
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibraryState, LibrarySessionEntry, LibraryResult } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, TrainingWeek, GamePlan, NutritionLog, MealEntry, CoachNote, CustomTimerPreset, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysis, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibraryState, LibrarySessionEntry, LibraryResult } from '../types';
 import { DEFAULT_SUBSCRIPTION } from './subscription';
 import { defaultGamificationState } from './gamification';
 import { upsertCornerRound } from './cornerMode';
 import { clearFitbitSecrets, loadFitbitSecrets, saveFitbitSecrets } from './fitbitSecrets';
+import { migrateNutritionLog } from './nutrition/nutritionDay';
 
 const STORAGE_KEY = 'fightcamp_app';
 
@@ -255,6 +256,11 @@ export function loadState(): AppState {
       subscription: stored.subscription
         ? { ...defaults.subscription, ...stored.subscription }
         : defaults.subscription,
+      // Documents written before meal entries existed carry one `macros` object
+      // for the whole day. It becomes a single imported entry — the slot it
+      // belonged to is not recoverable, so it is not guessed — and the legacy
+      // field is dropped here so no totals call site needs a fallback branch.
+      nutritionLogs: (stored.nutritionLogs ?? defaults.nutritionLogs).map(migrateNutritionLog),
     };
 
     // Re-attach Fitbit bearer tokens from the side store. Older builds kept
@@ -538,22 +544,108 @@ export function saveGamePlan(state: AppState, plan: GamePlan): AppState {
   return { ...state, gamePlans: { ...state.gamePlans, [plan.campId]: plan } };
 }
 
-export function upsertNutritionLog(state: AppState, log: Omit<NutritionLog, 'id' | 'createdAt'>): AppState {
+/**
+ * Patch the day-level fields of a nutrition log: water, meal ratings, notes.
+ *
+ * `meals` is deliberately absent from the payload type. This function merges
+ * the incoming patch over the existing row, and when the payload could carry
+ * meal data that merge was a replace — the generator's save handler wrote one
+ * meal's totals into the day and silently discarded breakfast. Meals move
+ * through `addMealEntry` / `updateMealEntry` / `deleteMealEntry` only.
+ */
+export type NutritionDayPatch = Omit<NutritionLog, 'id' | 'createdAt' | 'meals'>;
+
+export function upsertNutritionLog(state: AppState, log: NutritionDayPatch): AppState {
   const existing = state.nutritionLogs.find(n => n.campId === log.campId && n.date === log.date);
   if (existing) {
     return {
       ...state,
       nutritionLogs: state.nutritionLogs.map(n =>
-        n.id === existing.id ? { ...existing, ...log, updatedAt: new Date().toISOString() } : n
+        n.id === existing.id
+          // `meals` after the spread, so a stale `meals` on the patch cannot
+          // win even if one is forced past the type.
+          ? { ...existing, ...log, meals: existing.meals, updatedAt: new Date().toISOString() }
+          : n
       ),
     };
   }
-  const newLog: NutritionLog = { ...log, id: generateId(), createdAt: new Date().toISOString() };
+  const newLog: NutritionLog = {
+    ...log,
+    meals: [],
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
   return { ...state, nutritionLogs: [newLog, ...state.nutritionLogs] };
 }
 
 export function deleteNutritionLog(state: AppState, id: string): AppState {
   return { ...state, nutritionLogs: state.nutritionLogs.filter(n => n.id !== id) };
+}
+
+// ─── Meal entries ─────────────────────────────────────────────────────────────
+
+/**
+ * Find or create the day a meal belongs to, then apply `change` to its meals.
+ *
+ * Every meal mutation goes through here, so adding a meal to a day that does
+ * not exist yet creates it with the day's other fields intact rather than
+ * replacing them.
+ */
+function withMealsFor(
+  state: AppState,
+  campId: string,
+  date: string,
+  change: (meals: MealEntry[]) => MealEntry[],
+): AppState {
+  const existing = state.nutritionLogs.find(n => n.campId === campId && n.date === date);
+  const now = new Date().toISOString();
+
+  if (!existing) {
+    const created: NutritionLog = {
+      id: generateId(),
+      campId,
+      date,
+      waterOz: 0,
+      mealRatings: {},
+      meals: change([]),
+      notes: '',
+      createdAt: now,
+    };
+    return { ...state, nutritionLogs: [created, ...state.nutritionLogs] };
+  }
+
+  return {
+    ...state,
+    nutritionLogs: state.nutritionLogs.map(n =>
+      n.id === existing.id ? { ...n, meals: change(n.meals ?? []), updatedAt: now } : n,
+    ),
+  };
+}
+
+export function addMealEntry(
+  state: AppState,
+  payload: { campId: string; entry: MealEntry },
+): AppState {
+  // Appended, never merged. Two generated lunches are two meals.
+  return withMealsFor(state, payload.campId, payload.entry.date, meals => [...meals, payload.entry]);
+}
+
+export function updateMealEntry(
+  state: AppState,
+  payload: { campId: string; entry: MealEntry },
+): AppState {
+  return withMealsFor(state, payload.campId, payload.entry.date, meals =>
+    meals.map(m => (m.id === payload.entry.id ? payload.entry : m)),
+  );
+}
+
+export function deleteMealEntry(
+  state: AppState,
+  payload: { campId: string; date: string; entryId: string },
+): AppState {
+  return withMealsFor(state, payload.campId, payload.date, meals =>
+    meals.filter(m => m.id !== payload.entryId),
+  );
 }
 
 export function addCoachNote(state: AppState, note: Omit<CoachNote, 'id' | 'createdAt'>): AppState {

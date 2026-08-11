@@ -205,7 +205,8 @@ create table if not exists public.nutrition_logs (
   date          date not null,
   water_oz      numeric default 0,
   meal_ratings  jsonb default '{}'::jsonb,   -- { breakfast, lunch, dinner }
-  macros        jsonb,                       -- { calories, protein, carbs, fat }
+  meals         jsonb not null default '[]'::jsonb, -- MealEntry[]; day totals derive from this
+  macros        jsonb,                       -- DEPRECATED derived day total, for pre-meal-entry clients
   notes         text default '',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),

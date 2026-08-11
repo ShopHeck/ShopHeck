@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { generateId, loadCustomPresets, saveCustomPresets } from '../utils/storage';
 import type { Database } from './database.types';
+import { deriveDayTotalsRounded, migrateNutritionLog } from '../utils/nutrition/nutritionDay';
 import type {
   AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest,
   WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
@@ -449,7 +450,12 @@ export async function pushState(
     const err5 = await run('nutrition_logs', (state.nutritionLogs ?? []).filter(n => childOf(n.campId)).map(n => ({
       id: uuidFor(n.id), user_id: userId, camp_id: uuidFor(n.campId),
       date: n.date, water_oz: n.waterOz, meal_ratings: n.mealRatings as Ins<'nutrition_logs'>['meal_ratings'],
-      macros: (n.macros ?? null) as Ins<'nutrition_logs'>['macros'], notes: n.notes ?? '', created_at: ts(n, now),
+      // `macros` is the pre-meal-entries column. Still written so a device on
+      // an older build reads a sane day total instead of nothing, but `meals`
+      // is the source of truth and the only thing read back below.
+      macros: deriveDayTotalsRounded(n.meals ?? []) as unknown as Ins<'nutrition_logs'>['macros'],
+      meals: (n.meals ?? []) as unknown as Ins<'nutrition_logs'>['meals'],
+      notes: n.notes ?? '', created_at: ts(n, now),
     })), 'user_id,camp_id,date', true, 'id');
     if (err5) return fail(err5);
 
@@ -881,12 +887,18 @@ export async function pullState(userId: string): Promise<PullResult> {
         // does not carry the key.
         officialWeighIn: e.official_weigh_in || undefined,
       })),
-      nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) => ({
-        id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
-        mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
-        macros: (n.macros ?? undefined) as MacroEntry | undefined,
-        notes: n.notes ?? '', createdAt: n.created_at,
-      })),
+      // A row written by an older build carries `macros` and no `meals`;
+      // migrateNutritionLog folds that into one imported entry, exactly as the
+      // local load path does, so there is a single migration to reason about.
+      nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) =>
+        migrateNutritionLog({
+          id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
+          mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
+          meals: (n.meals ?? []) as unknown as NutritionLog['meals'],
+          macros: (n.macros ?? undefined) as MacroEntry | undefined,
+          notes: n.notes ?? '', createdAt: n.created_at,
+        }),
+      ),
       hrvEntries: live(hrvQ.data as Row<'hrv_entries'>[] | null).map((h: Row<'hrv_entries'>) => ({
         id: lid(h.id), campId: lid(h.camp_id), date: h.date, rmssd: h.rmssd,
         restingHR: h.resting_hr ?? undefined, source: h.source as HRVSource,
