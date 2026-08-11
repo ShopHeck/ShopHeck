@@ -382,6 +382,29 @@ export function generateMealForTarget(
   }
 
   const items = buildItems(best.foods, best.servings);
+
+  // A target small enough that every anchor is better dropped than portioned
+  // satisfies the tolerance check trivially — an empty plate is within ±40 kcal
+  // of 50, and four cups of spinach are within it of 77. Both pass every macro
+  // test and neither is a meal. Require something to actually eat.
+  const hasAnchor = items.some(item => {
+    const category = best.foods.find(f => f.id === item.foodId)?.category;
+    return category === 'protein' || category === 'carb' || category === 'fat';
+  });
+
+  if (!hasAnchor) {
+    return {
+      ok: false,
+      misses: [],
+      message:
+        `A ${target.slot.toLowerCase()} target of ${Math.round(target.calories)} kcal is smaller ` +
+        `than the smallest real portion of any protein, carbohydrate or fat source. ` +
+        `Fold it into another meal.`,
+      closest: best.totals,
+      seed,
+    };
+  }
+
   return {
     ok: true,
     meal: { slot: target.slot, target, items, totals: sumMacros(items.map(i => i.macros)), seed },
