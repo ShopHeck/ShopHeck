@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase';
 import { generateId, loadCustomPresets, saveCustomPresets } from '../utils/storage';
 import type { Database } from './database.types';
+import { deriveDayTotalsRounded, migrateNutritionLog } from '../utils/nutrition/nutritionDay';
 import type {
   AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest,
   WeightEntry, NutritionLog, HRVEntry, FightResult, GamePlan, GamificationState,
@@ -449,7 +450,12 @@ export async function pushState(
     const err5 = await run('nutrition_logs', (state.nutritionLogs ?? []).filter(n => childOf(n.campId)).map(n => ({
       id: uuidFor(n.id), user_id: userId, camp_id: uuidFor(n.campId),
       date: n.date, water_oz: n.waterOz, meal_ratings: n.mealRatings as Ins<'nutrition_logs'>['meal_ratings'],
-      macros: (n.macros ?? null) as Ins<'nutrition_logs'>['macros'], notes: n.notes ?? '', created_at: ts(n, now),
+      // `macros` is the pre-meal-entries column. Still written so a device on
+      // an older build reads a sane day total instead of nothing, but `meals`
+      // is the source of truth and the only thing read back below.
+      macros: deriveDayTotalsRounded(n.meals ?? []) as unknown as Ins<'nutrition_logs'>['macros'],
+      meals: (n.meals ?? []) as unknown as Ins<'nutrition_logs'>['meals'],
+      notes: n.notes ?? '', created_at: ts(n, now),
     })), 'user_id,camp_id,date', true, 'id');
     if (err5) return fail(err5);
 
@@ -881,12 +887,18 @@ export async function pullState(userId: string): Promise<PullResult> {
         // does not carry the key.
         officialWeighIn: e.official_weigh_in || undefined,
       })),
-      nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) => ({
-        id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
-        mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
-        macros: (n.macros ?? undefined) as MacroEntry | undefined,
-        notes: n.notes ?? '', createdAt: n.created_at,
-      })),
+      // A row written by an older build carries `macros` and no `meals`;
+      // migrateNutritionLog folds that into one imported entry, exactly as the
+      // local load path does, so there is a single migration to reason about.
+      nutritionLogs: live(nutritionQ.data as Row<'nutrition_logs'>[] | null).map((n: Row<'nutrition_logs'>) =>
+        migrateNutritionLog({
+          id: lid(n.id), campId: lid(n.camp_id), date: n.date, waterOz: n.water_oz ?? 0,
+          mealRatings: (n.meal_ratings ?? {}) as NutritionLog['mealRatings'],
+          meals: (n.meals ?? []) as unknown as NutritionLog['meals'],
+          macros: (n.macros ?? undefined) as MacroEntry | undefined,
+          notes: n.notes ?? '', createdAt: n.created_at,
+        }),
+      ),
       hrvEntries: live(hrvQ.data as Row<'hrv_entries'>[] | null).map((h: Row<'hrv_entries'>) => ({
         id: lid(h.id), campId: lid(h.camp_id), date: h.date, rmssd: h.rmssd,
         restingHR: h.resting_hr ?? undefined, source: h.source as HRVSource,
@@ -1005,6 +1017,47 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     return [...kept, ...cloud.filter(x => !ids.has(x.id) && !deletedHere.has(x.id))];
   };
 
+  /**
+   * Nutrition days merge on their NATURAL key and union their meals by entry id.
+   *
+   * `union` above keeps the local row wholesale whenever the ids match, which
+   * for a day-level scalar is merely last-writer-wins. For `meals` it is data
+   * loss of exactly the kind this whole model exists to prevent: two devices
+   * each push their entire array against a `(user_id, camp_id, date)` conflict
+   * target, so the later push drops meals the other device logged.
+   *
+   * Keying on `(campId, date)` rather than the surrogate id matters too — the
+   * push already upserts on that natural key precisely because two offline
+   * devices mint different local ids for the same day, so an id-keyed merge
+   * would hold both copies locally.
+   *
+   * The trade this makes: a meal deleted on one device is restored from another
+   * device's stale copy until that device pulls. Entries carry no tombstones,
+   * only rows do. A resurrected meal is visible and can be deleted again; a
+   * silently discarded one is neither, so the union is the safer failure.
+   */
+  const mergeNutritionDays = (local: NutritionLog[], cloud: NutritionLog[]): NutritionLog[] => {
+    const kept = local.filter(d => !deletedElsewhere.has(d.id));
+    const key = (d: NutritionLog) => `${d.campId}|${d.date}`;
+    const byDay = new Map(kept.map(d => [key(d), d]));
+
+    for (const remote of cloud) {
+      if (deletedHere.has(remote.id)) continue;
+      const mine = byDay.get(key(remote));
+      if (!mine) {
+        byDay.set(key(remote), remote);
+        continue;
+      }
+      const seen = new Set(mine.meals.map(m => m.id));
+      const added = remote.meals.filter(m => !seen.has(m.id));
+      // Local wins on the day's own scalars, matching `union`'s local-first
+      // rule; only the meal list gains from the other side.
+      if (added.length > 0) byDay.set(key(remote), { ...mine, meals: [...mine.meals, ...added] });
+    }
+
+    return [...byDay.values()];
+  };
+
   const camps = union(state.camps, c.camps);
 
   // The camp-keyed metadata maps have to be filtered by the SAME rule as the
@@ -1052,7 +1105,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     sparringLogs: union(state.sparringLogs, c.sparringLogs),
     conditioningTests: union(state.conditioningTests, c.conditioningTests),
     weightEntries: union(state.weightEntries, c.weightEntries),
-    nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
+    nutritionLogs: mergeNutritionDays(state.nutritionLogs, c.nutritionLogs),
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults,
     // Coach notes merge like every other collection, but only the cloud side is

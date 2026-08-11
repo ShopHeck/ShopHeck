@@ -1,3 +1,8 @@
+import type { LoggedMealSlot, Macros, ServingUnit } from '../data/nutrition/types';
+
+// Re-exported so app code can reach the nutrition vocabulary from one place.
+export type { LoggedMealSlot, ServingUnit };
+
 export type OffSeasonGoal = 'base-building' | 'strength' | 'maintain' | 'recovery';
 
 export type WeightClass =
@@ -126,12 +131,11 @@ export interface WeightEntry {
   officialWeighIn?: boolean;
 }
 
-export interface MacroEntry {
-  calories: number;
-  protein: number; // grams
-  carbs: number;   // grams
-  fat: number;     // grams
-}
+/**
+ * One shape for macros across the app and the nutrition library, so a recipe's
+ * total and a logged meal's total are the same kind of thing.
+ */
+export type MacroEntry = Macros;
 
 export interface FighterProfile {
   id: string;
@@ -262,6 +266,50 @@ export interface GamePlan {
   updatedAt: string;
 }
 
+/** One thing eaten, with its macros frozen at the moment it was logged. */
+export interface MealItem {
+  id: string;
+  /** Absent when the item was typed in by hand rather than picked from the library. */
+  foodId?: string;
+  /**
+   * Denormalized on purpose. A food removed or renamed in the library must not
+   * silently rewrite what someone recorded eating six weeks ago.
+   */
+  name: string;
+  servings: number;
+  unit: ServingUnit;
+  /**
+   * A SNAPSHOT, not a lookup. Corrections to the food database change what the
+   * generator suggests from now on; they do not revise history.
+   */
+  macros: MacroEntry;
+}
+
+export type MealSource = 'manual' | 'recipe' | 'generated' | 'imported';
+
+export interface MealEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm, local
+  mealSlot: LoggedMealSlot;
+  items: MealItem[];
+  /** Derived from `items` by `buildMealEntry`. Never edited directly. */
+  totals: MacroEntry;
+  source: MealSource;
+  /** Set when the entry came from a library recipe. */
+  recipeId?: string;
+}
+
+/**
+ * A day's nutrition.
+ *
+ * There is deliberately no day-level `macros` field. There used to be, and the
+ * generator's save handler wrote the generated meal's totals into it while the
+ * reducer merged the incoming log over the existing one — so logging breakfast
+ * and then saving a generated lunch replaced breakfast. Day totals are now
+ * derived from `meals` by `deriveDayTotals`, which makes that overwrite
+ * unrepresentable rather than merely avoided.
+ */
 export interface NutritionLog {
   id: string;
   campId: string;
@@ -272,9 +320,9 @@ export interface NutritionLog {
     lunch?: 'good' | 'ok' | 'poor';
     dinner?: 'good' | 'ok' | 'poor';
   };
+  meals: MealEntry[];
   notes: string;
   createdAt: string;
-  macros?: MacroEntry;
 }
 
 // ─── Fitness Tracker / HRV ───────────────────────────────────────────────

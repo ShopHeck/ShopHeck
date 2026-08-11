@@ -855,3 +855,96 @@ describe('pullState — embedded record ledger', () => {
     expect(second.previouslySynced.has('corner-1')).toBe(true);
   });
 });
+
+// ─── Nutrition day merge ──────────────────────────────────────────────────────
+
+/**
+ * Meals are a list of independent entries, not a day-level scalar. Merging them
+ * with the generic id-keyed union made the sync layer reintroduce exactly the
+ * data loss the meal-entry model exists to prevent: two devices push their
+ * whole array against a natural-key conflict target, so the later push drops
+ * meals the other device logged.
+ */
+function mealEntry(id: string, slot: string, calories: number) {
+  return {
+    id,
+    date: '2026-08-11',
+    time: '12:00',
+    mealSlot: slot as 'Breakfast' | 'Lunch' | 'Dinner',
+    source: 'manual' as const,
+    items: [{
+      id: `${id}-item`,
+      name: id,
+      servings: 1,
+      unit: 'piece' as const,
+      macros: { calories, protein: 0, carbs: 0, fat: 0 },
+    }],
+    totals: { calories, protein: 0, carbs: 0, fat: 0 },
+  };
+}
+
+function nutritionDay(id: string, meals: ReturnType<typeof mealEntry>[]) {
+  return {
+    id,
+    campId: 'camp-1',
+    date: '2026-08-11',
+    waterOz: 32,
+    mealRatings: {},
+    meals,
+    notes: '',
+    createdAt: '2026-08-11T08:00:00.000Z',
+  };
+}
+
+describe('mergeCloud — nutrition days', () => {
+  it('keeps meals logged on another device instead of replacing the array', () => {
+    const local = localState({
+      nutritionLogs: [nutritionDay('day-local', [mealEntry('breakfast', 'Breakfast', 500)])],
+    });
+    const merged = mergeCloud(
+      local,
+      snapshot({ nutritionLogs: [nutritionDay('day-cloud', [mealEntry('lunch', 'Lunch', 700)])] }),
+    );
+
+    expect(merged.nutritionLogs).toHaveLength(1);
+    expect(merged.nutritionLogs[0].meals.map(m => m.id).sort()).toEqual(['breakfast', 'lunch']);
+  });
+
+  it('matches days on their natural key, so one day does not become two', () => {
+    // Two offline devices mint different local ids for the same day; the push
+    // already upserts on (user_id, camp_id, date) for exactly this reason.
+    const local = localState({
+      nutritionLogs: [nutritionDay('device-a', [mealEntry('breakfast', 'Breakfast', 500)])],
+    });
+    const merged = mergeCloud(
+      local,
+      snapshot({ nutritionLogs: [nutritionDay('device-b', [mealEntry('breakfast', 'Breakfast', 500)])] }),
+    );
+
+    expect(merged.nutritionLogs).toHaveLength(1);
+    // Same entry id on both sides is one meal, not two.
+    expect(merged.nutritionLogs[0].meals).toHaveLength(1);
+  });
+
+  it('leaves the day’s own fields to the local copy', () => {
+    const local = localState({
+      nutritionLogs: [{ ...nutritionDay('day-1', []), waterOz: 64, notes: 'local note' }],
+    });
+    const merged = mergeCloud(
+      local,
+      snapshot({ nutritionLogs: [{ ...nutritionDay('day-1', []), waterOz: 8, notes: 'cloud note' }] }),
+    );
+
+    expect(merged.nutritionLogs[0].waterOz).toBe(64);
+    expect(merged.nutritionLogs[0].notes).toBe('local note');
+  });
+
+  it('brings down a day this device has never seen', () => {
+    const merged = mergeCloud(
+      localState(),
+      snapshot({ nutritionLogs: [nutritionDay('day-1', [mealEntry('lunch', 'Lunch', 700)])] }),
+    );
+    expect(merged.nutritionLogs).toHaveLength(1);
+    expect(merged.nutritionLogs[0].meals).toHaveLength(1);
+  });
+});

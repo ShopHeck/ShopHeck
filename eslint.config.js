@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `.claude` holds local tooling state, including git worktrees that contain
+  // whole copies of the repo. Linting those re-reports every finding once per
+  // worktree, and the per-file rule exemptions below never match them because
+  // their paths are prefixed — so a clean tree still failed `npm run lint`.
+  globalIgnores(['dist', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

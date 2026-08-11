@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Droplets, Minus, Trash2, UtensilsCrossed, Flame, Settings2 } from 'lucide-react';
+import { Droplets, Minus, Trash2, UtensilsCrossed, Flame, Settings2, Plus, Pencil } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../utils/dates';
 import { format, parseISO, subDays, differenceInDays } from 'date-fns';
-import type { NutritionLog, MacroEntry } from '../types';
+import type { NutritionLog, MacroEntry, MealEntry } from '../types';
+import { MEAL_SLOTS, type LoggedMealSlot } from '../data/nutrition/types';
+import { buildMealEntry, deriveDayTotalsRounded, itemFromManualEntry } from '../utils/nutrition/nutritionDay';
+import { generateId } from '../utils/storage';
 import Modal from './shared/Modal';
 import ConfirmDialog from './shared/ConfirmDialog';
 import { MACRO_COLORS, PACE_COLORS } from '../utils/designTokens';
@@ -70,7 +73,11 @@ export default function NutritionTracker() {
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
-  const [showMacroEntry, setShowMacroEntry] = useState(false);
+  const [showMealEditor, setShowMealEditor] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
+  const [mealSlotInput, setMealSlotInput] = useState<LoggedMealSlot>('Lunch');
+  const [mealNameInput, setMealNameInput] = useState('');
+  const [deleteMealId, setDeleteMealId] = useState<string | null>(null);
   const [showTargetEditor, setShowTargetEditor] = useState(false);
   const [macroInput, setMacroInput] = useState<MacroEntry>({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [targetInput, setTargetInput] = useState<MacroEntry>({ calories: 2000, protein: 150, carbs: 200, fat: 65 });
@@ -91,6 +98,18 @@ export default function NutritionTracker() {
 
   const campLogs = nutritionLogs.filter(n => n.campId === activeCamp.id);
   const todayLog = campLogs.find(n => n.date === selectedDate);
+
+  const meals = todayLog?.meals ?? [];
+  // Derived on every render from the day's meals. Nothing stores a day total,
+  // so nothing can disagree with the meals that make it up.
+  const dayTotals = deriveDayTotalsRounded(meals);
+  // Grouped in the library's slot order, with any migrated 'Unspecified'
+  // entries last — they came from a day-level macro figure whose slot was
+  // never recorded, and guessing one would put a claim into the fighter's own
+  // history that nothing supports.
+  const mealsBySlot = ([...MEAL_SLOTS, 'Unspecified'] as LoggedMealSlot[])
+    .map(slot => [slot, meals.filter(m => m.mealSlot === slot)] as const)
+    .filter(([, entries]) => entries.length > 0);
 
   const waterOz = todayLog?.waterOz ?? 0;
   const glasses = Math.floor(waterOz / GLASS_OZ);
@@ -135,14 +154,59 @@ export default function NutritionTracker() {
     setDeleteConfirmId(null);
   }
 
-  function saveMacros() {
-    updateLog({ macros: macroInput });
-    setShowMacroEntry(false);
+  // Meals are added, never merged. Two meals in a slot are two meals — the old
+  // single day-level `macros` field meant the second silently replaced the first.
+  /**
+   * A meal built from the food library carries per-item food ids, servings and
+   * macro snapshots. The editor only knows how to express one free-text item
+   * with an aggregate macro figure, so rebuilding a structured meal from it
+   * would discard every ingredient behind an unchanged-looking total — and
+   * leave `source: 'generated'` asserting a provenance that no longer holds.
+   * Structured meals therefore keep their items, and only their slot is
+   * editable here; changing the food means regenerating or logging afresh.
+   */
+  const editingStructured =
+    !!editingMeal && (editingMeal.items.length > 1 || editingMeal.items.some(i => i.foodId));
+
+  function saveMeal() {
+    const id = editingMeal?.id ?? generateId();
+    const entry = buildMealEntry({
+      id,
+      date: selectedDate,
+      time: editingMeal?.time ?? format(new Date(), 'HH:mm'),
+      mealSlot: mealSlotInput,
+      source: editingMeal?.source ?? 'manual',
+      recipeId: editingMeal?.recipeId,
+      items: editingStructured
+        ? editingMeal!.items
+        : [itemFromManualEntry(`${id}-item`, mealNameInput.trim() || mealSlotInput, macroInput)],
+    });
+    dispatch({
+      type: editingMeal ? 'UPDATE_MEAL_ENTRY' : 'ADD_MEAL_ENTRY',
+      payload: { campId: activeCamp!.id, entry },
+    });
+    closeMealEditor();
   }
 
-  function openMacroEntry() {
-    setMacroInput(todayLog?.macros ?? { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    setShowMacroEntry(true);
+  function openMealEditor(meal?: MealEntry) {
+    setEditingMeal(meal ?? null);
+    setMealSlotInput(meal?.mealSlot ?? 'Lunch');
+    setMealNameInput(meal?.items.length === 1 ? meal.items[0].name : '');
+    setMacroInput(meal?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    setShowMealEditor(true);
+  }
+
+  function closeMealEditor() {
+    setShowMealEditor(false);
+    setEditingMeal(null);
+  }
+
+  function removeMeal(entryId: string) {
+    dispatch({
+      type: 'DELETE_MEAL_ENTRY',
+      payload: { campId: activeCamp!.id, date: selectedDate, entryId },
+    });
+    setDeleteMealId(null);
   }
 
   function openTargetEditor() {
@@ -333,18 +397,80 @@ export default function NutritionTracker() {
           {currentUser?.macroTargets ? (
             <>
               {/* Macro colors are their own locked system (§2.6), separate from
-                  status semantics — green here means protein, not "good". */}
-              <MacroBar label="Calories" actual={todayLog?.macros?.calories ?? 0} target={currentUser.macroTargets.calories} color={MACRO_COLORS.calories} />
-              <MacroBar label="Protein"  actual={todayLog?.macros?.protein  ?? 0} target={currentUser.macroTargets.protein}  color={MACRO_COLORS.protein} />
-              <MacroBar label="Carbs"    actual={todayLog?.macros?.carbs    ?? 0} target={currentUser.macroTargets.carbs}    color={MACRO_COLORS.carbs} />
-              <MacroBar label="Fat"      actual={todayLog?.macros?.fat      ?? 0} target={currentUser.macroTargets.fat}      color={MACRO_COLORS.fat} />
+                  status semantics — green here means protein, not "good".
+                  Every figure here is derived from the day's meals; there is no
+                  day-level macro field to edit, and so none to overwrite. */}
+              <MacroBar label="Calories" actual={dayTotals.calories} target={currentUser.macroTargets.calories} color={MACRO_COLORS.calories} />
+              <MacroBar label="Protein"  actual={dayTotals.protein}  target={currentUser.macroTargets.protein}  color={MACRO_COLORS.protein} />
+              <MacroBar label="Carbs"    actual={dayTotals.carbs}    target={currentUser.macroTargets.carbs}    color={MACRO_COLORS.carbs} />
+              <MacroBar label="Fat"      actual={dayTotals.fat}      target={currentUser.macroTargets.fat}      color={MACRO_COLORS.fat} />
             </>
           ) : (
             <p className="text-sm text-gray-400 text-center py-2">Set targets to track your macros</p>
           )}
-          <button onClick={openMacroEntry} className="w-full text-sm text-brand-400 hover:text-brand-300 font-semibold py-1 transition-colors">
-            {todayLog?.macros ? 'Edit today\'s intake' : '+ Log today\'s macros'}
+        </div>
+      </section>
+
+      {/* Meals */}
+      <section className="mx-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed size={14} className="text-gray-400" />
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Meals{meals.length > 0 && <span className="text-gray-450 normal-case"> · {meals.length}</span>}
+            </p>
+          </div>
+          <button
+            onClick={() => openMealEditor()}
+            className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
+            <Plus size={12} />
+            Add meal
           </button>
+        </div>
+
+        <div className="card space-y-2">
+          {meals.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-2">
+              No meals logged. Add one, or generate a meal from the library.
+            </p>
+          ) : (
+            mealsBySlot.map(([slot, entries]) => (
+              <div key={slot} className="space-y-1">
+                <p className="text-[10px] font-semibold text-gray-450 uppercase tracking-wide">{slot}</p>
+                {entries.map(meal => (
+                  <div key={meal.id} className="flex items-center justify-between gap-2 py-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-white truncate">
+                        {meal.items.map(i => i.name).join(', ')}
+                      </p>
+                      <p className="text-[11px] text-gray-450 tabular-nums">
+                        {Math.round(meal.totals.calories)} kcal · {Math.round(meal.totals.protein)}P
+                        {' '}· {Math.round(meal.totals.carbs)}C · {Math.round(meal.totals.fat)}F
+                        {meal.source === 'generated' && ' · generated'}
+                      </p>
+                    </div>
+                    <div className="flex items-center flex-shrink-0">
+                      <button
+                        onClick={() => openMealEditor(meal)}
+                        aria-label={`Edit ${meal.mealSlot}`}
+                        className="text-gray-450 hover:text-brand-400 transition-colors p-2"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteMealId(meal.id)}
+                        aria-label={`Delete ${meal.mealSlot}`}
+                        className="text-gray-450 hover:text-red-400 transition-colors p-2"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
         </div>
       </section>
 
@@ -391,27 +517,40 @@ export default function NutritionTracker() {
             const isToday = date === todayISO();
             const isSelected = date === selectedDate;
             return (
-              <button
+              // The delete used to sit INSIDE the row's own button, which is
+              // invalid HTML — React logged a hydration error on every render
+              // of this view. They are siblings now, which keeps the delete the
+              // small, deliberate target it needs to be (a mis-tap on the row
+              // used to wipe the day outright) without nesting.
+              <div
                 key={date}
-                onClick={() => {
-                  setSelectedDate(date);
-                  setNotes(log?.notes ?? '');
-                }}
-                className={`w-full flex items-center justify-between py-2.5 px-1 transition-colors ${isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : ''}`}
+                className={`flex items-center justify-between transition-colors ${
+                  isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : 'px-1'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-16 text-left">
+                <button
+                  onClick={() => {
+                    setSelectedDate(date);
+                    setNotes(log?.notes ?? '');
+                  }}
+                  aria-pressed={isSelected}
+                  className="flex-1 min-w-0 flex items-center gap-3 py-2.5 text-left"
+                >
+                  <span className="text-xs text-gray-400 w-16 flex-shrink-0">
                     {isToday ? 'Today' : format(parseISO(date), 'EEE M/d')}
                   </span>
                   {log ? (
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-2 flex-wrap">
                       <span className="text-blue-400 text-xs font-semibold">{log.waterOz}oz</span>
-                      {log.macros && (
-                        <>
-                          <span className="text-orange-400 text-xs font-semibold">{log.macros.calories}kcal</span>
-                          <span className="text-green-400 text-xs font-semibold">{log.macros.protein}g P</span>
-                        </>
-                      )}
+                      {log.meals.length > 0 && (() => {
+                        const t = deriveDayTotalsRounded(log.meals);
+                        return (
+                          <>
+                            <span className="text-orange-400 text-xs font-semibold">{t.calories}kcal</span>
+                            <span className="text-green-400 text-xs font-semibold">{t.protein}g P</span>
+                          </>
+                        );
+                      })()}
                       {score && (
                         <span className={`badge text-xs ${
                           score === 'good' ? 'bg-green-900/40 text-green-400' :
@@ -421,58 +560,122 @@ export default function NutritionTracker() {
                           {score === 'good' ? '✓ On track' : score === 'ok' ? '~ OK' : 'Needs work'}
                         </span>
                       )}
-                    </div>
+                    </span>
                   ) : (
                     <span className="text-gray-450 text-xs">No data</span>
                   )}
-                </div>
+                </button>
                 {log && (
                   <button
-                    onClick={e => { e.stopPropagation(); setDeleteConfirmId(log.id); }}
+                    onClick={() => setDeleteConfirmId(log.id)}
                     aria-label={`Delete nutrition log for ${format(parseISO(log.date), 'MMM d')}`}
-                    className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2"
+                    className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2 flex-shrink-0"
                   >
                     <Trash2 size={13} />
                   </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
       </section>
 
-      {/* Macro Entry Modal */}
-      {showMacroEntry && (
+      {/* Meal Editor — one meal, added to the day rather than replacing it */}
+      {showMealEditor && (
         <Modal
-          title="Today's Intake"
-          onClose={() => setShowMacroEntry(false)}
+          title={editingMeal ? 'Edit Meal' : 'Add Meal'}
+          onClose={closeMealEditor}
           footer={
             <div className="flex gap-2">
-              <button onClick={saveMacros} className="btn-primary flex-1 py-2 text-sm">Save</button>
-              <button onClick={() => setShowMacroEntry(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+              <button onClick={saveMeal} className="btn-primary flex-1 py-2 text-sm">
+                {editingMeal ? 'Save Changes' : 'Add Meal'}
+              </button>
+              <button onClick={closeMealEditor} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
             </div>
           }
         >
           <div className="space-y-3">
-            {([
-              { key: 'calories', label: 'Calories (kcal)' },
-              { key: 'protein',  label: 'Protein (g)' },
-              { key: 'carbs',    label: 'Carbs (g)' },
-              { key: 'fat',      label: 'Fat (g)' },
-            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
-              <div key={key}>
-                <label className="block">
-                  <span className="label">{label}</span>
-                  <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  value={macroInput[key] || ''}
-                  onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
-                />
-                </label>
+            <div>
+              <span className="label">Meal</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {MEAL_SLOTS.map(slot => (
+                  <button
+                    key={slot}
+                    onClick={() => setMealSlotInput(slot)}
+                    aria-pressed={mealSlotInput === slot}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
+                      mealSlotInput === slot
+                        ? 'bg-brand-600 border-brand-500 text-white'
+                        : 'bg-dark-600 border-dark-400 text-gray-400 hover:border-dark-300'
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {editingStructured ? (
+              /* Its ingredients are shown, not offered for editing: this form
+                 cannot express per-item servings, so letting it save would
+                 collapse the meal into a single free-text row. */
+              <div>
+                <span className="label">Ingredients</span>
+                <ul className="mt-1 space-y-0.5">
+                  {editingMeal!.items.map(item => (
+                    <li key={item.id} className="text-xs text-gray-300 flex items-center justify-between gap-2">
+                      <span className="truncate">{item.name}</span>
+                      <span className="text-gray-450 tabular-nums flex-shrink-0">
+                        {Math.round(item.macros.calories)} kcal
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-gray-450 mt-2">
+                  {Math.round(editingMeal!.totals.calories)} kcal ·{' '}
+                  {Math.round(editingMeal!.totals.protein)}P ·{' '}
+                  {Math.round(editingMeal!.totals.carbs)}C ·{' '}
+                  {Math.round(editingMeal!.totals.fat)}F
+                </p>
+                <p className="text-[11px] text-gray-450 mt-2">
+                  Move it to a different meal above. To change the food, delete this
+                  entry and log or generate a new one.
+                </p>
+              </div>
+            ) : (
+              <>
+                <label className="block">
+                  <span className="label">What did you eat?</span>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Chicken, rice and broccoli"
+                    value={mealNameInput}
+                    onChange={e => setMealNameInput(e.target.value)}
+                  />
+                </label>
+
+                {([
+                  { key: 'calories', label: 'Calories (kcal)' },
+                  { key: 'protein',  label: 'Protein (g)' },
+                  { key: 'carbs',    label: 'Carbs (g)' },
+                  { key: 'fat',      label: 'Fat (g)' },
+                ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block">
+                      <span className="label">{label}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        className="input"
+                        value={macroInput[key] || ''}
+                        onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
+                      />
+                    </label>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </Modal>
       )}
@@ -514,6 +717,17 @@ export default function NutritionTracker() {
             ))}
           </div>
         </Modal>
+      )}
+
+      {deleteMealId && (
+        <ConfirmDialog
+          danger
+          title="Delete This Meal?"
+          message="This meal will be removed from the day. Water, notes and your other meals are unaffected."
+          confirmLabel="Delete"
+          onConfirm={() => removeMeal(deleteMealId)}
+          onCancel={() => setDeleteMealId(null)}
+        />
       )}
 
       {deleteConfirmId && (

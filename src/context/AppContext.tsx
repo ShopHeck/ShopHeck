@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
-import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, NutritionLog, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibrarySessionEntry, LibraryResult } from '../types';
+import type { AppState, FightCamp, FighterProfile, WorkoutLog, SparringLog, ConditioningTest, WeightEntry, GamePlan, MealEntry, CoachNote, SubscriptionState, HRVEntry, FitbitConfig, FightResult, CampFactorWeights, DashboardPrefs, AiAnalysisKind, CampAdaptation, CornerRound, CornerSession, LibrarySessionEntry, LibraryResult } from '../types';
 import { processStripeReturn, saveSubscription, checkNativeSubscription, identifyNativeSubscriber, isCompEmail, COMP_SUBSCRIPTION, DEFAULT_SUBSCRIPTION } from '../utils/subscription';
 import {
   loadState,
@@ -25,6 +25,10 @@ import {
   saveGamePlan,
   upsertNutritionLog,
   deleteNutritionLog,
+  addMealEntry,
+  updateMealEntry,
+  deleteMealEntry,
+  type NutritionDayPatch,
   addCoachNote,
   deleteCoachNote,
   linkCoach,
@@ -87,8 +91,11 @@ export type Action =
   | { type: 'SET_SESSION_COMPLETE'; payload: string }
   | { type: 'TOGGLE_DAY_OVERRIDE'; payload: string }
   | { type: 'SAVE_GAME_PLAN'; payload: GamePlan }
-  | { type: 'LOG_NUTRITION'; payload: Omit<NutritionLog, 'id' | 'createdAt'> }
+  | { type: 'LOG_NUTRITION'; payload: NutritionDayPatch }
   | { type: 'DELETE_NUTRITION'; payload: string }
+  | { type: 'ADD_MEAL_ENTRY'; payload: { campId: string; entry: MealEntry } }
+  | { type: 'UPDATE_MEAL_ENTRY'; payload: { campId: string; entry: MealEntry } }
+  | { type: 'DELETE_MEAL_ENTRY'; payload: { campId: string; date: string; entryId: string } }
   | { type: 'ADD_COACH_NOTE'; payload: Omit<CoachNote, 'id' | 'createdAt'> }
   | { type: 'DELETE_COACH_NOTE'; payload: string }
   | { type: 'LINK_COACH'; payload: string | null }
@@ -232,6 +239,18 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'DELETE_NUTRITION':
       return deleteNutritionLog(state, action.payload);
+
+    // Meals are separate actions from LOG_NUTRITION so water, ratings, notes
+    // and meals stay independently patchable. Folding them into one payload is
+    // what let a generated meal's totals overwrite the day.
+    case 'ADD_MEAL_ENTRY':
+      return addMealEntry(state, action.payload);
+
+    case 'UPDATE_MEAL_ENTRY':
+      return updateMealEntry(state, action.payload);
+
+    case 'DELETE_MEAL_ENTRY':
+      return deleteMealEntry(state, action.payload);
 
     case 'ADD_COACH_NOTE':
       return addCoachNote(state, action.payload);
