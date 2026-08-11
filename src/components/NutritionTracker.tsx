@@ -503,20 +503,30 @@ export default function NutritionTracker() {
             const isToday = date === todayISO();
             const isSelected = date === selectedDate;
             return (
-              <button
+              // The delete used to sit INSIDE the row's own button, which is
+              // invalid HTML — React logged a hydration error on every render
+              // of this view. They are siblings now, which keeps the delete the
+              // small, deliberate target it needs to be (a mis-tap on the row
+              // used to wipe the day outright) without nesting.
+              <div
                 key={date}
-                onClick={() => {
-                  setSelectedDate(date);
-                  setNotes(log?.notes ?? '');
-                }}
-                className={`w-full flex items-center justify-between py-2.5 px-1 transition-colors ${isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : ''}`}
+                className={`flex items-center justify-between transition-colors ${
+                  isSelected ? 'bg-dark-600 -mx-1 px-2 rounded-lg' : 'px-1'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-16 text-left">
+                <button
+                  onClick={() => {
+                    setSelectedDate(date);
+                    setNotes(log?.notes ?? '');
+                  }}
+                  aria-pressed={isSelected}
+                  className="flex-1 min-w-0 flex items-center gap-3 py-2.5 text-left"
+                >
+                  <span className="text-xs text-gray-400 w-16 flex-shrink-0">
                     {isToday ? 'Today' : format(parseISO(date), 'EEE M/d')}
                   </span>
                   {log ? (
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-2 flex-wrap">
                       <span className="text-blue-400 text-xs font-semibold">{log.waterOz}oz</span>
                       {log.meals.length > 0 && (() => {
                         const t = deriveDayTotalsRounded(log.meals);
@@ -536,21 +546,21 @@ export default function NutritionTracker() {
                           {score === 'good' ? '✓ On track' : score === 'ok' ? '~ OK' : 'Needs work'}
                         </span>
                       )}
-                    </div>
+                    </span>
                   ) : (
                     <span className="text-gray-450 text-xs">No data</span>
                   )}
-                </div>
+                </button>
                 {log && (
                   <button
-                    onClick={e => { e.stopPropagation(); setDeleteConfirmId(log.id); }}
+                    onClick={() => setDeleteConfirmId(log.id)}
                     aria-label={`Delete nutrition log for ${format(parseISO(log.date), 'MMM d')}`}
-                    className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2"
+                    className="text-gray-450 hover:text-red-400 transition-colors p-3 -m-2 flex-shrink-0"
                   >
                     <Trash2 size={13} />
                   </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
