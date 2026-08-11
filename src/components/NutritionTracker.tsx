@@ -156,6 +156,18 @@ export default function NutritionTracker() {
 
   // Meals are added, never merged. Two meals in a slot are two meals — the old
   // single day-level `macros` field meant the second silently replaced the first.
+  /**
+   * A meal built from the food library carries per-item food ids, servings and
+   * macro snapshots. The editor only knows how to express one free-text item
+   * with an aggregate macro figure, so rebuilding a structured meal from it
+   * would discard every ingredient behind an unchanged-looking total — and
+   * leave `source: 'generated'` asserting a provenance that no longer holds.
+   * Structured meals therefore keep their items, and only their slot is
+   * editable here; changing the food means regenerating or logging afresh.
+   */
+  const editingStructured =
+    !!editingMeal && (editingMeal.items.length > 1 || editingMeal.items.some(i => i.foodId));
+
   function saveMeal() {
     const id = editingMeal?.id ?? generateId();
     const entry = buildMealEntry({
@@ -165,7 +177,9 @@ export default function NutritionTracker() {
       mealSlot: mealSlotInput,
       source: editingMeal?.source ?? 'manual',
       recipeId: editingMeal?.recipeId,
-      items: [itemFromManualEntry(`${id}-item`, mealNameInput.trim() || mealSlotInput, macroInput)],
+      items: editingStructured
+        ? editingMeal!.items
+        : [itemFromManualEntry(`${id}-item`, mealNameInput.trim() || mealSlotInput, macroInput)],
     });
     dispatch({
       type: editingMeal ? 'UPDATE_MEAL_ENTRY' : 'ADD_MEAL_ENTRY',
@@ -177,7 +191,7 @@ export default function NutritionTracker() {
   function openMealEditor(meal?: MealEntry) {
     setEditingMeal(meal ?? null);
     setMealSlotInput(meal?.mealSlot ?? 'Lunch');
-    setMealNameInput(meal?.items[0]?.name ?? '');
+    setMealNameInput(meal?.items.length === 1 ? meal.items[0].name : '');
     setMacroInput(meal?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 });
     setShowMealEditor(true);
   }
@@ -601,36 +615,67 @@ export default function NutritionTracker() {
               </div>
             </div>
 
-            <label className="block">
-              <span className="label">What did you eat?</span>
-              <input
-                type="text"
-                className="input"
-                placeholder="e.g. Chicken, rice and broccoli"
-                value={mealNameInput}
-                onChange={e => setMealNameInput(e.target.value)}
-              />
-            </label>
-
-            {([
-              { key: 'calories', label: 'Calories (kcal)' },
-              { key: 'protein',  label: 'Protein (g)' },
-              { key: 'carbs',    label: 'Carbs (g)' },
-              { key: 'fat',      label: 'Fat (g)' },
-            ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
-              <div key={key}>
+            {editingStructured ? (
+              /* Its ingredients are shown, not offered for editing: this form
+                 cannot express per-item servings, so letting it save would
+                 collapse the meal into a single free-text row. */
+              <div>
+                <span className="label">Ingredients</span>
+                <ul className="mt-1 space-y-0.5">
+                  {editingMeal!.items.map(item => (
+                    <li key={item.id} className="text-xs text-gray-300 flex items-center justify-between gap-2">
+                      <span className="truncate">{item.name}</span>
+                      <span className="text-gray-450 tabular-nums flex-shrink-0">
+                        {Math.round(item.macros.calories)} kcal
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-gray-450 mt-2">
+                  {Math.round(editingMeal!.totals.calories)} kcal ·{' '}
+                  {Math.round(editingMeal!.totals.protein)}P ·{' '}
+                  {Math.round(editingMeal!.totals.carbs)}C ·{' '}
+                  {Math.round(editingMeal!.totals.fat)}F
+                </p>
+                <p className="text-[11px] text-gray-450 mt-2">
+                  Move it to a different meal above. To change the food, delete this
+                  entry and log or generate a new one.
+                </p>
+              </div>
+            ) : (
+              <>
                 <label className="block">
-                  <span className="label">{label}</span>
+                  <span className="label">What did you eat?</span>
                   <input
-                    type="number"
-                    min={0}
+                    type="text"
                     className="input"
-                    value={macroInput[key] || ''}
-                    onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
+                    placeholder="e.g. Chicken, rice and broccoli"
+                    value={mealNameInput}
+                    onChange={e => setMealNameInput(e.target.value)}
                   />
                 </label>
-              </div>
-            ))}
+
+                {([
+                  { key: 'calories', label: 'Calories (kcal)' },
+                  { key: 'protein',  label: 'Protein (g)' },
+                  { key: 'carbs',    label: 'Carbs (g)' },
+                  { key: 'fat',      label: 'Fat (g)' },
+                ] as { key: keyof MacroEntry; label: string }[]).map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block">
+                      <span className="label">{label}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        className="input"
+                        value={macroInput[key] || ''}
+                        onChange={e => setMacroInput(m => ({ ...m, [key]: Number(e.target.value) }))}
+                      />
+                    </label>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </Modal>
       )}

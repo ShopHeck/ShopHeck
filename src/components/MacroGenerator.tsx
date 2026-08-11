@@ -138,6 +138,25 @@ export default function MacroGenerator() {
     fat: Math.max(0, Number(fat) || 0),
   }), [calories, protein, carbs, fat]);
 
+  /**
+   * Toggle a slot in the fighter's meal pattern, keeping the slot being built
+   * inside it.
+   *
+   * `slot` and `pattern` are separate state, and dropping the selected slot
+   * from the pattern used to leave `slot` pointing at it: the Building chips
+   * stopped offering that slot while the button still said "Generate Lunch",
+   * and `mealTargetForSlot` quietly widened the pattern back to include it. The
+   * meal was then portioned against a pattern the fighter could not see.
+   */
+  function togglePatternSlot(s: MealSlot) {
+    const next = pattern.includes(s) ? pattern.filter(x => x !== s) : [...pattern, s];
+    setPattern(next);
+    if (!next.includes(slot)) {
+      const fallback = MEAL_SLOTS.find(x => next.includes(x));
+      if (fallback) setSlot(fallback);
+    }
+  }
+
   function handleGenerate() {
     setSavedIds([]);
     if (mode === 'day') {
@@ -260,7 +279,7 @@ export default function MacroGenerator() {
               return (
                 <button
                   key={s}
-                  onClick={() => setPattern(p => (on ? p.filter(x => x !== s) : [...p, s]))}
+                  onClick={() => togglePatternSlot(s)}
                   aria-pressed={on}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
                     on ? 'bg-brand-600 border-brand-500 text-white' : 'bg-dark-600 border-dark-400 text-gray-400 hover:border-dark-300'

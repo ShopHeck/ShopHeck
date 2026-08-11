@@ -1017,6 +1017,47 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     return [...kept, ...cloud.filter(x => !ids.has(x.id) && !deletedHere.has(x.id))];
   };
 
+  /**
+   * Nutrition days merge on their NATURAL key and union their meals by entry id.
+   *
+   * `union` above keeps the local row wholesale whenever the ids match, which
+   * for a day-level scalar is merely last-writer-wins. For `meals` it is data
+   * loss of exactly the kind this whole model exists to prevent: two devices
+   * each push their entire array against a `(user_id, camp_id, date)` conflict
+   * target, so the later push drops meals the other device logged.
+   *
+   * Keying on `(campId, date)` rather than the surrogate id matters too — the
+   * push already upserts on that natural key precisely because two offline
+   * devices mint different local ids for the same day, so an id-keyed merge
+   * would hold both copies locally.
+   *
+   * The trade this makes: a meal deleted on one device is restored from another
+   * device's stale copy until that device pulls. Entries carry no tombstones,
+   * only rows do. A resurrected meal is visible and can be deleted again; a
+   * silently discarded one is neither, so the union is the safer failure.
+   */
+  const mergeNutritionDays = (local: NutritionLog[], cloud: NutritionLog[]): NutritionLog[] => {
+    const kept = local.filter(d => !deletedElsewhere.has(d.id));
+    const key = (d: NutritionLog) => `${d.campId}|${d.date}`;
+    const byDay = new Map(kept.map(d => [key(d), d]));
+
+    for (const remote of cloud) {
+      if (deletedHere.has(remote.id)) continue;
+      const mine = byDay.get(key(remote));
+      if (!mine) {
+        byDay.set(key(remote), remote);
+        continue;
+      }
+      const seen = new Set(mine.meals.map(m => m.id));
+      const added = remote.meals.filter(m => !seen.has(m.id));
+      // Local wins on the day's own scalars, matching `union`'s local-first
+      // rule; only the meal list gains from the other side.
+      if (added.length > 0) byDay.set(key(remote), { ...mine, meals: [...mine.meals, ...added] });
+    }
+
+    return [...byDay.values()];
+  };
+
   const camps = union(state.camps, c.camps);
 
   // The camp-keyed metadata maps have to be filtered by the SAME rule as the
@@ -1064,7 +1105,7 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
     sparringLogs: union(state.sparringLogs, c.sparringLogs),
     conditioningTests: union(state.conditioningTests, c.conditioningTests),
     weightEntries: union(state.weightEntries, c.weightEntries),
-    nutritionLogs: union(state.nutritionLogs, c.nutritionLogs),
+    nutritionLogs: mergeNutritionDays(state.nutritionLogs, c.nutritionLogs),
     hrvEntries: union(state.hrvEntries ?? [], c.hrvEntries),
     fightResults,
     // Coach notes merge like every other collection, but only the cloud side is
