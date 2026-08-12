@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Award, ChevronRight, Eye, EyeOff, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope, Watch } from 'lucide-react';
+import { Award, ChevronRight, Flame, Plus, Trash2, Check, Edit3, LogOut, Brain, Heart, UserCheck, Users, Zap, Trophy, Bluetooth, BluetoothOff, Bell, HeartPulse, Scale, AlertCircle, Stethoscope, Watch } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ZONE_COLORS, ZONE_LABELS } from '../hooks/useBluetoothHR';
 import IconChipRow from './shared/IconChipRow';
@@ -951,25 +951,10 @@ export default function Settings({ onNewCamp, onNavigate }: Props) {
             </div>
             <span className="text-xs font-mono font-bold text-brand-400 flex-shrink-0 uppercase">{weightUnit}</span>
           </button>
-          <button
-            onClick={() => {
-              const hidden = !(state.dashboardPrefs?.progressWidgetHidden ?? false);
-              dispatch({ type: 'SET_DASHBOARD_PREF', payload: { progressWidgetHidden: hidden } });
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-dark-600 transition-colors text-left"
-          >
-            <div className="w-8 h-8 bg-dark-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              {state.dashboardPrefs?.progressWidgetHidden
-                ? <EyeOff size={15} className="text-gray-400" />
-                : <Eye size={15} className="text-gray-400" />}
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">Progress widget on dashboard</p>
-              <p className="text-xs text-gray-450">
-                {state.dashboardPrefs?.progressWidgetHidden ? 'Hidden — tap to show' : 'Visible — tap to hide'}
-              </p>
-            </div>
-          </button>
+          {/* "Progress widget on dashboard" lived here. It was a second,
+              competing control for something More now owns outright: the widget
+              is the `belt-streak` card, and pinning is what decides whether it
+              shows. Two switches for one card is how they end up disagreeing. */}
 
           <button
             onClick={() => setConfirmReset(true)}

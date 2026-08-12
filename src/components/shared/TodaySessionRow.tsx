@@ -13,6 +13,15 @@ interface Props {
   logColor: string;
   /** Omit to render the row without a Log action (rest slots, zero duration). */
   onLog?: () => void;
+  /**
+   * Drop the row's own glass surface.
+   *
+   * Set when the rows are stacked inside a surface of their own — the Today
+   * card holds readiness and the day's work in one card, and glass nested in
+   * glass reads as a rendering mistake rather than as depth (§3.3: one live
+   * layer per visual group).
+   */
+  bare?: boolean;
 }
 
 /**
@@ -28,12 +37,12 @@ interface Props {
  * are replaced by a green COMPLETED badge, so the card only ever offers work
  * that is still outstanding.
  */
-export default function TodaySessionRow({ session, done, logColor, onLog }: Props) {
+export default function TodaySessionRow({ session, done, logColor, onLog, bare }: Props) {
   const accent = done ? 'var(--accent-green)' : SESSION_COLORS[session.type];
   const Icon = SESSION_ICONS[session.type];
 
-  return (
-    <GlassSurface cornerRadius="md" className="flex items-center gap-3 p-4">
+  const content = (
+    <>
       <div
         className="w-10 h-10 flex items-center justify-center flex-shrink-0"
         style={{
@@ -73,6 +82,15 @@ export default function TodaySessionRow({ session, done, logColor, onLog }: Prop
           )}
         </>
       )}
-    </GlassSurface>
+    </>
+  );
+
+  // Branching on the wrapper rather than building one inline: a component
+  // defined during render is a new type on every render, so React unmounts and
+  // remounts the whole row — which would drop a Log button mid-press.
+  return bare ? (
+    <div className="flex items-center gap-3 py-2">{content}</div>
+  ) : (
+    <GlassSurface cornerRadius="md" className="flex items-center gap-3 p-4">{content}</GlassSurface>
   );
 }

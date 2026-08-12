@@ -4,10 +4,9 @@ import GlassSurface from './GlassSurface';
 
 export type TileState = 'populated' | 'loading' | 'empty' | 'error';
 
-interface Props {
+interface BaseProps {
   /** Caption style, single line. Never wraps — §3.4. */
   label: string;
-  value?: React.ReactNode;
   /** Signed delta. Colored green when an improvement, crimson when not. */
   trend?: { value: string; direction: 'up' | 'down' };
   /**
@@ -22,6 +21,20 @@ interface Props {
   onRetry?: () => void;
   className?: string;
 }
+
+/**
+ * A value that is markup must also say what it says.
+ *
+ * The accessible name interpolates `value`, so a node stringifies to
+ * "[object Object]" — a tile rendering "4/6" with a styled denominator was
+ * announced as "Sessions: [object Object]". Splitting the props into two cases
+ * makes `valueLabel` mandatory exactly when the value is not already text, so
+ * the next styled tile cannot ship silently broken.
+ */
+type Props = BaseProps & (
+  | { value?: string | number; valueLabel?: string }
+  | { value: React.ReactNode; valueLabel: string }
+);
 
 /**
  * The 2-column grid tile (§3.4).
@@ -40,6 +53,7 @@ interface Props {
 export default function GlassMetricTile({
   label,
   value,
+  valueLabel,
   trend,
   goodDirection = 'up',
   icon,
@@ -65,7 +79,7 @@ export default function GlassMetricTile({
       style={{ padding: 'var(--space-4)' }}
       aria-label={
         state === 'populated' && value !== undefined
-          ? `${label}: ${value}${trend ? `, ${trend.direction === 'up' ? 'up' : 'down'} ${trend.value}` : ''}`
+          ? `${label}: ${valueLabel ?? String(value)}${trend ? `, ${trend.direction === 'up' ? 'up' : 'down'} ${trend.value}` : ''}`
           : state === 'error'
             ? `${label}: could not load. Tap to retry.`
             : state === 'empty'

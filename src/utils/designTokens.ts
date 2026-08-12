@@ -153,6 +153,39 @@ export const SESSION_COLORS = {
   rest: 'var(--session-rest)',
 } as const satisfies Record<import('../types').SessionType, string>;
 
+// ── Camp phase (§2.7) ───────────────────────────────────────────────────────
+
+/**
+ * Phase → accent, for both camp and off-season blocks.
+ *
+ * Phases run cool→hot as the work sharpens, which is why they take the accent
+ * ramp rather than the status palette — a phase is a stage, not a judgement,
+ * and Peak being crimson does not mean anything is wrong.
+ *
+ * One record because there were three, and they had already drifted: the
+ * weekly planner and the off-season Home disagreed about Foundation until one
+ * was corrected, and nothing stopped them disagreeing again. The key sets are
+ * disjoint, so a single record loses nothing.
+ */
+export const PHASE_COLORS: Record<string, string> = {
+  // Fight camp.
+  'Base Building': 'var(--accent-blue)',
+  'Strength & Conditioning': 'var(--accent-gold)',
+  'Fight Specific': 'var(--accent-flame)',
+  'Peak': 'var(--accent-crimson)',
+  'Taper': 'var(--accent-green)',
+  // Off-season — the same ramp over a longer cycle.
+  'Foundation': 'var(--accent-blue)',
+  'Development': 'var(--accent-cyan)',
+  'Performance': 'var(--accent-violet)',
+  'Active Recovery': 'var(--accent-green)',
+};
+
+/** The phase accent, or the neutral fallback for an unrecognised phase. */
+export function phaseColor(phase: string | undefined): string {
+  return (phase && PHASE_COLORS[phase]) || 'var(--text-tertiary)';
+}
+
 // ── Surfaces and accents, for JS-applied styling ────────────────────────────
 
 export const TOKENS = {

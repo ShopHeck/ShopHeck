@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users, Settings, Timer } from 'lucide-react';
+import { LayoutDashboard, Calendar, Dumbbell, Scale, BarChart3, Users, Menu, Timer } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavTab {
@@ -7,11 +7,20 @@ export interface NavTab {
   label: string;
 }
 
+/**
+ * "More" occupies the slot Settings used to.
+ *
+ * The bar was already at six tabs, so a seventh for More would have dropped
+ * every target to roughly 44pt on an iPhone SE and truncated the longest
+ * label. It did not need one: Settings and More are the same idea — the drawer
+ * for everything that is not the daily work — so Settings became a row inside
+ * More rather than a peer of it.
+ */
 export const COACH_TABS: NavTab[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'fighters', icon: Users, label: 'Fighters' },
   { id: 'progress', icon: BarChart3, label: 'Progress' },
-  { id: 'settings', icon: Settings, label: 'Settings' },
+  { id: 'more', icon: Menu, label: 'More' },
 ];
 
 export const FIGHTER_TABS: NavTab[] = [
@@ -20,7 +29,7 @@ export const FIGHTER_TABS: NavTab[] = [
   { id: 'log', icon: Dumbbell, label: 'Log' },
   { id: 'timer', icon: Timer, label: 'Timer' },
   { id: 'weight', icon: Scale, label: 'Weight' },
-  { id: 'settings', icon: Settings, label: 'Settings' },
+  { id: 'more', icon: Menu, label: 'More' },
 ];
 
 export function tabsFor(isCoach: boolean): NavTab[] {

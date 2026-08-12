@@ -89,6 +89,14 @@ tests/            Vitest
 
 ## Features
 
+**Home and the More tab** — Home is a fixed cockpit: countdown, anything
+urgent, one card merging readiness with today's work, and a three-number week
+pulse. Everything else is pinned. The More tab holds every tool plus the cards
+Home does not show by default, each with a pin toggle and a drag handle for
+order. Both are built from one registry (`utils/homeLayout.ts`), so the tool
+grid and the list you pin from cannot drift apart. Pins live in
+`dashboardPrefs` and sync with the account.
+
 **Camp planning** — periodized schedule from fight date, sport and experience;
 weekly planner with session ticking; off-season blocks.
 

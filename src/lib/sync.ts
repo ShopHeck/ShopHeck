@@ -1145,6 +1145,17 @@ export function mergeCloud(state: AppState, c: CloudSnapshot): AppState {
           progressWidgetHidden:
             state.dashboardPrefs?.progressWidgetHidden ?? c.dashboardPrefs?.progressWidgetHidden ?? false,
           weightUnit: state.dashboardPrefs?.weightUnit ?? c.dashboardPrefs?.weightUnit,
+          // Same `??` rule as weightUnit, and for the same reason: undefined
+          // means "this device never customised its Home", so the account's
+          // layout fills in — while a local `[]` (everything deliberately
+          // unpinned) is a real choice and wins over the cloud copy.
+          //
+          // Naming them here is not optional. This object is an allowlist, and
+          // a key it omits is dropped on every restore and then written back
+          // by the forced push that follows — so leaving them out did not just
+          // fail to sync a pinned layout, it erased one on restart.
+          pinnedCards: state.dashboardPrefs?.pinnedCards ?? c.dashboardPrefs?.pinnedCards,
+          pinnedTools: state.dashboardPrefs?.pinnedTools ?? c.dashboardPrefs?.pinnedTools,
         }
       : undefined,
     fitbitConfig: state.fitbitConfig ?? c.fitbitConfig ?? undefined,

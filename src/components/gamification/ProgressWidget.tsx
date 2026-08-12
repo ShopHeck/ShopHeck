@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Flame, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Flame } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { BELT_LABELS, defaultGamificationState } from '../../utils/gamification';
 import BeltBadge from './BeltBadge';
@@ -12,8 +12,10 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
   const prefs = state.dashboardPrefs ?? { progressWidgetCollapsed: false, progressWidgetHidden: false };
   const gam = state.gamification ?? defaultGamificationState();
 
-  if (prefs.progressWidgetHidden) return null;
-
+  // No hidden check here any more. This card is the `belt-streak` entry in
+  // utils/homeLayout — whether it appears is whether it is pinned, decided in
+  // More. Keeping a second, private hide flag would have meant two controls for
+  // one thing that could disagree: pinned in More, still invisible here.
   const { belt, streak } = gam;
   const activeChallenge = gam.challenges
     .filter(c => !c.completed)
@@ -28,10 +30,6 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
   function toggleCollapsed(e: React.MouseEvent) {
     e.stopPropagation();
     dispatch({ type: 'SET_DASHBOARD_PREF', payload: { progressWidgetCollapsed: !prefs.progressWidgetCollapsed } });
-  }
-  function hide(e: React.MouseEvent) {
-    e.stopPropagation();
-    dispatch({ type: 'SET_DASHBOARD_PREF', payload: { progressWidgetHidden: true } });
   }
 
   if (prefs.progressWidgetCollapsed) {
@@ -74,22 +72,13 @@ export default function ProgressWidget({ onOpenProgress }: Props) {
       <div className="bg-gradient-to-br from-dark-700 to-dark-800 border border-dark-500 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Your Progress</p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={toggleCollapsed}
-              className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
-              aria-label="Collapse progress widget"
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              onClick={hide}
-              className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
-              aria-label="Hide progress widget"
-            >
-              <X size={14} />
-            </button>
-          </div>
+          <button
+            onClick={toggleCollapsed}
+            className="p-3 -m-2 text-gray-400 hover:text-gray-300 transition-colors"
+            aria-label="Collapse progress widget"
+          >
+            <ChevronUp size={14} />
+          </button>
         </div>
 
         <button onClick={onOpenProgress} className="w-full text-left">

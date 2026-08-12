@@ -10,7 +10,7 @@ import type { LogPrefill } from '../App';
 import { timerPrefillForSession, type TimerPrefill } from '../utils/timerSession';
 import DurationBadge from './shared/DurationBadge';
 import { SESSION_COLORS, SESSION_LABELS } from '../utils/sessionVisuals';
-import { tint } from '../utils/designTokens';
+import { PHASE_COLORS, tint } from '../utils/designTokens';
 
 /**
  * Session card styling, derived from the one session→color mapping rather than
@@ -30,19 +30,6 @@ function sessionStyles(type: SessionType, done: boolean) {
     color: accent,
   };
 }
-
-const PHASE_COLORS: Record<string, string> = {
-  'Base Building': 'var(--accent-blue)',
-  'Strength & Conditioning': 'var(--accent-gold)',
-  'Fight Specific': 'var(--accent-flame)',
-  'Peak': 'var(--accent-crimson)',
-  'Taper': 'var(--accent-green)',
-  // Off-season phases run the same cool→hot ramp over a longer cycle.
-  'Foundation': 'var(--accent-blue)',
-  'Development': 'var(--accent-cyan)',
-  'Performance': 'var(--accent-violet)',
-  'Active Recovery': 'var(--accent-green)',
-};
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

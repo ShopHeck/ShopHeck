@@ -7,7 +7,7 @@ import { SyncProvider } from './context/SyncContext';
 import { TimerProvider, useTimerSignal } from './context/TimerContext';
 import { HeartRateProvider } from './context/HeartRateContext';
 import ViewSkeleton from './components/shared/ViewSkeleton';
-import type { SessionType } from './types';
+import type { SessionType, View } from './types';
 
 // ── Static imports — rendered immediately on first paint ──────────────────
 import Onboarding from './components/Onboarding';
@@ -47,6 +47,7 @@ const CornerMode       = lazy(() => import('./components/CornerMode'));
 const FightBreakdown   = lazy(() => import('./components/FightBreakdown'));
 const CampComparison   = lazy(() => import('./components/CampComparison'));
 const ProgressScreen   = lazy(() => import('./components/gamification/ProgressScreen'));
+const More             = lazy(() => import('./components/More'));
 
 import CelebrationToast from './components/gamification/CelebrationToast';
 
@@ -88,8 +89,6 @@ function NoCampState({ feature, onSetUp }: { feature: string; onSetUp: () => voi
   );
 }
 
-type View = 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health' | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log' | 'fight-breakdown' | 'camp-history' | 'achievements' | 'corner';
-
 export interface LogPrefill {
   sessionType: SessionType;
   title: string;
@@ -111,6 +110,7 @@ const VIEW_TITLES: Record<View, { title: string; subtitle?: string }> = {
   weight:           { title: 'Weight Tracker',      subtitle: 'Cut Monitoring' },
   progress:         { title: 'Progress',            subtitle: 'Charts & Benchmarks' },
   fighters:         { title: 'Fighters',            subtitle: 'Coach View' },
+  more:             { title: 'More',                 subtitle: 'Tools & Home layout' },
   settings:         { title: 'Settings' },
   gameplan:         { title: 'Game Plan',           subtitle: 'Fight Strategy' },
   nutrition:        { title: 'Nutrition',           subtitle: 'Hydration & Meals' },
@@ -286,10 +286,13 @@ function AppShell() {
               />
             )}
             {view === 'dashboard' && !isCoach && camp && camp.isOffSeason && (
-              <OffSeasonDashboard onNavigate={(v, prefill?) => {
-                if (v === 'log' && prefill) navigateToLog(prefill);
-                else navigate(v as View);
-              }} />
+              <OffSeasonDashboard
+                onNavigate={(v, prefill?) => {
+                  if (v === 'log' && prefill) navigateToLog(prefill);
+                  else navigate(v as View);
+                }}
+                onStartTimer={navigateToTimer}
+              />
             )}
             {view === 'dashboard' && !isCoach && !camp && (
               <div className="mx-4 mt-8 flex flex-col gap-4">
@@ -409,6 +412,7 @@ function AppShell() {
             )}
             {view === 'fighters'        && <CoachDashboard mode="roster" />}
             {view === 'achievements'    && <ProgressScreen />}
+            {view === 'more'            && <More onNavigate={v => navigate(v)} />}
             {view === 'settings'        && (
               <Settings onNewCamp={() => requestNewCamp(false)} onNavigate={v => navigate(v as View)} />
             )}
