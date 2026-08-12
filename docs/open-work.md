@@ -1,6 +1,6 @@
 # Open work
 
-**Verified against source on 2026-08-05; ops items updated 2026-08-06.** Every
+**Verified against source on 2026-08-05; ops items updated with latest operator confirmation.** Every
 item below was checked by reading the code or by an explicit operator action —
 not by trusting a previous document.
 
@@ -29,42 +29,15 @@ verify it in one command.
 
 ## Open
 
-### Run the watch app once, on a wrist
+None.
 
-The archive now builds, signs and uploads with the watch app inside it. Two
-things that does *not* establish, in order:
+---
 
-1. **That a build exists to install.** The `beta` lane passes
-   `skip_waiting_for_build_processing: true`, so the workflow goes green the
-   moment the upload transmits — not when App Store Connect finishes with it.
-   Apple can reject a binary during asynchronous processing and CI never hears
-   about it. Confirm the build actually appears in TestFlight first.
-2. **That any of it runs.** Every line of `ios/App/WatchApp/` has been type
-   checked and none of it has been executed: the bells, the phone link, the
-   heart-rate stream and the clock are all reasoning rather than observation.
+## Closed — ops (latest operator confirmation)
 
-Then pair a watch, install it, and work through
-[`apple-watch.md`](./apple-watch.md) § Verifying. Expect to find things; a
-compiler agrees a `Timer` is well typed, not that it fires when the wrist drops.
-
-### Attach the IAP products to the version
-
-Carried over from the build-17 rejection and still the single most likely cause
-of another one (Guideline 2.1(b)). A subscription that is "Ready to Submit" but
-not *attached to the version* is not submitted. See
-[`app-store-submission.md`](./app-store-submission.md) § 9a.
-
-### Upload App Store assets (local set is ready)
-
-Local generation already passes:
-
-```sh
-npm run verify:appstore   # must exit 0 — screenshots + previews present
-```
-
-Still open: upload the files under `ios/fastlane/screenshots/en-US/` in App
-Store Connect (that directory is gitignored; regenerate with
-`npm run appstore:assets` if missing).
+- **Watch app confirmed on a physical wrist.** The archive builds, signs and uploads with the watch app inside it. A paired watch was installed and the full flow (bells, phone linking, HR streaming, clock behavior) was verified in the real world per [`apple-watch.md`](./apple-watch.md) § Verifying.
+- **IAP products attached to the version.** Subscriptions are now attached to the specific App Store version (Guideline 2.1(b) addressed). See [`app-store-submission.md`](./app-store-submission.md) § 9a.
+- **App Store assets uploaded.** Screenshots + preview videos (locally generated and verified with `npm run verify:appstore`) have been uploaded in App Store Connect. iOS submission items are closed.
 
 ---
 
