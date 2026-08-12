@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, UtensilsCrossed, Sparkles, BookOpen, Search, X } from 'lucide-react';
 import { MEAL_PLANS, MEAL_PLAN_PHASES, formatIngredient, planMacros, planRecipes, recipeMacros, type MealGoal, type MealPlan } from '../data/nutrition';
 import { MACRO_COLORS, tint, type Macro } from '../utils/designTokens';
+import { mealPlanMatchesQuery } from '../utils/nutrition/mealPlanSearch';
 import MacroGenerator from './MacroGenerator';
 
 function MacroPill({ label, value, unit, macro }: { label: string; value: number; unit: string; macro: Macro }) {
@@ -125,17 +126,7 @@ export default function MealLibrary() {
     return MEAL_PLANS.filter(p => {
       if (goal !== 'all' && p.goal !== goal) return false;
       if (phase !== 'all' && p.phase !== phase) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const hay = [
-          p.name,
-          p.description,
-          p.phase,
-          ...planRecipes(p).map(r => r.name),
-        ].join(' ').toLowerCase();
-        return hay.includes(q);
-      }
-      return true;
+      return mealPlanMatchesQuery(p, planRecipes(p).map(r => r.name), search);
     });
   }, [goal, phase, search]);
 
