@@ -219,7 +219,11 @@ export const HOME_ITEMS: HomeItem[] = [
     icon: Gauge,
     accent: 'var(--accent-green)',
     view: 'readiness',
-    modes: ['camp', 'offseason'],
+    // Camp only, because the screen behind it is: FightReadiness refuses an
+    // off-season block outright ("off-season blocks don't have a countdown to
+    // score against"). A tool that is pinnable into a Home where its own
+    // destination declines to render is a dead end with a tile on it.
+    modes: ['camp'],
   },
   {
     id: 'apple-health',

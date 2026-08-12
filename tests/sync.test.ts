@@ -507,6 +507,69 @@ describe('mergeCloud — dashboardPrefs', () => {
 
     expect(merged.dashboardPrefs?.weightUnit).toBe('lbs');
   });
+
+  it('carries a pinned Home layout through a restore', () => {
+    // Regression: this merge rebuilds dashboardPrefs key-by-key as an
+    // allowlist, and it named only the three original keys. Every restore
+    // dropped pinnedCards/pinnedTools, and the forced push that follows wrote
+    // the reduced object back to the account — so a signed-in fighter's Home
+    // layout was not merely un-synced, it was erased on app restart.
+    const merged = mergeCloud(
+      localState({ dashboardPrefs: { progressWidgetCollapsed: false, progressWidgetHidden: false } }),
+      snapshot({
+        dashboardPrefs: {
+          progressWidgetCollapsed: false,
+          progressWidgetHidden: false,
+          pinnedCards: ['weight-status'],
+          pinnedTools: ['nutrition', 'trackers'],
+        },
+      }),
+    );
+
+    // Never customised on this device, so the account's layout fills in.
+    expect(merged.dashboardPrefs?.pinnedCards).toEqual(['weight-status']);
+    expect(merged.dashboardPrefs?.pinnedTools).toEqual(['nutrition', 'trackers']);
+  });
+
+  it('keeps a layout this device has explicitly set', () => {
+    const merged = mergeCloud(
+      localState({
+        dashboardPrefs: {
+          progressWidgetCollapsed: false,
+          progressWidgetHidden: false,
+          pinnedTools: ['meal-library'],
+        },
+      }),
+      snapshot({
+        dashboardPrefs: {
+          progressWidgetCollapsed: false,
+          progressWidgetHidden: false,
+          pinnedTools: ['nutrition', 'trackers'],
+        },
+      }),
+    );
+
+    expect(merged.dashboardPrefs?.pinnedTools).toEqual(['meal-library']);
+  });
+
+  it('keeps a deliberately emptied Home empty against a populated account', () => {
+    // [] is a choice, not silence — `??` has to let it win, or unpinning
+    // everything would spring back from the cloud on the next restore.
+    const merged = mergeCloud(
+      localState({
+        dashboardPrefs: {
+          progressWidgetCollapsed: false, progressWidgetHidden: false, pinnedTools: [],
+        },
+      }),
+      snapshot({
+        dashboardPrefs: {
+          progressWidgetCollapsed: false, progressWidgetHidden: false, pinnedTools: ['nutrition'],
+        },
+      }),
+    );
+
+    expect(merged.dashboardPrefs?.pinnedTools).toEqual([]);
+  });
 });
 
 describe('mergeCloud — coach notes', () => {

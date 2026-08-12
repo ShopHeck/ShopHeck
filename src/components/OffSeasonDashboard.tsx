@@ -31,12 +31,16 @@ interface Props {
  * alerts — moving between a camp and the block after it should not feel like
  * changing apps.
  *
- * Two things changed beyond the restructure. It now carries the readiness
- * gauge: `computeReadiness` never needed a *fight*, only an active camp, and
- * an off-season block is one, so the score was simply never being shown to the
- * people training without a bout booked. And the standalone "Training Streak"
- * card is gone — `ProgressWidget` directly above it already showed the same
- * streak, about a hundred pixels apart.
+ * No readiness gauge, deliberately. `computeReadiness` does return a score for
+ * an off-season block, which makes showing it look free — but `FightReadiness`
+ * refuses off-season camps outright, because without a fight date the number
+ * counts down to the end of the block rather than to being ready for anything.
+ * A tappable score whose own breakdown says "start a fight camp to see it" is
+ * worse than no score, so `showReadiness` is off here until the metric is
+ * defined for a block rather than for a bout.
+ *
+ * The standalone "Training Streak" card is gone — `ProgressWidget` directly
+ * above it already showed the same streak, about a hundred pixels apart.
  */
 export default function OffSeasonDashboard({ onNavigate, onStartTimer }: Props) {
   const { state } = useApp();
@@ -63,6 +67,7 @@ export default function OffSeasonDashboard({ onNavigate, onStartTimer }: Props) 
 
       <TodayCard
         accent={ACCENT}
+        showReadiness={false}
         onNavigate={v => onNavigate(v)}
         onLog={prefill => onNavigate('log', prefill)}
         onStartTimer={onStartTimer}

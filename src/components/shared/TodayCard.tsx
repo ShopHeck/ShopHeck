@@ -15,6 +15,18 @@ import type { LogPrefill } from '../../App';
 
 interface Props {
   accent: string;
+  /**
+   * Show the readiness gauge and let it open the full breakdown.
+   *
+   * Off for off-season blocks. `computeReadiness` does return a number for
+   * one, which is what made showing it look safe — but the screen behind the
+   * tap (`FightReadiness.tsx`) deliberately refuses off-season camps, because
+   * without a fight date the score is a countdown to the end of the block
+   * rather than readiness for anything. Presenting an actionable score whose
+   * own detail view says "start a fight camp to see it" is worse than not
+   * showing it, so the block keeps the behaviour it always had.
+   */
+  showReadiness?: boolean;
   onNavigate: (view: 'readiness') => void;
   onLog: (prefill: LogPrefill) => void;
   onStartTimer: (prefill: TimerPrefill) => void;
@@ -35,7 +47,9 @@ interface Props {
  * should I train (the score), what is it (the rows), go (the button). The
  * session is named once, and ticking it off is right beside starting it.
  */
-export default function TodayCard({ accent, onNavigate, onLog, onStartTimer, onOpenTimer }: Props) {
+export default function TodayCard({
+  accent, showReadiness = true, onNavigate, onLog, onStartTimer, onOpenTimer,
+}: Props) {
   const { state } = useApp();
   const {
     activeCamp, trainingSchedule, workoutLogs, sparringLogs, weightEntries,
@@ -51,12 +65,14 @@ export default function TodayCard({ accent, onNavigate, onLog, onStartTimer, onO
   // day key so the elapsed-time terms cannot go stale on a Home left open
   // overnight. Must sit above the early return — hooks cannot be conditional.
   const todayKey = todayISO();
-  const readiness = useMemo(
+  const scored = useMemo(
     () => computeReadiness(state),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeCamp, workoutLogs, sparringLogs, weightEntries, conditioningTests,
      nutritionLogs, currentUser, trainingSchedule, unit, todayKey],
   );
+
+  const readiness = showReadiness ? scored : null;
 
   if (!activeCamp) return null;
 

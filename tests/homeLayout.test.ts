@@ -39,6 +39,25 @@ describe('registry invariants', () => {
     }
   });
 
+  it('keeps tools out of a mode whose destination screen refuses to render', () => {
+    // Regression: a tool is only offerable where the screen behind it works.
+    // `fight-readiness` was pinnable in off-season while FightReadiness.tsx
+    // rejects off-season camps outright ("off-season blocks don't have a
+    // countdown to score against"), so pinning it put a tile on Home whose tap
+    // landed on an unavailable-state message. `game-plan` is the same shape —
+    // there is no opponent to plan for in a block.
+    //
+    // Add to this list when a destination grows a mode guard; the alternative
+    // is finding out from a fighter who tapped it.
+    const campOnlyDestinations = ['fight-readiness', 'game-plan'];
+    for (const id of campOnlyDestinations) {
+      const item = HOME_ITEMS.find(i => i.id === id);
+      expect(item, id).toBeDefined();
+      expect(item!.modes, id).toEqual(['camp']);
+      expect(itemsFor('tool', 'offseason').map(i => i.id), id).not.toContain(id);
+    }
+  });
+
   it('fills both grid rows on each fighter Home by default', () => {
     // Four tools is two rows of the 2-up grid. A default of one or three
     // leaves a visibly half-empty row on first run.
