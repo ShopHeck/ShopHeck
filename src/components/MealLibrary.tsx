@@ -1,16 +1,10 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, UtensilsCrossed, Sparkles, BookOpen } from 'lucide-react';
-import { MEAL_PLANS, formatIngredient, planMacros, planRecipes, recipeMacros, type MealGoal, type MealPlan } from '../data/nutrition';
+import { ChevronDown, ChevronUp, UtensilsCrossed, Sparkles, BookOpen, Search, X } from 'lucide-react';
+import { MEAL_PLANS, MEAL_PLAN_PHASES, formatIngredient, planMacros, planRecipes, recipeMacros, type MealGoal, type MealPlan } from '../data/nutrition';
 import { MACRO_COLORS, tint, type Macro } from '../utils/designTokens';
+import { mealPlanMatchesQuery } from '../utils/nutrition/mealPlanSearch';
 import MacroGenerator from './MacroGenerator';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Takes the macro itself rather than a color, so a pill cannot be built with
- * the wrong one. Every call site previously passed its own Tailwind class pair,
- * which is how the same four macros ended up with two different purples.
- */
 function MacroPill({ label, value, unit, macro }: { label: string; value: number; unit: string; macro: Macro }) {
   const color = MACRO_COLORS[macro];
   return (
@@ -29,18 +23,20 @@ const GOAL_COLORS: Record<MealGoal, string> = {
   Build:    'bg-purple-900/40 text-purple-300',
 };
 
-// ─── Meal Plan Card ───────────────────────────────────────────────────────────
+const GOAL_ACCENT: Record<MealGoal, string> = {
+  Cut:      'border-l-red-500',
+  Maintain: 'border-l-brand-500',
+  Build:    'border-l-purple-500',
+};
 
 function MealPlanCard({ plan }: { plan: MealPlan }) {
   const [open, setOpen] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState<number | null>(null);
-  // Computed, never stored. The card used to render `plan.totalMacros`, which
-  // advertised 1600 kcal for meals that summed to 1120.
   const t = useMemo(() => planMacros(plan), [plan]);
   const meals = useMemo(() => planRecipes(plan), [plan]);
 
   return (
-    <div className="card p-0 overflow-hidden">
+    <div className={`card p-0 overflow-hidden border-l-4 ${GOAL_ACCENT[plan.goal]}`}>
       <button
         className="w-full p-4 text-left flex items-start justify-between gap-3"
         onClick={() => setOpen(o => !o)}
@@ -116,23 +112,26 @@ function MealPlanCard({ plan }: { plan: MealPlan }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 type Tab = 'plans' | 'generator';
 
 const GOALS: (MealGoal | 'all')[] = ['all', 'Cut', 'Maintain', 'Build'];
 
 export default function MealLibrary() {
-  const [tab,  setTab]  = useState<Tab>('plans');
+  const [tab, setTab] = useState<Tab>('plans');
   const [goal, setGoal] = useState<MealGoal | 'all'>('all');
+  const [phase, setPhase] = useState<string>('all');
+  const [search, setSearch] = useState('');
 
-  const filteredPlans = useMemo(() => (
-    goal === 'all' ? MEAL_PLANS : MEAL_PLANS.filter(p => p.goal === goal)
-  ), [goal]);
+  const filteredPlans = useMemo(() => {
+    return MEAL_PLANS.filter(p => {
+      if (goal !== 'all' && p.goal !== goal) return false;
+      if (phase !== 'all' && p.phase !== phase) return false;
+      return mealPlanMatchesQuery(p, planRecipes(p).map(r => r.name), search);
+    });
+  }, [goal, phase, search]);
 
   return (
     <div className="pb-4">
-      {/* Tab bar */}
       <div className="mx-4 mt-4 flex gap-1 bg-dark-700 rounded-xl p-1">
         {([['plans', 'Meal Plans', BookOpen], ['generator', 'Macro Generator', Sparkles]] as const).map(
           ([value, label, Icon]) => (
@@ -140,9 +139,7 @@ export default function MealLibrary() {
               key={value}
               onClick={() => setTab(value)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
-                tab === value
-                  ? 'bg-brand-600 text-white'
-                  : 'text-gray-400 hover:text-white'
+                tab === value ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
               <Icon size={14} />
@@ -154,7 +151,19 @@ export default function MealLibrary() {
 
       {tab === 'plans' && (
         <>
-          {/* Goal filter */}
+          <div className="mx-4 mt-3">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                className="input pl-9 text-sm"
+                aria-label="Search meal plans"
+                placeholder="Search plans, recipes, phase…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="mx-4 mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {GOALS.map(g => (
               <button
@@ -164,27 +173,64 @@ export default function MealLibrary() {
                   goal === g
                     ? g === 'Cut'      ? 'bg-red-600 border-red-500 text-white'
                     : g === 'Build'    ? 'bg-purple-600 border-purple-500 text-white'
-                    : g === 'Maintain' ? 'bg-brand-600 border-brand-500 text-white'
                     :                   'bg-brand-600 border-brand-500 text-white'
                     : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
                 }`}
               >
-                {g === 'all' ? 'All Plans' : g}
+                {g === 'all' ? 'All Goals' : g}
               </button>
             ))}
           </div>
 
-          <div className="mx-4 mt-3 mb-2">
-            <p className="text-xs text-gray-400">{filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''}</p>
+          <div className="mx-4 mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button
+              onClick={() => setPhase('all')}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                phase === 'all' ? 'bg-brand-600 border-brand-500 text-white' : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
+              }`}
+            >
+              All Phases
+            </button>
+            {MEAL_PLAN_PHASES.map(p => (
+              <button
+                key={p}
+                onClick={() => setPhase(p)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  phase === p ? 'bg-brand-600 border-brand-500 text-white' : 'bg-dark-700 border-dark-500 text-gray-400 hover:border-dark-300'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
+          <div className="mx-4 mt-3 mb-2 flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              {filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''}
+            </p>
+            {(search || goal !== 'all' || phase !== 'all') && (
+              <button
+                onClick={() => { setSearch(''); setGoal('all'); setPhase('all'); }}
+                className="text-xs text-gray-400 hover:text-white font-semibold flex items-center gap-1"
+              >
+                <X size={11} /> Clear
+              </button>
+            )}
           </div>
 
           <div className="mx-4 space-y-2">
             {filteredPlans.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
                 <div className="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center">
                   <UtensilsCrossed size={22} className="text-gray-400" />
                 </div>
-                <p className="text-sm text-gray-400">No plans found.</p>
+                <p className="text-sm text-gray-400">No plans match. Try a different search or clear filters.</p>
+                <button
+                  onClick={() => { setSearch(''); setGoal('all'); setPhase('all'); }}
+                  className="text-xs text-brand-400 font-semibold"
+                >
+                  Clear filters
+                </button>
               </div>
             ) : (
               filteredPlans.map(plan => <MealPlanCard key={plan.id} plan={plan} />)

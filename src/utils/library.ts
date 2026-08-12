@@ -179,21 +179,28 @@ export function queueToPrefill(entries: LibrarySessionEntry[]): { sessionType: S
 // ─── Search ──────────────────────────────────────────────────────────────────
 
 /**
- * Free-text match across everything a fighter might type — name, instructions,
- * cues, equipment, and the kind-specific fields (muscles and sports for
- * exercises; discipline, position and focus tags for techniques).
+ * Free-text match across everything a fighter might type.
+ * Tokenized AND: every word must appear somewhere in the haystack.
+ * This is how people actually search a playbook (“teep kick”, “hip hinge”).
  */
 export function matchesQuery(item: LibraryItem, query: string): boolean {
   const q = query.toLowerCase().trim();
   if (!q) return true;
 
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+
   const haystack: string[] = [
     item.name,
     item.instructions,
+    item.tips ?? '',
     ...item.equipment,
     ...item.cues,
     ...item.commonMistakes,
     ...item.substitutions,
+    ...item.progressions,
+    ...item.regressions,
+    ...item.contraindications,
   ];
 
   if (isTechnique(item)) {
@@ -203,10 +210,18 @@ export function matchesQuery(item: LibraryItem, query: string): boolean {
       ...item.intents,
       item.range,
       item.position ?? '',
+      ...(item.linkedTechniques ?? []),
     );
   } else {
-    haystack.push(...item.muscleGroups, ...item.sports, item.category, item.adaptation);
+    haystack.push(
+      ...item.muscleGroups,
+      ...item.sports,
+      item.category,
+      item.adaptation,
+      ...(item.movementPatterns ?? []),
+    );
   }
 
-  return haystack.some(value => value.toLowerCase().includes(q));
+  const joined = haystack.join(' ').toLowerCase();
+  return words.every(word => joined.includes(word));
 }

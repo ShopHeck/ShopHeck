@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Search, Dumbbell, Star, SlidersHorizontal, History, ClipboardList, X } from 'lucide-react';
+import {
+  Search, Dumbbell, Star, SlidersHorizontal, History, ClipboardList, X,
+  Flame, PersonStanding,
+} from 'lucide-react';
 import {
   CAMP_PHASE_LABELS, ENERGY_SYSTEM_LABELS, EXERCISE_CATEGORY_LABELS, EXERCISE_EQUIPMENT,
   FORMAT_LABELS, INTENT_LABELS, TECHNIQUE_DISCIPLINES, TECHNIQUE_EQUIPMENT,
@@ -43,6 +46,12 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     </button>
   );
 }
+
+const CATEGORY_ICONS: Record<ExerciseCategory, React.ReactNode> = {
+  strength:     <Dumbbell size={11} />,
+  conditioning: <Flame size={11} />,
+  mobility:     <PersonStanding size={11} />,
+};
 
 interface Props {
   /** Hands a queued session to the workout logger. */
@@ -210,7 +219,7 @@ export default function WorkoutLibrary({ onLogSession }: Props) {
             <Chip active={category === 'all'} onClick={() => setCategory('all')}>All</Chip>
             {(Object.keys(EXERCISE_CATEGORY_LABELS) as ExerciseCategory[]).map(c => (
               <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
-                {EXERCISE_CATEGORY_LABELS[c]}
+                {CATEGORY_ICONS[c]} {EXERCISE_CATEGORY_LABELS[c]}
               </Chip>
             ))}
           </>
