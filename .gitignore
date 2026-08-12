@@ -32,3 +32,6 @@ ios/fastlane/screenshots/
 
 # Share-card previews (node scripts/share-card-preview.mjs)
 share-card-preview/
+
+# Visual brainstorming companion (superpowers)
+.superpowers/

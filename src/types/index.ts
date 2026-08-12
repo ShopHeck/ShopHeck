@@ -542,12 +542,45 @@ export interface LibraryState {
   results: LibraryResult[];
 }
 
+/**
+ * Every screen the shell can render.
+ *
+ * Lives here rather than in App.tsx because `utils/homeLayout.ts` names a view
+ * per pinnable tool, and a registry that pointed at a view id App had never
+ * heard of would fail at tap time rather than at compile time.
+ */
+export type View =
+  | 'dashboard' | 'planner' | 'log' | 'timer' | 'weight' | 'progress' | 'fighters'
+  | 'more' | 'settings' | 'gameplan' | 'nutrition' | 'aiinsights' | 'health'
+  | 'readiness' | 'trackers' | 'workout-library' | 'meal-library' | 'fight-log'
+  | 'fight-breakdown' | 'camp-history' | 'achievements' | 'corner';
+
 export interface DashboardPrefs {
   progressWidgetCollapsed: boolean;
+  /**
+   * Legacy hide flag for the belt/streak widget.
+   *
+   * Superseded by `pinnedCards`: the widget is now the `belt-streak` card, and
+   * pinning is the one control for whether it shows. Still read once, by
+   * `initialPins`, to carry an existing "I hid this" choice across the upgrade
+   * — and still written by older builds on other devices, which is why it is
+   * left in place rather than deleted.
+   */
   progressWidgetHidden: boolean;
   /** Display/input unit for body weight. Stored data stays lbs; this only
    *  converts at the UI edge (see utils/units.ts). Default: lbs. */
   weightUnit?: 'lbs' | 'kg';
+  /**
+   * Home layout — ids from `utils/homeLayout.ts`, in render order.
+   *
+   * Membership is the pin state and array position is the order, so a pin set
+   * and a separate order map cannot disagree. `undefined` means "never
+   * customised" and resolves to the defaults; `[]` means the fighter unpinned
+   * everything and must stay empty. Never read raw — `resolvePinned` drops ids
+   * whose item no longer exists or does not belong to the current mode.
+   */
+  pinnedCards?: string[];
+  pinnedTools?: string[];
 }
 
 export interface GamificationState {

@@ -228,6 +228,9 @@ export default function WeightTracker() {
           <GlassMetricTile
             label="Done"
             value={<span style={{ color: cutChipColor }}>{Math.round(cutProgress)}%</span>}
+            // The percentage is a coloured span, so it needs to be said in
+            // words too — the tile was announced as "Done: [object Object]".
+            valueLabel={`${Math.round(cutProgress)} percent`}
             icon={
               <span
                 className="w-2.5 h-2.5 rounded-full inline-block"

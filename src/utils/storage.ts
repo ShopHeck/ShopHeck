@@ -197,6 +197,13 @@ export function setDashboardPrefs(state: AppState, prefs: Partial<DashboardPrefs
       progressWidgetCollapsed: state.dashboardPrefs?.progressWidgetCollapsed ?? false,
       progressWidgetHidden: state.dashboardPrefs?.progressWidgetHidden ?? false,
       weightUnit: state.dashboardPrefs?.weightUnit,
+      // Like weightUnit, deliberately NOT defaulted: undefined means "never
+      // customised their Home", which is what `resolvePinned` reads to fall
+      // back to the default pin set. Defaulting to [] here would stamp
+      // "unpinned everything" the moment any other pref is toggled, and Home
+      // would silently empty itself.
+      pinnedCards: state.dashboardPrefs?.pinnedCards,
+      pinnedTools: state.dashboardPrefs?.pinnedTools,
       ...prefs,
     },
   };
