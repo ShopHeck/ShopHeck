@@ -20,7 +20,7 @@ import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import type { WorkoutLog, FightCamp, FighterProfile, SessionType } from '../types';
 import { resolveToken } from './designTokens';
 import { blockHeight, fitText, LINE_HEIGHT_RATIO, type FittedText, type Measure } from './canvasText';
-import { APP_SHARE_DOMAIN } from './shareLink';
+import { APP_SHARE_CTA } from './shareLink';
 
 /**
  * Canvas 2D cannot parse `var()`; it fails silently and paints black. Both
@@ -861,8 +861,10 @@ function paintFooter(ctx: CanvasRenderingContext2D, c: Palette, dateText: string
   const dateSpec = { weight: 600, tracking: 0.22 } as const;
   drawBlock(ctx, fit(ctx, dateText, dateSpec, { maxSize: 32, minSize: 24 }), dateSpec, DATE_TOP, c.tertiary);
 
+  // Uppercase like the date above it — the footer's one lowercase element was
+  // a domain, and the call to action that replaced it is not.
   const linkSpec = { weight: 700, tracking: 0.16 } as const;
-  const link = fit(ctx, APP_SHARE_DOMAIN, linkSpec, { maxSize: 38, minSize: 26 });
+  const link = fit(ctx, APP_SHARE_CTA.toUpperCase(), linkSpec, { maxSize: 38, minSize: 26 });
   withGlow(ctx, withAlpha(c.flame, 0.45), 22, () => {
     drawBlock(ctx, link, linkSpec, LINK_TOP, c.flame);
   });

@@ -4,7 +4,7 @@ import { CHART_SERIES, resolveToken } from '../utils/designTokens';
 import { format, parseISO } from 'date-fns';
 import { getDaysUntilFight, getCampProgress } from '../utils/campGenerator';
 import { weeklyAdherenceSeries } from '../utils/adherence';
-import { APP_SHARE_DOMAIN, buildShareMessage } from '../utils/shareLink';
+import { APP_SHARE_CTA, buildShareMessage } from '../utils/shareLink';
 import {
   LineChart,
   Line,
@@ -142,10 +142,11 @@ function shareStats(opts: {
   ctx.fillText(`Camp Progress: ${opts.progress}%`, 40, H - 20);
 
   // Brand watermark — the shared image is the app's only outbound artifact, so
-  // it carries the link in the pixels as well as in the caption below.
+  // it carries the call to action in the pixels as well as the link in the
+  // caption below.
   ctx.fillStyle = flame;
   ctx.textAlign = 'right';
-  ctx.fillText(APP_SHARE_DOMAIN, W - 40, H - 20);
+  ctx.fillText(APP_SHARE_CTA, W - 40, H - 20);
   ctx.textAlign = 'left';
 
   const title = `${opts.name}'s Fight Camp Stats`;
