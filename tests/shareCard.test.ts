@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blockHeight, fitText, truncateToWidth, wrapText, type Measure } from '../src/utils/canvasText';
-import { APP_SHARE_URL, buildShareMessage } from '../src/utils/shareLink';
+import { APP_SHARE_CTA, APP_SHARE_DOMAIN, APP_SHARE_URL, buildShareMessage } from '../src/utils/shareLink';
 import { campDay, milestoneFacts, sessionHeadline } from '../src/utils/shareCardCanvas';
 import type { FightCamp, SessionType } from '../src/types';
 
@@ -303,6 +303,25 @@ describe('sessionHeadline', () => {
       expect(typeof word).toBe('string');
       expect(word.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('the shared link', () => {
+  it('points at the App Store listing', () => {
+    // Pinned because this is the app's only acquisition path: every shared
+    // card, every stats image and every caption carries this one URL, and a
+    // typo in it is invisible until a new user reports a dead link.
+    expect(APP_SHARE_URL).toBe(
+      'https://apps.apple.com/us/app/fight-camp-training/id6767876080',
+    );
+    expect(APP_SHARE_URL).toContain(APP_SHARE_DOMAIN);
+  });
+
+  it('draws a call to action rather than the URL', () => {
+    // The drawn line lands in a screenshot, where it can only be read — an
+    // App Store numeric id is not something a recipient retypes.
+    expect(APP_SHARE_CTA).toBe('Download on the App Store');
+    expect(APP_SHARE_CTA).not.toMatch(/https?:|\bid\d/);
   });
 });
 

@@ -194,7 +194,7 @@ export default function ShareCard({ content, user, onClose }: Props) {
         <div className="flex-shrink-0 flex items-center gap-2.5 rounded-xl border border-dark-500 bg-dark-700/60 px-3 py-2">
           <Link2 size={15} className="text-brand-400 flex-shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] leading-tight text-gray-400">Shared with a link to the app</p>
+            <p className="text-[11px] leading-tight text-gray-400">Shared with a link to the App Store</p>
             <p className="text-xs text-white truncate">{APP_SHARE_DOMAIN}</p>
           </div>
           <button

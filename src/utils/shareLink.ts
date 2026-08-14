@@ -8,12 +8,27 @@
  * keep it) *and* drawn into the pixels (a Story, or a screenshot forwarded on,
  * keeps only what's in the image).
  *
- * The domain is the live PWA, which is both the install page and the App Store
- * signpost — see `docs/app-store-listing.md`, where the same host serves the
- * marketing, privacy and support URLs.
+ * It points at the App Store listing rather than the PWA host: the shipped iOS
+ * app is what a fighter is being invited to install, and the store page is the
+ * one destination that survives being forwarded to someone who has never heard
+ * of Fight Camp. The PWA is still served from `fightcamp.netlify.app`, which
+ * remains the marketing, privacy and support host (`docs/app-store-listing.md`)
+ * — it is simply no longer what a shared card advertises.
  */
-export const APP_SHARE_DOMAIN = 'fightcamp.netlify.app';
-export const APP_SHARE_URL = `https://${APP_SHARE_DOMAIN}`;
+export const APP_SHARE_URL = 'https://apps.apple.com/us/app/fight-camp-training/id6767876080';
+
+/** Where that link goes, for UI that says so before it's tapped. */
+export const APP_SHARE_DOMAIN = 'apps.apple.com';
+
+/**
+ * The line drawn into a shared image.
+ *
+ * Deliberately not the URL: pixels aren't tappable, so the only thing a
+ * recipient can do with drawn text is read it and act on it. `id6767876080` is
+ * not something anyone retypes, where "the App Store" is an instruction that
+ * lands on any device holding the screenshot.
+ */
+export const APP_SHARE_CTA = 'Download on the App Store';
 
 /**
  * Caption for the share sheet: what was achieved, then where to get the app.
