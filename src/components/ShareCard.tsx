@@ -34,9 +34,15 @@ export default function ShareCard({ content, user, onClose }: Props) {
 
   const fileName =
     content.kind === 'session' ? 'fight-camp-session.png' : `fight-camp-${content.milestone.slug}.png`;
+  // Null for a session logged before the camp's start date, which is a real
+  // case — see `campDay`. The caption drops the prefix rather than inventing a
+  // day one.
+  const day = content.kind === 'session' ? campDay(content.camp, content.log.date) : null;
   const shareTitle =
     content.kind === 'session'
-      ? `Day ${campDay(content.camp, content.log.date)} — ${content.log.title}`
+      ? day === null
+        ? content.log.title
+        : `Day ${day} — ${content.log.title}`
       : content.milestone.title;
   const shareDetail =
     content.kind === 'session'

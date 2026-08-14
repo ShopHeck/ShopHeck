@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { blockHeight, fitText, truncateToWidth, wrapText, type Measure } from '../src/utils/canvasText';
 import { APP_SHARE_URL, buildShareMessage } from '../src/utils/shareLink';
-import { milestoneFacts } from '../src/utils/shareCardCanvas';
+import { campDay, milestoneFacts, sessionHeadline } from '../src/utils/shareCardCanvas';
+import type { FightCamp, SessionType } from '../src/types';
 
 /**
  * Stand-in for `ctx.measureText`: a monospace face at half the em width. The
@@ -204,6 +205,104 @@ describe('milestoneFacts', () => {
     // Already spent on the descriptor — repeating it under the stat would be
     // the same sentence twice.
     expect(facts.footnote).toBeUndefined();
+  });
+});
+
+describe('campDay', () => {
+  const camp = { startDate: '2026-07-01', campWeeks: 8 } as FightCamp;
+
+  it('counts from the start date, inclusive', () => {
+    expect(campDay(camp, '2026-07-01')).toBe(1);
+    expect(campDay(camp, '2026-07-12')).toBe(12);
+  });
+
+  it('has no day number for a session logged before camp starts', () => {
+    // The shipped bug. A camp's start date is the fight date minus its length,
+    // so a fight booked months out puts the start date in the future — and the
+    // old `Math.max(1, …)` printed "DAY 1" on every session logged until then,
+    // day after day after day.
+    expect(campDay(camp, '2026-06-30')).toBeNull();
+    expect(campDay(camp, '2026-03-14')).toBeNull();
+  });
+
+  it('keeps counting past the end of the block', () => {
+    expect(campDay(camp, '2026-09-01')).toBe(63);
+  });
+
+  it('is null rather than NaN for an unusable date', () => {
+    expect(campDay(camp, 'not-a-date')).toBeNull();
+  });
+});
+
+describe('sessionHeadline', () => {
+  const session = {
+    date: '2026-08-09',
+    title: 'Heavy Bag Intervals',
+    sessionType: 'conditioning' as SessionType,
+    duration: 60,
+    rpe: 7,
+  };
+
+  it('gives the same session the same word every time', () => {
+    // ShareCard redraws the canvas on every parent render, so a word that
+    // wasn't a pure function of the log would change between the preview the
+    // fighter looked at and the image they shared.
+    const first = sessionHeadline(session);
+    expect(sessionHeadline({ ...session })).toBe(first);
+    expect(sessionHeadline({ ...session })).toBe(first);
+  });
+
+  it('never repeats itself two days running', () => {
+    // The actual complaint: the same session, logged three days in a row, put
+    // the same word on all three cards.
+    const dates = ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13'];
+    const words = dates.map(date => sessionHeadline({ ...session, date }));
+    for (let i = 1; i < words.length; i++) {
+      expect(words[i]).not.toBe(words[i - 1]);
+    }
+  });
+
+  it('speaks to what the session actually was', () => {
+    const type = (sessionType: SessionType) =>
+      // One word per type says little; the whole rotation is the vocabulary.
+      new Set(
+        ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14']
+          .map(date => sessionHeadline({ ...session, sessionType, date })),
+      );
+
+    expect(type('strength')).toContain('FORGED');
+    expect(type('sparring')).toContain('BATTLE');
+    expect(type('recovery')).toContain('RESET');
+    // Vocabularies don't overlap, so the word alone tells you the session.
+    expect([...type('recovery')].some(w => type('sparring').has(w))).toBe(false);
+  });
+
+  it('saves the all-out words for the sessions that earned them', () => {
+    const brutal = sessionHeadline({ ...session, sessionType: 'sparring', rpe: 10 });
+    const ordinary = sessionHeadline({ ...session, sessionType: 'sparring', rpe: 6 });
+    expect(['SAVAGE', 'ALL HEART', 'NO MERCY', 'WARRIOR', 'EMPTY TANK']).toContain(brutal);
+    expect(['SAVAGE', 'ALL HEART', 'NO MERCY', 'WARRIOR', 'EMPTY TANK']).not.toContain(ordinary);
+
+    // …and not for an RPE that can only be a slip of the finger: a recovery
+    // session is a recovery session however it was scored.
+    const softButSteep = sessionHeadline({ ...session, sessionType: 'recovery', rpe: 10 });
+    expect(['SAVAGE', 'ALL HEART', 'NO MERCY', 'WARRIOR', 'EMPTY TANK']).not.toContain(softButSteep);
+  });
+
+  it('always returns a drawable word, whatever it is handed', () => {
+    const inputs = [
+      { ...session, date: 'not-a-date' },
+      { ...session, date: '1998-02-14' },
+      { ...session, title: '', duration: NaN, rpe: NaN },
+      { ...session, sessionType: 'kickboxing' as SessionType },
+    ];
+    for (const input of inputs) {
+      const word = sessionHeadline(input);
+      // `paintDisplay` calls `.toUpperCase()` on this — an undefined pick
+      // would take the whole card down, not just the headline.
+      expect(typeof word).toBe('string');
+      expect(word.length).toBeGreaterThan(0);
+    }
   });
 });
 
