@@ -109,6 +109,14 @@ const CASES = [
     camp: { opponent: 'Alexander Konstantinopoulos-Fernandez' },
   },
   { name: 'session-offseason', kind: 'session', log: { title: 'Strength Block', sessionType: 'strength', duration: 75, rpe: 7 }, camp: { fightDate: null, opponent: null } },
+  {
+    // Logged before the block starts, which is what a fight booked months out
+    // looks like every single day until camp opens. This is the card that used
+    // to headline "DAY 1" — there is no day number here to print.
+    name: 'session-pre-camp',
+    kind: 'session',
+    log: { date: '2026-06-20', title: 'Base Roadwork', sessionType: 'conditioning', duration: 45, rpe: 6 },
+  },
 ];
 
 /** Waits for the dev server to answer, so the page load isn't a race. */

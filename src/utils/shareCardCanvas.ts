@@ -16,8 +16,8 @@
  * push a later block into another one — and every text block goes through
  * `fit`, so no line can reach the card's edge either.
  */
-import { format, parseISO, differenceInDays } from 'date-fns';
-import type { WorkoutLog, FightCamp, FighterProfile } from '../types';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
+import type { WorkoutLog, FightCamp, FighterProfile, SessionType } from '../types';
 import { resolveToken } from './designTokens';
 import { blockHeight, fitText, LINE_HEIGHT_RATIO, type FittedText, type Measure } from './canvasText';
 import { APP_SHARE_DOMAIN } from './shareLink';
@@ -1007,16 +1007,113 @@ export function milestoneFacts(m: MilestoneShare): CardFacts {
   };
 }
 
-/** Day N of a camp, 1-based and never below 1. */
-export function campDay(camp: FightCamp, isoDate: string): number {
-  return Math.max(1, differenceInDays(parseISO(isoDate), parseISO(camp.startDate)) + 1);
+/**
+ * Day N of the camp for a logged date — or null when the session predates the
+ * block entirely.
+ *
+ * The `Math.max(1, …)` this replaces is why the card read "DAY 1" for days on
+ * end: a camp's start date is derived backwards from the fight, so a fight
+ * booked far enough out (six months, with an eight-week camp) leaves every
+ * session logged in the meantime sitting *before* day one. Clamping printed
+ * all of them as the first day of camp. Absent is honest; wrong is not.
+ *
+ * Calendar days rather than elapsed 24-hour periods, matching
+ * `getWeekNumberForDate`: a daylight-saving weekend is 71 hours long and would
+ * otherwise shave a day off the count.
+ */
+export function campDay(camp: FightCamp, isoDate: string): number | null {
+  const day = differenceInCalendarDays(parseISO(isoDate), parseISO(camp.startDate)) + 1;
+  // Also catches an unparseable date, which arrives here as NaN.
+  return day >= 1 ? day : null;
+}
+
+// ── The session card's hero word ────────────────────────────────────────────
+//
+// The display slot used to hold `Day ${n}` — the least interesting thing the
+// card knew about the session, and (see `campDay`) frequently a lie. The day
+// number is context, and context belongs in the footnote under the stat; the
+// headline now says something about the training that was actually done.
+
+/** What picking a word needs to know. A log, minus the parts it doesn't read. */
+type SessionSeed = Pick<WorkoutLog, 'date' | 'title' | 'sessionType' | 'duration' | 'rpe'>;
+
+/**
+ * Hero words, by what the session was.
+ *
+ * Short on purpose: the display slot holds seven or so characters at its full
+ * 224px, and `paintDisplay` shrinks anything longer. A word that has to shrink
+ * to fit stops reading as a headline, so nothing here is longer than it has to
+ * be.
+ */
+const SESSION_WORDS: Record<SessionType, string[]> = {
+  conditioning: ['ENGINE', 'RELENTLESS', 'NO QUIT', 'UNBROKEN', 'MOTOR', 'EARNED'],
+  skill: ['SHARP', 'PRECISION', 'CRAFT', 'DIALED IN', 'POLISHED', 'CLEAN WORK'],
+  sparring: ['BATTLE', 'TESTED', 'FEARLESS', 'IRON', 'WAR READY', 'NO FEAR'],
+  strength: ['FORGED', 'STRONGER', 'POWER', 'BUILT', 'HEAVY', 'STEEL'],
+  recovery: ['RESET', 'RESTORED', 'RECHARGED', 'REPAIR', 'PATIENCE'],
+  rest: ['RECHARGED', 'RESET', 'PATIENCE'],
+};
+
+/**
+ * Reserved for sessions that went to the well. Gated on session type as well
+ * as effort, because RPE 9 on a recovery swim is a typo, not a war.
+ */
+const ALL_OUT_WORDS = ['SAVAGE', 'ALL HEART', 'NO MERCY', 'WARRIOR', 'EMPTY TANK'];
+const ALL_OUT_TYPES = new Set<SessionType>(['conditioning', 'skill', 'sparring', 'strength']);
+const ALL_OUT_RPE = 9;
+
+/** A session type this build doesn't know — synced from a newer one, say. */
+const FALLBACK_WORDS = ['EARNED', 'WORK DONE', 'SHOWED UP', 'PROGRESS'];
+
+/** FNV-1a. Spreads the session's own details across the word pool. */
+function hashString(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** The rotation's anchor. Any fixed date does; this one keeps the maths small. */
+const WORD_EPOCH = '2020-01-01';
+
+/**
+ * The word that headlines a session card.
+ *
+ * Deterministic, and deliberately not `Math.random()`: `ShareCard` redraws the
+ * canvas whenever its parent re-renders, so a random word would change under
+ * the fighter between the preview they looked at and the image they shared —
+ * and `scripts/share-card-preview.mjs` could no longer tell a layout change
+ * from a reshuffle.
+ *
+ * The pick steps once per calendar day and is phased by the session's own
+ * details, which buys the two properties that matter here: the same session
+ * logged on consecutive days is *guaranteed* a different word — the complaint
+ * that started this — and two sessions on one day land on the same word only
+ * if they were the same work.
+ */
+export function sessionHeadline(log: SessionSeed): string {
+  const pool =
+    log.rpe >= ALL_OUT_RPE && ALL_OUT_TYPES.has(log.sessionType)
+      ? ALL_OUT_WORDS
+      : SESSION_WORDS[log.sessionType] ?? FALLBACK_WORDS;
+
+  const phase = hashString(
+    `${log.sessionType}|${log.title.trim().toLowerCase()}|${log.duration}|${log.rpe}`,
+  );
+  const day = differenceInCalendarDays(parseISO(log.date), parseISO(WORD_EPOCH));
+  // An unparseable date must not cost the whole card: NaN would index the pool
+  // to `undefined`, and `paintDisplay` calls `.toUpperCase()` on what it gets.
+  const step = Number.isFinite(day) ? day : 0;
+  // Two-step modulo — `step` is negative for any date before the epoch.
+  return pool[(((phase + step) % pool.length) + pool.length) % pool.length];
 }
 
 function sessionFacts(log: WorkoutLog, camp: FightCamp, c: Palette): CardFacts {
   const dayNum = campDay(camp, log.date);
   const totalDays = camp.campWeeks * 7;
   const daysToFight = camp.fightDate
-    ? Math.max(0, differenceInDays(parseISO(camp.fightDate), new Date()))
+    ? Math.max(0, differenceInCalendarDays(parseISO(camp.fightDate), new Date()))
     : 0;
   const typeLabel = SESSION_LABELS[log.sessionType] ?? log.sessionType;
 
@@ -1029,12 +1126,20 @@ function sessionFacts(log: WorkoutLog, camp: FightCamp, c: Palette): CardFacts {
       ? `Fight day · ${fightDate}`
       : 'Off-season training block';
 
+  // Where the session sits in the block. A log from before the start date has
+  // no day number at all, and one from after the last day has a number but no
+  // total left to count it against.
+  const dayPart =
+    dayNum === null ? 'Pre-camp'
+      : dayNum <= totalDays ? `Day ${dayNum} of ${totalDays}`
+        : `Day ${dayNum}`;
+
   return {
-    headline: `Day ${dayNum}`,
+    headline: sessionHeadline(log),
     descriptor: log.title,
     statValue: String(log.duration),
     statLabel: 'Minutes',
-    footnote: `${typeLabel} · RPE ${log.rpe}/10 · Day ${dayNum} of ${totalDays}`,
+    footnote: `${typeLabel} · RPE ${log.rpe}/10 · ${dayPart}`,
     accent,
     // The same fight-week urgency ramp the countdown card uses, with the
     // relaxed tier moved off the pace-green and onto gold — green is the app's
