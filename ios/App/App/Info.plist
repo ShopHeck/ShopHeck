@@ -54,7 +54,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Fight Camp Training saves workout data to Apple Health.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Fight Camp Training uses the camera only when you choose Take Photo or Video while attaching a file.</string>
+	<string>Fight Camp Training uses the camera when you take a photo or video to attach, and during a vitals check to measure your heart rate, heart-rate variability and breathing from your face. Measurement happens on your iPhone; the video is never saved or uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Fight Camp Training uses the microphone only when you record a video to attach a file.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

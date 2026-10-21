@@ -37,6 +37,7 @@
 		E23A4817B8B53BB552425619 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5139CF4F8E593DA26E54168 /* LiveActivityPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0E2F /* RevenueCatPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0E1F /* RevenueCatPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0E6F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = FC1A2B3C4D5E6A7B8C9D0E4F /* RevenueCat */; };
+		3858B15B4909F1D583B0D803 /* SmartSpectra in Frameworks */ = {isa = PBXBuildFile; productRef = 33864F0F83D8CB033206CD36 /* SmartSpectra */; };
 		FC1A2B3C4D5E6A7B8C9D0E7F /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = FC1A2B3C4D5E6A7B8C9D0E5F /* RevenueCatUI */; };
 		FC1A2B3C4D5E6A7B8C9D0F1B /* HealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F1A /* HealthKitPlugin.swift */; };
 		FC1A2B3C4D5E6A7B8C9D0F2B /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1A2B3C4D5E6A7B8C9D0F2A /* AppReviewPlugin.swift */; };
@@ -150,6 +151,7 @@
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
 				FC1A2B3C4D5E6A7B8C9D0E6F /* RevenueCat in Frameworks */,
+				3858B15B4909F1D583B0D803 /* SmartSpectra in Frameworks */,
 				FC1A2B3C4D5E6A7B8C9D0E7F /* RevenueCatUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -294,6 +296,7 @@
 			packageProductDependencies = (
 				FC1A2B3C4D5E6A7B8C9D0E4F /* RevenueCat */,
 				FC1A2B3C4D5E6A7B8C9D0E5F /* RevenueCatUI */,
+				33864F0F83D8CB033206CD36 /* SmartSpectra */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -364,6 +367,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				FC1A2B3C4D5E6A7B8C9D0E3F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+				C2B6AD34D760458A5A619B22 /* XCRemoteSwiftPackageReference "SmartSpectra-Swift" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -665,7 +669,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Fight Camp Training";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -694,7 +698,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Fight Camp Training";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -826,6 +830,14 @@
 				minimumVersion = 5.0.0;
 			};
 		};
+		C2B6AD34D760458A5A619B22 /* XCRemoteSwiftPackageReference "SmartSpectra-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Presage-Security/SmartSpectra-Swift";
+			requirement = {
+				kind = exactVersion;
+				version = 3.4.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -838,6 +850,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FC1A2B3C4D5E6A7B8C9D0E3F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCatUI;
+		};
+		33864F0F83D8CB033206CD36 /* SmartSpectra */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C2B6AD34D760458A5A619B22 /* XCRemoteSwiftPackageReference "SmartSpectra-Swift" */;
+			productName = SmartSpectra;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

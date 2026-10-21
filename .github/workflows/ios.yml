@@ -65,6 +65,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+          SMARTSPECTRA_API_KEY: ${{ secrets.SMARTSPECTRA_API_KEY }}
         run: |
           fail=0
           problem() { echo "::error::$1"; fail=1; }
@@ -118,6 +119,17 @@ jobs:
               sk_*) problem "REVENUECAT_API_KEY is a *secret* key (sk_…) — server-side only. The app needs the public Apple SDK key (appl_…)." ;;
               *) problem "REVENUECAT_API_KEY does not look like an Apple SDK key (expected it to start with appl_)." ;;
             esac
+          fi
+
+          # Camera vitals key. Optional, so a missing one only warns: the build
+          # ships with the feature reporting "not configured" and hidden, and
+          # nothing else in the app depends on it. A mangled paste still fails
+          # here rather than ~20 minutes in, where the Fastfile would reject it.
+          ss_trimmed=$(trim "$SMARTSPECTRA_API_KEY")
+          if [ -z "$ss_trimmed" ]; then
+            echo "::warning::SMARTSPECTRA_API_KEY is not set — camera vitals will be hidden in this build."
+          elif [ "$ss_trimmed" != "$SMARTSPECTRA_API_KEY" ]; then
+            problem "SMARTSPECTRA_API_KEY has surrounding whitespace or quotes — re-paste it with none."
           fi
 
           if [ "$fail" -ne 0 ]; then
