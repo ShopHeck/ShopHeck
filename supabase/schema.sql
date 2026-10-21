@@ -114,6 +114,7 @@ create table if not exists public.workout_logs (
   notes         text default '',
   completed     boolean not null default true,
   mep           int,
+  energy_kcal   int check (energy_kcal > 0), -- active calories; NULL = not tracked
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   deleted_at    timestamptz

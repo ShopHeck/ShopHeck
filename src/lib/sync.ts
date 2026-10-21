@@ -415,6 +415,10 @@ export async function pushState(
       date: l.date, week_number: l.weekNumber, day_label: l.dayLabel,
       session_type: l.sessionType, title: l.title, duration: l.duration,
       rpe: l.rpe, notes: l.notes ?? '', completed: l.completed, mep: l.mep ?? null,
+      // Sent only when tracked: rows without it keep their dirty-hash (no mass
+      // re-push), and sync keeps working against a database that has not had
+      // the energy_kcal migration applied until someone actually logs calories.
+      ...(l.energyKcal !== undefined ? { energy_kcal: l.energyKcal } : {}),
       created_at: ts(l, now),
     })), 'id', true);
     if (err1) return fail(err1);
@@ -868,6 +872,7 @@ export async function pullState(userId: string): Promise<PullResult> {
         dayLabel: w.day_label, sessionType: w.session_type as SessionType, title: w.title,
         duration: w.duration, rpe: w.rpe, notes: w.notes ?? '', completed: w.completed,
         createdAt: w.created_at, mep: w.mep ?? undefined,
+        energyKcal: w.energy_kcal ?? undefined,
       })),
       sparringLogs: live(sparringQ.data as Row<'sparring_logs'>[] | null).map((s: Row<'sparring_logs'>) => ({
         id: lid(s.id), campId: lid(s.camp_id), date: s.date, weekNumber: s.week_number,

@@ -20,6 +20,10 @@ Code can be green while these stay broken. Each item is a **silent** failure.
    - At minimum these were applied:
      - `20260803190000_harden_authorization.sql`
      - `20260805210000_sync_adaptations_corner_and_analyses.sql`
+     - `20261021230000_workout_energy_kcal.sql` (`workout_logs.energy_kcal`)
+   - `20260811120000_nutrition_meal_entries.sql` is live (`nutrition_logs.meals`
+     exists) but was run outside the migration history, so `list_migrations`
+     does not show it.
    - Prefer migrations over re-running full `supabase/schema.sql`.
    - If you *do* re-run `schema.sql`, the hardening block at the **end** of that
      file must run last (it is appended for this reason).
