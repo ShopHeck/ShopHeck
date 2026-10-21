@@ -24,6 +24,23 @@ describe('scrubSentryEvent', () => {
     expect(event.request.headers.Authorization).toBe('[redacted]');
     expect(event.request.headers['Content-Type']).toBe('application/json');
   });
+
+  it('redacts vitals readings, which are health data like HRV', () => {
+    const event = scrubSentryEvent({
+      extra: {
+        reading: { restingHR: 52, pulseRate: 54, breathingRate: 14, hrvRmssd: 61, source: 'camera' },
+        heartRate: 140,
+      },
+    });
+    const reading = event.extra.reading as Record<string, unknown>;
+    expect(reading.restingHR).toBe('[redacted]');
+    expect(reading.pulseRate).toBe('[redacted]');
+    expect(reading.breathingRate).toBe('[redacted]');
+    expect(reading.hrvRmssd).toBe('[redacted]');
+    expect(event.extra.heartRate).toBe('[redacted]');
+    // Non-health context stays readable for debugging.
+    expect(reading.source).toBe('camera');
+  });
 });
 
 describe('fitbitRedirectUri', () => {

@@ -61,6 +61,8 @@
 	<string>Fight Camp Training accesses your photo library only when you choose a photo or video to attach a file.</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_API_KEY)</string>
+	<key>SmartSpectraAPIKey</key>
+	<string>$(SMARTSPECTRA_API_KEY)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!-- Live Activities (Dynamic Island / Lock Screen) for the round timer.

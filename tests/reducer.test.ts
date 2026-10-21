@@ -120,3 +120,26 @@ describe('reducer purity', () => {
     expect(reducer(dirty, { type: 'RESET' }).workoutLogs).toEqual([]);
   });
 });
+
+describe('UPSERT_HRV', () => {
+  const reading = { campId: 'c', date: '2026-08-01', rmssd: 60, restingHR: 52, source: 'camera' as const };
+
+  it('keeps one reading per camp, day and source, correcting rather than duplicating', () => {
+    const first = reducer(createDefaultState(), { type: 'UPSERT_HRV', payload: reading });
+    const original = first.hrvEntries[0];
+    const second = reducer(first, { type: 'UPSERT_HRV', payload: { ...reading, rmssd: 64, restingHR: 50 } });
+
+    expect(second.hrvEntries).toHaveLength(1);
+    expect(second.hrvEntries[0]).toMatchObject({ rmssd: 64, restingHR: 50 });
+    // Stable identity, so cloud sync updates the row instead of orphaning it.
+    expect(second.hrvEntries[0].id).toBe(original.id);
+    expect(second.hrvEntries[0].createdAt).toBe(original.createdAt);
+  });
+
+  it('keeps readings from different sources or days apart', () => {
+    let state = reducer(createDefaultState(), { type: 'UPSERT_HRV', payload: reading });
+    state = reducer(state, { type: 'UPSERT_HRV', payload: { ...reading, source: 'fitbit' } });
+    state = reducer(state, { type: 'UPSERT_HRV', payload: { ...reading, date: '2026-08-02' } });
+    expect(state.hrvEntries).toHaveLength(3);
+  });
+});

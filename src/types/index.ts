@@ -327,7 +327,15 @@ export interface NutritionLog {
 
 // ─── Fitness Tracker / HRV ───────────────────────────────────────────────
 
-export type HRVSource = 'bluetooth' | 'apple_health' | 'fitbit' | 'garmin' | 'whoop' | 'polar_flow' | 'manual';
+/**
+ * Where a reading came from. `camera` is a seated SmartSpectra check measured
+ * from the front camera — a different context from overnight wearable HRV, so
+ * baselines are always compared within one source (see `compareHRVToBaseline`).
+ *
+ * `hrv_entries.source` is unconstrained text, so adding a value here needs no
+ * migration.
+ */
+export type HRVSource = 'bluetooth' | 'apple_health' | 'fitbit' | 'garmin' | 'whoop' | 'polar_flow' | 'manual' | 'camera';
 
 export interface HRVEntry {
   id: string;

@@ -255,6 +255,9 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           # Production RevenueCat key injected into the Release build.
           REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+          # SmartSpectra (camera vitals) key. Optional: unset, the build ships
+          # with the feature reporting "not configured" and hidden.
+          SMARTSPECTRA_API_KEY: ${{ secrets.SMARTSPECTRA_API_KEY }}
           # Shared signing via fastlane match. When these are unset the Fastfile
           # falls back to automatic signing, so the pipeline keeps working until
           # they're configured (see docs/ios-signing.md).

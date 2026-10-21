@@ -5,13 +5,64 @@ import { formatWeightDelta } from './units';
 import { getWeekNumberForDate } from './campGenerator';
 import { latestComparableTrend } from './conditioningMetrics';
 import { readinessColor } from './designTokens';
+import { compareHRVToBaseline, HRV_SUPPRESSED_PCT, type HRVBaselineComparison } from './hrvBaseline';
 
 export interface ReadinessBreakdownItem {
   label: string;
   score: number;
   max: number;
   detail: string;
-  icon: 'scale' | 'activity' | 'flame' | 'zap' | 'timer' | 'droplets';
+  icon: 'scale' | 'activity' | 'flame' | 'zap' | 'timer' | 'droplets' | 'heart';
+}
+
+/**
+ * Share of the readiness score carried by recovery vitals, once the fighter has
+ * an HRV baseline to compare against.
+ *
+ * Every other input is something the fighter logged; this is the only one
+ * measured from their body. It is held to 15% because a single morning reading
+ * is noisy and the baseline smooths only so much — enough to move the score
+ * when recovery is genuinely lagging, not enough for one bad reading to bury a
+ * well-run camp.
+ */
+export const VITALS_WEIGHT = 15;
+
+/**
+ * Recovery vitals as a 0..1 ratio: HRV against baseline, with resting heart
+ * rate folded in when the source recorded it.
+ *
+ * The HRV bands are derived from HRV_SUPPRESSED_PCT, the line camp adaptation
+ * already uses to propose a deload, so the two features read the same week the
+ * same way. Resting HR varies by 2–3 bpm day to day; a sustained rise of ~5 bpm
+ * over a fighter's own baseline is the usual flag for accumulated fatigue,
+ * illness or dehydration — the last one being live for a fighter mid-cut.
+ * These are heuristic bands, not clinical thresholds.
+ */
+export function vitalsRatio(c: HRVBaselineComparison): number {
+  const pct = c.deltaPct;
+  const hrv =
+    pct > HRV_SUPPRESSED_PCT / 2 ? 1 :
+    pct > HRV_SUPPRESSED_PCT     ? 0.75 :
+    pct > HRV_SUPPRESSED_PCT * 2 ? 0.45 : 0.2;
+  if (!c.restingHR) return hrv;
+
+  const bpm = c.restingHR.deltaBpm;
+  const rhr =
+    bpm <= 2 ? 1 :
+    bpm <= 4 ? 0.75 :
+    bpm <= 7 ? 0.45 : 0.2;
+  return 0.7 * hrv + 0.3 * rhr;
+}
+
+function hrvPhrase(pct: number): string {
+  if (pct === 0) return 'HRV at baseline';
+  return `HRV ${Math.abs(pct)}% ${pct < 0 ? 'below' : 'above'} baseline`;
+}
+
+function restingHRPhrase(deltaBpm: number): string {
+  const d = Math.round(deltaBpm);
+  if (d === 0) return 'resting HR at baseline';
+  return `resting HR ${d > 0 ? 'up' : 'down'} ${Math.abs(d)} bpm`;
 }
 
 export interface ReadinessResult {
@@ -276,11 +327,35 @@ export function computeReadiness(state: AppState, asOf: Date = new Date()): Read
   }
   const nutritionScore = scale(nutritionRatio, w.nutrition);
 
+  // ── 7. Recovery Vitals (blended, max = VITALS_WEIGHT) ────────────────────
+  // Present only once the fighter has an HRV baseline. Without one this
+  // section does not exist at all — no breakdown card, no coverage signal, no
+  // effect on the score — so a fighter on the web, on an older iPhone, or who
+  // simply never measures gets exactly the score they always did. Absence is
+  // not scored as a weakness: nothing else in the app asks for vitals, so
+  // marking a fighter down for not having them would penalise the hardware
+  // they own rather than how their camp is going.
+  const vitals = compareHRVToBaseline(
+    (state.hrvEntries ?? []).filter(e => e.campId === activeCamp.id),
+    now,
+  );
+  const vitalsScore = vitals ? scale(vitalsRatio(vitals), VITALS_WEIGHT) : 0;
+
   // ── Overall + data confidence ─────────────────────────────────────────────
-  const overall = Math.min(
+  const baseOverall = Math.min(
     100,
     weightScore + volumeScore + qualityScore + sparScore + condScore + nutritionScore,
   );
+  // Vitals are blended rather than added as a seventh weight, because the six
+  // weights are the fighter's own and need not sum to 100: adding 15 points of
+  // headroom would let a custom-weighted fighter's score jump the moment their
+  // baseline completed. The blend moves the score at most VITALS_WEIGHT points
+  // in either direction, whatever the weights.
+  const overall = vitals
+    ? Math.min(100, Math.round(
+        (1 - VITALS_WEIGHT / 100) * baseOverall + VITALS_WEIGHT * vitalsRatio(vitals),
+      ))
+    : baseOverall;
 
   const breakdown: ReadinessBreakdownItem[] = [
     { label: 'Weight Cut',      score: weightScore,    max: w.weightCut,       detail: weightDetail,    icon: 'scale' },
@@ -290,6 +365,12 @@ export function computeReadiness(state: AppState, asOf: Date = new Date()): Read
     { label: 'Conditioning',    score: condScore,      max: w.conditioning,    detail: condDetail,       icon: 'timer' },
     { label: 'Nutrition',       score: nutritionScore, max: w.nutrition,       detail: nutritionDetail,  icon: 'droplets' },
   ];
+  if (vitals) {
+    const detail = vitals.restingHR
+      ? `${hrvPhrase(vitals.deltaPct)} · ${restingHRPhrase(vitals.restingHR.deltaBpm)}`
+      : hrvPhrase(vitals.deltaPct);
+    breakdown.push({ label: 'Recovery Vitals', score: vitalsScore, max: VITALS_WEIGHT, detail, icon: 'heart' });
+  }
 
   const coverageSignals = [
     !hasFightWeightTarget || Boolean(latestWeight),
@@ -324,6 +405,15 @@ export function computeReadiness(state: AppState, asOf: Date = new Date()): Read
       insights.push('Repeat the same conditioning test under similar conditions to establish a trustworthy trend.');
     } else if (item.label === 'Nutrition') {
       insights.push('Track meals and hydration consistently so the recovery component is based on current data.');
+    } else if (item.label === 'Recovery Vitals' && vitals) {
+      const rhrUp = vitals.restingHR !== null && vitals.restingHR.deltaBpm > 4;
+      if (vitals.deltaPct <= HRV_SUPPRESSED_PCT) {
+        insights.push(`HRV is ${Math.abs(vitals.deltaPct)}% below your baseline${rhrUp ? ' and resting heart rate is up' : ''} — you are not absorbing recent work yet. Protect sleep and keep intensity in check until it recovers.`);
+      } else if (rhrUp) {
+        insights.push(`Resting heart rate is up ${Math.round(vitals.restingHR!.deltaBpm)} bpm on your baseline — check sleep, hydration and illness before pushing intensity.`);
+      } else {
+        insights.push('Recovery vitals are drifting below your baseline; prioritise sleep and hydration this week.');
+      }
     }
   }
 

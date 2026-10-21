@@ -4,7 +4,10 @@
  * redacts payloads.
  */
 
-const SENSITIVE_KEY = /token|password|authorization|cookie|secret|refresh|access_token|id_token|client_secret|bearer|session|email|phone|ssn|weight|hrv|rmssd|fitbit|stripe|revenuecat/i;
+// Vitals keys (restingHR, pulseRate, breathingRate, heart*) are health data on
+// the same footing as hrv/rmssd: camera vitals checks and wearable syncs both
+// carry them through app state.
+const SENSITIVE_KEY = /token|password|authorization|cookie|secret|refresh|access_token|id_token|client_secret|bearer|session|email|phone|ssn|weight|hrv|rmssd|resting|pulse|breathing|heart|fitbit|stripe|revenuecat/i;
 
 const REDACTED = '[redacted]';
 

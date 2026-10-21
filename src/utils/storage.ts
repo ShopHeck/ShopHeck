@@ -677,6 +677,28 @@ export function addHRVEntry(state: AppState, entry: Omit<HRVEntry, 'id' | 'creat
   return { ...state, hrvEntries: [newEntry, ...(state.hrvEntries ?? [])] };
 }
 
+/**
+ * Record a reading as the one canonical entry for its camp, date and source.
+ *
+ * A second vitals check on the same morning corrects the first rather than
+ * adding to it: the baseline averages readings, so two rows for one day would
+ * count that day twice. The original id/createdAt stay stable for cloud sync,
+ * the same rule `addWeightEntry` follows.
+ */
+export function upsertHRVEntry(state: AppState, entry: Omit<HRVEntry, 'id' | 'createdAt'>): AppState {
+  const entries = state.hrvEntries ?? [];
+  const existing = entries.find(
+    e => e.campId === entry.campId && e.date === entry.date && e.source === entry.source,
+  );
+  if (existing) {
+    return {
+      ...state,
+      hrvEntries: entries.map(e => (e.id === existing.id ? { ...existing, ...entry } : e)),
+    };
+  }
+  return addHRVEntry(state, entry);
+}
+
 export function deleteHRVEntry(state: AppState, id: string): AppState {
   return { ...state, hrvEntries: (state.hrvEntries ?? []).filter(e => e.id !== id) };
 }
