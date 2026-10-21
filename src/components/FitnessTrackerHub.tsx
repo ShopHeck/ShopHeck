@@ -75,6 +75,7 @@ const SOURCE_LABELS: Record<HRVSource, string> = {
   whoop:       'Whoop',
   polar_flow:  'Polar Flow',
   manual:      'Manual',
+  camera:      'Camera check',
 };
 
 // ─── Main component ───────────────────────────────────────────────────────

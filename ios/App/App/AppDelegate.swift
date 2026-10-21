@@ -19,6 +19,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(LiveActivityPlugin())
         bridge?.registerPluginInstance(WatchBridgePlugin())
         bridge?.registerPluginInstance(TimerBellSchedulerPlugin())
+        bridge?.registerPluginInstance(SmartSpectraPlugin())
     }
 }
 

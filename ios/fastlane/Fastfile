@@ -546,6 +546,12 @@ platform :ios do
   private_lane :archive_app do
     rc_key = ENV["REVENUECAT_API_KEY"].to_s.strip
     validate_revenuecat_key!(rc_key)
+    # Optional, unlike the RevenueCat key: without it the build ships with
+    # camera vitals reporting "not configured" and the feature hidden, rather
+    # than crashing. Passed single-quoted like rc_key, so a quote would break
+    # the xcargs string — refuse it here instead of building a broken binary.
+    ss_key = ENV["SMARTSPECTRA_API_KEY"].to_s.strip
+    UI.user_error!("SMARTSPECTRA_API_KEY must not contain quotes") if ss_key.include?("'")
 
     sync_extension_versions
 
@@ -579,7 +585,7 @@ platform :ios do
         clean: true,
         output_directory: "./build",
         output_name: "FightCampTraining.ipa",
-        xcargs: "#{signing_args} REVENUECAT_API_KEY='#{rc_key}'",
+        xcargs: "#{signing_args} REVENUECAT_API_KEY='#{rc_key}' SMARTSPECTRA_API_KEY='#{ss_key}'",
         export_options: {
           signingStyle: "automatic",
           teamID: TEAM_ID
@@ -623,7 +629,7 @@ platform :ios do
         clean: true,
         output_directory: "./build",
         output_name: "FightCampTraining.ipa",
-        xcargs: "REVENUECAT_API_KEY='#{rc_key}'",
+        xcargs: "REVENUECAT_API_KEY='#{rc_key}' SMARTSPECTRA_API_KEY='#{ss_key}'",
         export_options: {
           signingStyle: "manual",
           teamID: TEAM_ID,

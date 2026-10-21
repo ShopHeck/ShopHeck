@@ -3,6 +3,7 @@ import type { AppState, FightCamp, TrainingWeek, TrainingSession, CampAdaptation
 import { computeReadiness } from './readiness';
 import { getWeekNumberForDate, generateTrainingCamp } from './campGenerator';
 import { weekAdherence } from './adherence';
+import { compareHRVToBaseline, HRV_SUPPRESSED_PCT } from './hrvBaseline';
 
 /**
  * Adaptive Camp — the generated plan reacts to how the fighter is actually
@@ -51,13 +52,6 @@ export interface AdaptationSignals {
   sessions7d: number;
 }
 
-/** Days of HRV used as the fighter's own baseline. */
-const HRV_BASELINE_DAYS = 28;
-/** Days of HRV treated as "recent" and compared against that baseline. */
-const HRV_RECENT_DAYS = 5;
-/** Minimum readings in each window before an HRV comparison means anything. */
-const HRV_MIN_READINGS = 3;
-
 function mean(values: number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -66,34 +60,14 @@ function mean(values: number[]): number | null {
 /**
  * HRV as a percentage of the fighter's own rolling baseline.
  *
- * Deliberately relative, never absolute: population HRV ranges span an order of
- * magnitude, so "RMSSD 45" says nothing without knowing whose wrist it came
- * from. The baseline window excludes the recent window so a genuinely
- * suppressed stretch cannot drag its own comparison down and hide itself.
+ * The windows, the per-source rule and the reasoning behind both live in
+ * `compareHRVToBaseline`, which the readiness score reads too — one definition,
+ * so adaptation and readiness cannot disagree about the same week.
  */
 export function hrvDeltaPct(state: AppState, now: Date): number | null {
   const entries = (state.hrvEntries ?? [])
     .filter(e => state.activeCamp === null || e.campId === state.activeCamp.id);
-  if (entries.length === 0) return null;
-
-  const recentFrom = subDays(now, HRV_RECENT_DAYS);
-  const baselineFrom = subDays(now, HRV_BASELINE_DAYS);
-
-  const recent: number[] = [];
-  const baseline: number[] = [];
-  for (const e of entries) {
-    const d = parseISO(e.date);
-    if (d > now) continue; // never let a future-dated entry leak in
-    if (d >= recentFrom) recent.push(e.rmssd);
-    else if (d >= baselineFrom) baseline.push(e.rmssd);
-  }
-
-  if (recent.length < HRV_MIN_READINGS || baseline.length < HRV_MIN_READINGS) return null;
-
-  const r = mean(recent)!;
-  const b = mean(baseline)!;
-  if (b <= 0) return null;
-  return Math.round(((r - b) / b) * 100);
+  return compareHRVToBaseline(entries, now)?.deltaPct ?? null;
 }
 
 export function readAdaptationSignals(state: AppState, now: Date = new Date()): AdaptationSignals {
@@ -144,8 +118,6 @@ export function adaptationKey(campId: string, weekNumber: number, kind: Adaptati
   return `${campId}:${weekNumber}:${kind}`;
 }
 
-/** HRV this far below baseline is a genuine suppression rather than noise. */
-const HRV_SUPPRESSED_PCT = -8;
 /** HRV comfortably above baseline — the fighter has absorbed the load. */
 const HRV_ELEVATED_PCT = 4;
 /** Readiness below this is a fighter who is not absorbing the plan. */

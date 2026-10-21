@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Scale, Activity, Flame, Zap, Timer, Droplets, AlertCircle } from 'lucide-react';
+import { Scale, Activity, Flame, Zap, Timer, Droplets, HeartPulse, AlertCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { computeReadiness } from '../utils/readiness';
 import type { ReadinessBreakdownItem } from '../utils/readiness';
 import GlassSurface from './shared/GlassSurface';
 import FightReadinessGauge from './shared/FightReadinessGauge';
+import MorningVitalsCard from './shared/MorningVitalsCard';
 import { PACE_COLORS, paceTier } from '../utils/designTokens';
 
 // ─── Breakdown card ───────────────────────────────────────────────────────────
@@ -16,6 +17,7 @@ const ICONS = {
   zap:      Zap,
   timer:    Timer,
   droplets: Droplets,
+  heart:    HeartPulse,
 } as const;
 
 function BreakdownCard({ item }: { item: ReadinessBreakdownItem }) {
@@ -130,6 +132,10 @@ export default function FightReadiness() {
           daysOut={daysUntilFight}
         />
       </GlassSurface>
+
+      {/* Morning vitals check. Renders nothing where the camera SDK can't run,
+          so the layout below is unchanged on the web and in builds without it. */}
+      <MorningVitalsCard />
 
       {/* Focus Areas — generated guidance, so the row template is what's locked
           here, not the text (§3.6). Caution-colored marker, not flame: these

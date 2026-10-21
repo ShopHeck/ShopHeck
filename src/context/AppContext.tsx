@@ -33,6 +33,7 @@ import {
   deleteCoachNote,
   linkCoach,
   addHRVEntry,
+  upsertHRVEntry,
   deleteHRVEntry,
   setFitbitConfig,
   addFightResult,
@@ -101,6 +102,7 @@ export type Action =
   | { type: 'LINK_COACH'; payload: string | null }
   | { type: 'SET_SUBSCRIPTION'; payload: SubscriptionState }
   | { type: 'LOG_HRV'; payload: Omit<HRVEntry, 'id' | 'createdAt'> }
+  | { type: 'UPSERT_HRV'; payload: Omit<HRVEntry, 'id' | 'createdAt'> }
   | { type: 'DELETE_HRV'; payload: string }
   | { type: 'SET_FITBIT_CONFIG'; payload: FitbitConfig | null }
   | { type: 'LOG_FIGHT_RESULT'; payload: FightResult }
@@ -266,6 +268,9 @@ function baseReducer(state: AppState, action: Action): AppState {
 
     case 'LOG_HRV':
       return addHRVEntry(state, action.payload);
+
+    case 'UPSERT_HRV':
+      return upsertHRVEntry(state, action.payload);
 
     case 'DELETE_HRV':
       return deleteHRVEntry(state, action.payload);
