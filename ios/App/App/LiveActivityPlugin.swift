@@ -122,15 +122,14 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             if existing.attributes.sessionId == sessionId {
                 currentActivity = existing
                 Task {
-                    // update(using:) is the 16.1 API; the ActivityContent-based
-                    // overload needs 16.2.
-                    await existing.update(using: state)
+                    await existing.update(ActivityContent(state: state, staleDate: nil))
                 }
                 call.resolve(["started": true])
                 return
             }
             Task {
-                await existing.end(using: nil)
+                // nil content ends the activity showing its last state.
+                await existing.end(nil, dismissalPolicy: .default)
             }
         }
         currentActivity = nil
@@ -166,9 +165,7 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         do {
             let state = try contentState(from: call)
             Task {
-                // update(using:) is the 16.1 API; the ActivityContent-based
-                // overload needs 16.2.
-                await activity.update(using: state)
+                await activity.update(ActivityContent(state: state, staleDate: nil))
             }
             call.resolve(["updated": true])
         } catch {
@@ -216,8 +213,7 @@ public class LiveActivityPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         guard !leftovers.isEmpty else { return }
         Task {
             for activity in leftovers {
-                // end(using:) is the 16.1 API; end(_:dismissalPolicy:) needs 16.2.
-                await activity.end(using: nil)
+                await activity.end(nil, dismissalPolicy: .default)
             }
         }
     }
