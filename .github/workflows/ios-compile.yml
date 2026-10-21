@@ -1,0 +1,87 @@
+name: iOS Compile Check
+
+# The TestFlight workflow (ios.yml) runs only after merge, so native Swift used
+# to compile for the first time on the trunk branch — where a mistake blocks
+# every TestFlight release until someone fixes it. This compiles the app on the
+# pull request instead: unsigned, for a generic iOS device, nothing archived or
+# uploaded, and no secrets needed.
+#
+# Path-filtered to the files that can break a native build, so web-only pull
+# requests never spend macOS minutes on it.
+
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ios-compile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-compile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same Xcode selection as ios.yml, so this compiles with the toolchain
+      # the release build will use.
+      - name: Select latest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Selecting $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # cap sync copies the built web assets into the app bundle, so it needs a
+      # build to copy. No VITE_* secrets: the bundle's contents don't affect
+      # whether the native code compiles.
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Install CocoaPods
+        run: pod install
+        working-directory: ios/App
+
+      # Release, because that is the configuration that ships. -quiet prints
+      # only warnings and errors, so a failure is readable in the log.
+      - name: Compile (unsigned, generic iOS device)
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -quiet \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO

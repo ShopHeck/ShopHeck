@@ -89,6 +89,12 @@ public class SmartSpectraPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             // the SDK; the key is set whenever present so either works alone.
             if let key = SmartSpectraPlugin.apiKey { sdk.config.apiKey = key }
             sdk.config.imageOutputEnabled = true
+            // Presage's aggregate diagnostics (device model, OS, session
+            // counts) default on and exist for their release metrics, not this
+            // app. Off, the SDK transmits nothing beyond key authentication —
+            // which is what the camera purpose string promises — and the app
+            // owes no extra privacy disclosure for it.
+            sdk.config.enableTelemetry = false
             sdk.config.requestedMetrics = SmartSpectraConfig.breathingMetrics + [.pulseRate, .hrv]
 
             self.measuring = true
