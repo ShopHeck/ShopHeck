@@ -29,6 +29,12 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
         if let bodyMass = HKQuantityType.quantityType(forIdentifier: .bodyMass) {
             types.insert(bodyMass)
         }
+        // HKWorkoutBuilder derives a workout's totalEnergyBurned from the
+        // active-energy samples added to it, so saveWorkout's energyKcal needs
+        // write access to this type.
+        if let activeEnergy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            types.insert(activeEnergy)
+        }
         return types
     }
 
@@ -108,27 +114,51 @@ public class HealthKitPlugin: CAPInstancePlugin, CAPBridgedPlugin {
             return
         }
 
-        var energy: HKQuantity?
-        if let kcal = call.getDouble("energyKcal"), kcal > 0 {
-            energy = HKQuantity(unit: .kilocalorie(), doubleValue: kcal)
+        let energySample: HKQuantitySample?
+        if let kcal = call.getDouble("energyKcal"), kcal > 0,
+           let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            energySample = HKQuantitySample(
+                type: energyType,
+                quantity: HKQuantity(unit: .kilocalorie(), doubleValue: kcal),
+                start: start,
+                end: end,
+                metadata: [HKMetadataKeyWasUserEntered: true]
+            )
+        } else {
+            energySample = nil
         }
 
-        let workout = HKWorkout(
-            activityType: activityType(for: call.getString("activityType")),
-            start: start,
-            end: end,
-            duration: end.timeIntervalSince(start),
-            totalEnergyBurned: energy,
-            totalDistance: nil,
-            metadata: [HKMetadataKeyWasUserEntered: true]
-        )
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = activityType(for: call.getString("activityType"))
+        // No device, as with the HKWorkout initializer this replaces. With no
+        // pause events the builder's duration is end - start, and with no
+        // distance samples totalDistance stays nil.
+        let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: configuration, device: nil)
 
-        healthStore.save(workout) { success, error in
-            if let error = error {
-                call.reject(error.localizedDescription)
-                return
+        let fail: (Error?) -> Void = { error in
+            builder.discardWorkout()
+            call.reject(error?.localizedDescription ?? "Could not save workout")
+        }
+        let finish: () -> Void = {
+            builder.endCollection(withEnd: end) { success, error in
+                guard success else { return fail(error) }
+                builder.finishWorkout { workout, error in
+                    if let error = error { return fail(error) }
+                    call.resolve(["saved": workout != nil])
+                }
             }
-            call.resolve(["saved": success])
+        }
+
+        builder.beginCollection(withStart: start) { success, error in
+            guard success else { return fail(error) }
+            builder.addMetadata([HKMetadataKeyWasUserEntered: true]) { success, error in
+                guard success else { return fail(error) }
+                guard let energySample = energySample else { return finish() }
+                builder.add([energySample]) { success, error in
+                    guard success else { return fail(error) }
+                    finish()
+                }
+            }
         }
     }
 
