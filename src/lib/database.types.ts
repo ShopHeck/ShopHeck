@@ -814,6 +814,7 @@ export type Database = {
           day_label: string
           deleted_at: string | null
           duration: number
+          energy_kcal: number | null
           id: string
           mep: number | null
           notes: string | null
@@ -832,6 +833,7 @@ export type Database = {
           day_label: string
           deleted_at?: string | null
           duration: number
+          energy_kcal?: number | null
           id?: string
           mep?: number | null
           notes?: string | null
@@ -850,6 +852,7 @@ export type Database = {
           day_label?: string
           deleted_at?: string | null
           duration?: number
+          energy_kcal?: number | null
           id?: string
           mep?: number | null
           notes?: string | null

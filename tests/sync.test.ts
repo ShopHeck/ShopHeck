@@ -274,6 +274,26 @@ describe('pullState — pagination', () => {
       expect(res.snapshot?.workoutLogs).toHaveLength(3);
     });
   });
+
+  it('maps energy_kcal to energyKcal, leaving untracked rows undefined', () => {
+    const row = {
+      camp_id: 'uuid-camp-x', date: '2026-02-01', week_number: 1, day_label: 'Monday',
+      session_type: 'skill', title: 'Pads', duration: 60, rpe: 7, notes: '', completed: true,
+      mep: null, created_at: '2026-02-01T00:00:00.000Z', deleted_at: null,
+    };
+    mock.rowsByTable.workout_logs = [
+      { ...row, id: 'uuid-kcal', energy_kcal: 540 },
+      { ...row, id: 'uuid-none', energy_kcal: null },
+      // A database without the migration returns no column at all.
+      { ...row, id: 'uuid-premigration' },
+    ];
+
+    return pullState('user-1').then(res => {
+      expect(res.ok).toBe(true);
+      const kcal = (res.snapshot?.workoutLogs ?? []).map(w => w.energyKcal);
+      expect(kcal).toEqual([540, undefined, undefined]);
+    });
+  });
 });
 
 describe('mergeCloud — restore', () => {

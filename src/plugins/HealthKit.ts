@@ -25,7 +25,11 @@ export interface HealthKitPlugin {
    * for import; write-only callers can pass `{ read: false }`.
    */
   requestAuthorization(opts?: { read?: boolean }): Promise<{ granted: boolean }>;
-  /** Writes a workout. Times are epoch milliseconds; `activityType` is a normalized string. */
+  /**
+   * Writes a workout. Times are epoch milliseconds; `activityType` is a normalized string.
+   * `energyKcal` is saved as an Active Energy sample attached to the workout; if Active
+   * Energy write access is not granted the whole call rejects and nothing is saved.
+   */
   saveWorkout(opts: {
     activityType: string;
     startMs: number;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Trash2, Clock, Zap, Activity, Share2 } from 'lucide-react';
+import { Plus, Dumbbell, Trash2, Clock, Zap, Activity, Share2, Flame } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getWeekNumberForDate } from '../utils/campGenerator';
 import { format, parseISO } from 'date-fns';
@@ -7,7 +7,8 @@ import ConfirmDialog from './shared/ConfirmDialog';
 import Modal from './shared/Modal';
 import ShareCard from './ShareCard';
 import type { SessionType, WorkoutLog } from '../types';
-import { writeWorkoutToHealth } from '../utils/healthSync';
+import { isHealthWriteEnabled, writeWorkoutToHealth } from '../utils/healthSync';
+import { MAX_SESSION_KCAL, bodyWeightLbsOn, estimateActiveKcal, parseSessionKcal } from '../utils/workoutEnergy';
 import { todayISO, isFutureISODate } from '../utils/dates';
 import type { LogPrefill } from '../App';
 
@@ -52,6 +53,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
   const [wDuration, setWDuration] = useState('60');
   const [wRpe, setWRpe] = useState('7');
   const [wNotes, setWNotes] = useState('');
+  const [wKcal, setWKcal] = useState('');
   /**
    * Scheduled session this modal was opened for, if any. Held until save (not
    * read off `prefill`, which AppShell clears as soon as it is consumed) and
@@ -115,10 +117,18 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
     conditioning: campCond.length,
   };
 
+  const kcal = parseSessionKcal(wKcal);
+  const kcalEstimate = estimateActiveKcal({
+    sessionType: wType,
+    durationMin: parseInt(wDuration),
+    rpe: parseInt(wRpe),
+    weightLbs: bodyWeightLbsOn(camp, state.weightEntries, wDate),
+  });
+
   function logWorkout() {
     // Logs are records of completed training — future dates would inflate
     // weekly volume and streaks with sessions that haven't happened.
-    if (!wTitle.trim() || isFutureISODate(wDate)) return;
+    if (!wTitle.trim() || isFutureISODate(wDate) || kcal === 'invalid') return;
     const payload: Omit<WorkoutLog, 'id' | 'createdAt'> = {
       campId: camp.id,
       date: wDate,
@@ -132,6 +142,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       rpe: parseInt(wRpe),
       notes: wNotes,
       completed: true,
+      ...(kcal !== undefined ? { energyKcal: kcal } : {}),
     };
     dispatch({ type: 'LOG_WORKOUT', payload });
     // Logging a scheduled session IS completing it — the planner tick and the
@@ -139,7 +150,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
     // the session sitting unchecked on the plan.
     if (wSessionKey) dispatch({ type: 'SET_SESSION_COMPLETE', payload: wSessionKey });
     void writeWorkoutToHealth(payload);
-    setWTitle(''); setWNotes(''); closeWorkoutModal();
+    setWTitle(''); setWNotes(''); setWKcal(''); closeWorkoutModal();
   }
 
   /** Closing always drops the session link — see `wSessionKey`. */
@@ -250,9 +261,12 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
                         </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Clock size={11} /> {log.duration}min</span>
                       <span className="flex items-center gap-1"><Zap size={11} /> RPE {log.rpe}/10</span>
+                      {log.energyKcal !== undefined && (
+                        <span className="flex items-center gap-1"><Flame size={11} /> {log.energyKcal} kcal</span>
+                      )}
                       <span>{format(parseISO(log.date), 'MMM d')}</span>
                     </div>
                     {log.notes && <p className="text-xs text-gray-450 mt-1 italic">{log.notes}</p>}
@@ -346,7 +360,7 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
       {/* Log Workout Modal */}
       {showModal && (
         <Modal title="Log Workout" onClose={closeWorkoutModal} footer={
-          <button onClick={logWorkout} disabled={!wTitle.trim()} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
+          <button onClick={logWorkout} disabled={!wTitle.trim() || kcal === 'invalid'} className="btn-primary w-full disabled:opacity-50">Save Workout</button>
         }>
           <div className="space-y-4">
             <div>
@@ -382,6 +396,31 @@ export default function WorkoutLogger({ prefill, onPrefillConsumed }: Props) {
               <label className="label mb-0" htmlFor="wl-rpe">Effort: {wRpe}/10</label>
               <input id="wl-rpe" type="range" min="1" max="10" value={wRpe} onChange={e => setWRpe(e.target.value)}
                 className="w-full accent-brand-500 mt-2" />
+            </div>
+            <div>
+              <label className="block">
+                <span className="label">Active Calories (kcal)</span>
+                <input className="input" type="number" inputMode="numeric" min="1" max={MAX_SESSION_KCAL} step="1"
+                  placeholder="Optional — from your watch or tracker" value={wKcal} onChange={e => setWKcal(e.target.value)}
+                  aria-invalid={kcal === 'invalid'} aria-describedby="wl-kcal-help" />
+              </label>
+              <div id="wl-kcal-help" className="mt-1 space-y-1">
+                {kcal === 'invalid' && (
+                  <p className="text-xs text-red-400">Enter a whole number from 1 to {MAX_SESSION_KCAL}.</p>
+                )}
+                {kcalEstimate !== null && wKcal.trim() === '' && (
+                  <p className="text-xs text-gray-450">
+                    <button type="button" onClick={() => setWKcal(String(kcalEstimate))}
+                      className="font-semibold text-brand-400 hover:text-brand-300">
+                      Use estimate: ~{kcalEstimate} kcal
+                    </button>
+                    {' '}— from session type, effort, duration and your latest weigh-in.
+                  </p>
+                )}
+                {isHealthWriteEnabled() && (
+                  <p className="text-xs text-gray-450">Saved to Apple Health as Active Energy.</p>
+                )}
+              </div>
             </div>
             <div>
               <label className="block">

@@ -63,16 +63,45 @@ function clampedWindow(date: string, durationMin: number): { startMs: number; en
   return { startMs: endMs - durMs, endMs };
 }
 
-/** Fire-and-forget: mirror a just-logged workout (duration in minutes) into Apple Health. */
-export async function writeWorkoutToHealth(w: { sessionType: SessionType; date: string; duration: number }): Promise<void> {
+/**
+ * Fire-and-forget: mirror a just-logged workout (duration in minutes) into Apple
+ * Health, with its active calories as Active Energy when the fighter logged them.
+ */
+export async function writeWorkoutToHealth(w: {
+  sessionType: SessionType;
+  date: string;
+  duration: number;
+  energyKcal?: number;
+}): Promise<void> {
   if (!isHealthWriteEnabled()) return;
   const activityType = ACTIVITY_BY_SESSION[w.sessionType];
   if (!activityType || !(w.duration > 0)) return;
   const { startMs, endMs } = clampedWindow(w.date, w.duration);
+  const energyKcal = w.energyKcal !== undefined && w.energyKcal > 0 ? w.energyKcal : undefined;
+
+  if (energyKcal !== undefined) {
+    // Active Energy joined the write set after Health write shipped, so a
+    // fighter who turned it on earlier has never been asked for it. HealthKit
+    // only shows the sheet for types not yet decided, so for everyone else
+    // this returns without UI.
+    try {
+      await HealthKit.requestAuthorization({ read: false });
+    } catch {
+      /* the save below still runs */
+    }
+  }
+
   try {
-    await HealthKit.saveWorkout({ activityType, startMs, endMs });
+    await HealthKit.saveWorkout({ activityType, startMs, endMs, ...(energyKcal !== undefined ? { energyKcal } : {}) });
   } catch {
-    /* best-effort */
+    // Natively, a declined Active Energy rejects the whole save. The workout
+    // itself still belongs in Health, so retry without the calories.
+    if (energyKcal === undefined) return;
+    try {
+      await HealthKit.saveWorkout({ activityType, startMs, endMs });
+    } catch {
+      /* best-effort */
+    }
   }
 }
 

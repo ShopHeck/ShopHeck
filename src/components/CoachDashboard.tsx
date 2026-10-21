@@ -392,7 +392,9 @@ export default function CoachDashboard({ mode = 'overview', onNavigate }: Props)
                     <div key={w.id} className="card flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-white">{w.title}</p>
-                        <p className="text-xs text-gray-400">{format(parseISO(w.date), 'MMM d')} · RPE {w.rpe}</p>
+                        <p className="text-xs text-gray-400">
+                          {format(parseISO(w.date), 'MMM d')} · RPE {w.rpe}{w.energy_kcal != null ? ` · ${w.energy_kcal} kcal` : ''}
+                        </p>
                       </div>
                       <span className="text-xs text-gray-400">{w.duration}min</span>
                     </div>

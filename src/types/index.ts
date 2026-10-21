@@ -84,6 +84,8 @@ export interface WorkoutLog {
   completed: boolean;
   createdAt: string;
   mep?: number; // MyZone Effort Points earned during session
+  /** Active calories (kcal), typed or an accepted estimate. Undefined = not tracked. */
+  energyKcal?: number;
 }
 
 export interface SparringLog {
