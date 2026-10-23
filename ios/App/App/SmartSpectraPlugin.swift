@@ -210,6 +210,8 @@ private struct VitalsCaptureView: View {
     @State private var hrv: [Hrv] = []
     @State private var validSeconds: Double = 0
     @State private var finished = false
+    /// Settled by `finish`, delivered by `run` once the SDK has stopped.
+    @State private var pendingOutcome: VitalsCaptureOutcome?
 
     /// Changes whenever a new rate or HRV sample lands. Each metrics payload
     /// carries only the samples since the previous one, so this is the trigger
@@ -233,7 +235,10 @@ private struct VitalsCaptureView: View {
         VStack(spacing: 24) {
             HStack {
                 Spacer()
-                Button("Cancel") { finish(.cancelled) }
+                // The screen closes only once the SDK has stopped, which can
+                // take a moment when Cancel lands during startup.
+                Button(finished ? "Stopping\u{2026}" : "Cancel") { finish(.cancelled) }
+                    .disabled(finished)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.white)
             }
@@ -304,11 +309,16 @@ private struct VitalsCaptureView: View {
     }
 
     private func run() async {
+        // A failed session leaves the shared SDK in its error state, where a
+        // new start() fails too; reset() is the SDK's documented recovery.
+        if sdk.processingStatus == .error { try? await sdk.reset() }
+        // `error` is the SDK's latest error, which may be from an earlier
+        // check rather than this one.
+        let staleError = sdk.error
         do {
             try await sdk.start()
         } catch {
-            finish(.failed(error.localizedDescription))
-            return
+            finish(.failed(vitalsFailureMessage(error)))
         }
 
         // Collect until there is enough valid signal AND a stable HRV window,
@@ -320,7 +330,14 @@ private struct VitalsCaptureView: View {
         var elapsed = 0.0
         while !finished {
             try? await Task.sleep(nanoseconds: 250_000_000)
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                finish(.cancelled)
+                break
+            }
+            if let message = terminalFailure(ignoring: staleError) {
+                finish(.failed(message))
+                break
+            }
             elapsed += tick
             if case .ok? = sdk.validationStatus?.code {
                 validSeconds += tick
@@ -328,8 +345,34 @@ private struct VitalsCaptureView: View {
             let enoughSignal = validSeconds >= Double(targetSeconds)
             if (enoughSignal && hasStableHRV) || elapsed >= cap { break }
         }
-        guard !finished else { return }
-        finish(summarise())
+        if !finished { finish(summarise()) }
+        // start() and stop() stay on this one task. A Cancel that lands while
+        // start() is suspended waits for it here, so the camera is never left
+        // running behind a closed screen; and the screen closes, letting
+        // another check begin, only once the SDK has stopped.
+        try? await sdk.stop()
+        if let outcome = pendingOutcome { onFinish(outcome) }
+    }
+
+    /// A failure that has ended the measurement, if any. Usage entitlement is
+    /// re-checked throughout a measurement, and a rejected key, exhausted quota
+    /// or failed refresh ends it on `error` after start() has succeeded.
+    /// Waiting out the cap would then report "no steady pulse" for a check
+    /// that never had a chance, or summarise samples from a run that failed.
+    private func terminalFailure(ignoring stale: SmartSpectraError?) -> String? {
+        if let error = sdk.error, error != stale {
+            switch error.code {
+            case .authenticationFailed, .creditExhausted, .networkError:
+                return vitalsFailureMessage(error)
+            default:
+                break
+            }
+        }
+        // The pipeline has stopped for any other reason: no more samples.
+        if sdk.processingStatus == .error {
+            return sdk.error.map { vitalsFailureMessage($0) } ?? "The vitals check stopped unexpectedly. Try again."
+        }
+        return nil
     }
 
     private func summarise() -> VitalsCaptureOutcome {
@@ -366,8 +409,22 @@ private struct VitalsCaptureView: View {
     private func finish(_ outcome: VitalsCaptureOutcome) {
         guard !finished else { return }
         finished = true
-        Task { try? await sdk.stop() }
-        onFinish(outcome)
+        pendingOutcome = outcome
+    }
+}
+
+/// What the fighter is told when the SDK fails. The SDK's messages are written
+/// for developers, and the account-side causes (key, quota, configuration,
+/// Presage's servers) are nothing the fighter can fix.
+private func vitalsFailureMessage(_ error: Error) -> String {
+    guard let error = error as? SmartSpectraError else { return error.localizedDescription }
+    switch error.code {
+    case .authenticationFailed, .creditExhausted, .configurationFailed, .serverError:
+        return "Camera vitals aren't available right now. Try again later."
+    case .networkError:
+        return "The vitals check needs an internet connection. Check your connection and try again."
+    default:
+        return error.message
     }
 }
 
